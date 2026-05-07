@@ -38,7 +38,7 @@ public sealed class TagValueJob(
         try
         {
             var value = valueGenerator.GenerateTag(tag.Emulator, tag, now);
-            stateStore.Set(emulatorId, tagId, tag.Name, value, now);
+            stateStore.Set(emulatorId, tagId, tag.Name, value.NumericValue ?? 0, now);
         }
         catch (Exception ex)
         {

@@ -4,27 +4,83 @@ using UniEmu.Features.Contracts;
 
 namespace UniEmu.Runtime;
 
+public sealed record GeneratedTagValue(
+    string Key,
+    string Name,
+    object? Value,
+    double? NumericValue,
+    SpecialParameter? SpecialParameter);
+
 public sealed class TelemetryValueGenerator
 {
     public IReadOnlyDictionary<string, double> Generate(EmulatorEntity emulator, IReadOnlyList<EmulatorTagEntity> tags, DateTimeOffset timestamp)
     {
-        var values = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var tag in tags)
-        {
-            values[tag.Name] = GenerateTag(emulator, tag, timestamp);
-        }
-
-        return values;
+        return GenerateTagValues(emulator, tags, timestamp)
+            .Where(value => value.NumericValue is not null)
+            .ToDictionary(value => value.Key, value => value.NumericValue!.Value, StringComparer.OrdinalIgnoreCase);
     }
 
-    public double GenerateTag(EmulatorEntity emulator, EmulatorTagEntity tag, DateTimeOffset timestamp)
+    public IReadOnlyList<GeneratedTagValue> GenerateTagValues(EmulatorEntity emulator, IReadOnlyList<EmulatorTagEntity> tags, DateTimeOffset timestamp)
+    {
+        return tags
+            .Select(tag => GenerateTag(emulator, tag, timestamp))
+            .ToList();
+    }
+
+    public GeneratedTagValue GenerateTag(EmulatorEntity emulator, EmulatorTagEntity tag, DateTimeOffset timestamp)
+    {
+        var numericValue = GenerateNumericTag(emulator, tag, timestamp);
+        var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
+        var value = CastValue(tagType, tag, numericValue);
+        SpecialParameter? specialParameter = string.IsNullOrWhiteSpace(tag.SpecialParameter)
+            ? null
+            : UniEmuJson.EnumValue<SpecialParameter>(tag.SpecialParameter);
+
+        return new GeneratedTagValue(tag.Key, tag.Name, value, ToNumericValue(value), specialParameter);
+    }
+
+    private static double GenerateNumericTag(EmulatorEntity emulator, EmulatorTagEntity tag, DateTimeOffset timestamp)
     {
         var elapsedSec = emulator.StartedAt is null
             ? 0
             : Math.Max(0, (timestamp - emulator.StartedAt.Value).TotalSeconds);
 
         return GenerateTagValue(tag, elapsedSec);
+    }
+
+    private static object? CastValue(TagType tagType, EmulatorTagEntity tag, double numericValue)
+    {
+        return tagType switch
+        {
+            TagType.Bool => numericValue != 0,
+            TagType.Int => (int)Math.Round(numericValue),
+            TagType.Double => numericValue,
+            TagType.String => GetStringValue(tag, numericValue),
+            _ => null,
+        };
+    }
+
+    private static string GetStringValue(EmulatorTagEntity tag, double numericValue)
+    {
+        var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+        if (source is TagSource.Static or TagSource.Script or TagSource.Cnc)
+        {
+            return tag.Preview;
+        }
+
+        return numericValue.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static double? ToNumericValue(object? value)
+    {
+        return value switch
+        {
+            bool boolValue => boolValue ? 1 : 0,
+            int intValue => intValue,
+            double doubleValue => doubleValue,
+            float floatValue => floatValue,
+            _ => null,
+        };
     }
 
     private static double GenerateTagValue(EmulatorTagEntity tag, double elapsedSec)
