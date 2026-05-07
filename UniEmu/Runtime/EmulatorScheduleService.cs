@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Quartz.Impl.Matchers;
+using UniEmu.Common;
+using UniEmu.Contracts.Dtos;
+using UniEmu.Contracts.Enums;
 using UniEmu.Data;
-using UniEmu.Features.Contracts;
+using UniEmu.Domain.Entities;
 
 namespace UniEmu.Runtime;
 

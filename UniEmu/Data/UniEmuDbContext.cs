@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UniEmu.Domain.Entities;
 
 namespace UniEmu.Data;
 

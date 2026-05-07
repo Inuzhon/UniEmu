@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using UniEmu.Contracts.Dtos;
+using UniEmu.Contracts.Enums;
+using UniEmu.Contracts.Requests;
 using UniEmu.Data;
-using UniEmu.Features.Contracts;
+using UniEmu.Domain.Entities;
+using UniEmu.Mapping;
 using UniEmu.Runtime;
 
 namespace UniEmu.Features.Emulators;

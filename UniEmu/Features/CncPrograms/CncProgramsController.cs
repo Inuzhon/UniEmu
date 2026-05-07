@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using UniEmu.Features.Contracts;
+using UniEmu.Contracts.Dtos;
+using UniEmu.Contracts.Enums;
+using UniEmu.Contracts.Requests;
 
 namespace UniEmu.Features.CncPrograms;
 

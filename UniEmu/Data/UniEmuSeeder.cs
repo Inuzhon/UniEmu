@@ -1,4 +1,7 @@
-using UniEmu.Features.Contracts;
+using UniEmu.Common;
+using UniEmu.Contracts.Dtos;
+using UniEmu.Contracts.Enums;
+using UniEmu.Domain.Entities;
 
 namespace UniEmu.Data;
 

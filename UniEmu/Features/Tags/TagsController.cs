@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using UniEmu.Features.Contracts;
+using UniEmu.Contracts.Dtos;
+using UniEmu.Contracts.Requests;
 
 namespace UniEmu.Features.Tags;
 
