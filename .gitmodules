@@ -1,0 +1,3 @@
+[submodule "UniEmu.Client"]
+	path = UniEmu.Client
+	url = https://github.com/xarleyn/emulator-hub.git
