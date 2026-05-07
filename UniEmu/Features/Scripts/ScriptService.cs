@@ -1,0 +1,97 @@
+using Microsoft.EntityFrameworkCore;
+using UniEmu.Data;
+using UniEmu.Features.Contracts;
+
+namespace UniEmu.Features.Scripts;
+
+public sealed class ScriptService(UniEmuDbContext db)
+{
+    public async Task<IReadOnlyList<ScriptFileDto>> ListAsync(ScriptScope? scope, string? emulatorId, CancellationToken cancellationToken)
+    {
+        var query = db.ScriptFiles.AsNoTracking();
+
+        if (scope is not null)
+        {
+            var scopeValue = UniEmuJson.EnumString(scope.Value);
+            query = query.Where(s => s.Scope == scopeValue);
+        }
+
+        if (!string.IsNullOrWhiteSpace(emulatorId))
+        {
+            query = query.Where(s => s.EmulatorId == emulatorId);
+        }
+
+        var scripts = await query.OrderBy(s => s.Scope).ThenBy(s => s.Name).ToListAsync(cancellationToken);
+        return scripts.Select(s => s.ToDto()).ToList();
+    }
+
+    public async Task<ScriptFileDto?> CreateAsync(CreateScriptRequest request, CancellationToken cancellationToken)
+    {
+        if (!await IsScopeValidAsync(request.Scope, request.EmulatorId, cancellationToken))
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var name = request.Name.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
+            ? request.Name.Trim()
+            : $"{request.Name.Trim()}.csx";
+        var content = $"// {name}{Environment.NewLine}{Environment.NewLine}return 0;{Environment.NewLine}";
+        var entity = new ScriptFileEntity
+        {
+            Id = $"scr-{Guid.NewGuid():N}"[..13],
+            Name = name,
+            Scope = UniEmuJson.EnumString(request.Scope),
+            EmulatorId = request.Scope == ScriptScope.Emulator ? request.EmulatorId : null,
+            Content = content,
+            UpdatedAt = now,
+            SizeBytes = content.Length,
+        };
+
+        db.ScriptFiles.Add(entity);
+        await db.SaveChangesAsync(cancellationToken);
+        return entity.ToDto();
+    }
+
+    public async Task<ScriptFileDto?> PatchAsync(string scriptId, PatchScriptRequest request, CancellationToken cancellationToken)
+    {
+        var entity = await db.ScriptFiles.FirstOrDefaultAsync(s => s.Id == scriptId, cancellationToken);
+        if (entity is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Name))
+        {
+            entity.Name = request.Name.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
+                ? request.Name.Trim()
+                : $"{request.Name.Trim()}.csx";
+        }
+
+        if (request.Content is not null)
+        {
+            entity.Content = request.Content;
+            entity.SizeBytes = request.Content.Length;
+        }
+
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return entity.ToDto();
+    }
+
+    public async Task<bool> DeleteAsync(string scriptId, CancellationToken cancellationToken)
+    {
+        return await db.ScriptFiles.Where(s => s.Id == scriptId).ExecuteDeleteAsync(cancellationToken) > 0;
+    }
+
+    private async Task<bool> IsScopeValidAsync(ScriptScope scope, string? emulatorId, CancellationToken cancellationToken)
+    {
+        return scope switch
+        {
+            ScriptScope.Shared => string.IsNullOrWhiteSpace(emulatorId),
+            ScriptScope.Emulator => !string.IsNullOrWhiteSpace(emulatorId)
+                && await db.Emulators.AnyAsync(e => e.Id == emulatorId, cancellationToken),
+            _ => false,
+        };
+    }
+}

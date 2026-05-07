@@ -390,3 +390,6 @@ IndustryTestProject/ConnectTest.cs
 # docker build results
 /result/
 **/dockerfiles/result/
+
+# UniEmu local SQLite database
+UniEmu/uniemu.db*
