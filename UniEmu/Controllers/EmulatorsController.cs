@@ -29,6 +29,11 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
             return BadRequest("Name and targetUrl are required.");
         }
 
+        if (request.ProtocolId <= 0)
+        {
+            return BadRequest("protocolId must be a positive number.");
+        }
+
         var emulator = await service.CreateAsync(request, cancellationToken);
         return CreatedAtAction(nameof(Get), new { emulatorId = emulator.Id }, emulator);
     }
@@ -36,6 +41,11 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
     [HttpPatch("{emulatorId}")]
     public async Task<ActionResult<EmulatorDto>> Patch(string emulatorId, PatchEmulatorRequest request, CancellationToken cancellationToken)
     {
+        if (request.ProtocolId is <= 0)
+        {
+            return BadRequest("protocolId must be a positive number.");
+        }
+
         var emulator = await service.PatchAsync(emulatorId, request, cancellationToken);
         return emulator is null ? NotFound() : Ok(emulator);
     }
