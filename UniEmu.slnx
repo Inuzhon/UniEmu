@@ -8,5 +8,6 @@
     <Build />
     <Deploy />
   </Project>
+  <Project Path="UniEmu.Tests/UniEmu.Tests.csproj" />
   <Project Path="UniEmu/UniEmu.csproj" />
 </Solution>
