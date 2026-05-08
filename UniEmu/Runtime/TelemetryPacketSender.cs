@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -10,8 +10,17 @@ public sealed record UniversalValue(string Key, object? Value);
 public sealed record UniversalPostRequest(object MachineIntegrationId, bool UseInnerId, List<UniversalValue> ListValues);
 public sealed record DispatcherProgram(string Name, byte[] Bytes);
 
-public sealed class TelemetryPacketSender(HttpClient httpClient, ILogger<TelemetryPacketSender> logger)
+public sealed class TelemetryPacketSender
 {
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<TelemetryPacketSender> _logger;
+
+    public TelemetryPacketSender(IHttpClientFactory httpClientFactory, ILogger<TelemetryPacketSender> logger)
+    {
+        _httpClient = httpClientFactory.CreateClient(nameof(TelemetryPacketSender));
+        _logger = logger;
+    }
+
     private const int ProgramChunkSize = 4096;
     private static readonly JsonSerializerOptions DispatcherJsonOptions = new(JsonSerializerDefaults.General);
 
@@ -22,10 +31,10 @@ public sealed class TelemetryPacketSender(HttpClient httpClient, ILogger<Telemet
     {
         var uri = BuildDispatcherUri(targetUrl, "PostUniversalMonitoringDataJson");
 
-        using var response = await httpClient.PostAsJsonAsync(uri, request, DispatcherJsonOptions, cancellationToken);
+        using var response = await _httpClient.PostAsJsonAsync(uri, request, DispatcherJsonOptions, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogWarning("Dispatcher monitoring POST to {TargetUrl} failed with {StatusCode}", uri, response.StatusCode);
+            _logger.LogWarning("Dispatcher monitoring POST to {TargetUrl} failed with {StatusCode}", uri, response.StatusCode);
             response.EnsureSuccessStatusCode();
         }
 
@@ -71,7 +80,7 @@ public sealed class TelemetryPacketSender(HttpClient httpClient, ILogger<Telemet
             }
 
             var request = new UniversalPostRequest(machineIntegrationId.ToString() ?? string.Empty, useInnerId, values);
-            using var response = await httpClient.PostAsJsonAsync(uri, request, DispatcherJsonOptions, cancellationToken);
+            using var response = await _httpClient.PostAsJsonAsync(uri, request, DispatcherJsonOptions, cancellationToken);
             _ = await response.Content.ReadAsStringAsync(cancellationToken);
         }
         while (offset < program.Bytes.Length);
@@ -83,7 +92,7 @@ public sealed class TelemetryPacketSender(HttpClient httpClient, ILogger<Telemet
         CancellationToken cancellationToken)
     {
         var hashUri = BuildGetFileUri(targetUrl, machineIntegrationId, fileType: 1);
-        var hashAnswer = await httpClient.GetStringAsync(hashUri, cancellationToken);
+        var hashAnswer = await _httpClient.GetStringAsync(hashUri, cancellationToken);
         if (!hashAnswer.Contains("Hash=", StringComparison.OrdinalIgnoreCase))
         {
             return null;
@@ -95,7 +104,7 @@ public sealed class TelemetryPacketSender(HttpClient httpClient, ILogger<Telemet
         while (true)
         {
             var chunkUri = BuildGetFileUri(targetUrl, machineIntegrationId, fileType: 0);
-            var chunkAnswer = await httpClient.GetStringAsync(chunkUri, cancellationToken);
+            var chunkAnswer = await _httpClient.GetStringAsync(chunkUri, cancellationToken);
             if (chunkAnswer == "EOF")
             {
                 break;
@@ -109,7 +118,7 @@ public sealed class TelemetryPacketSender(HttpClient httpClient, ILogger<Telemet
         var actualHash = MD5.HashData(receivedBytes);
         if (!actualHash.SequenceEqual(expectedHash))
         {
-            logger.LogWarning("Received Dispatcher program hash mismatch for machine {MachineIntegrationId}", machineIntegrationId);
+            _logger.LogWarning("Received Dispatcher program hash mismatch for machine {MachineIntegrationId}", machineIntegrationId);
         }
 
         return new DispatcherProgram($"received_program_machine_id_{machineIntegrationId}.txt", receivedBytes);

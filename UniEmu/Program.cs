@@ -1,6 +1,12 @@
+﻿using System.Diagnostics;
+using System.Reflection;
+using System.Text;
 using System.Text.Json.Serialization;
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
+using Serilog;
 using UniEmu.Data;
 using UniEmu.Features.CncPrograms;
 using UniEmu.Features.Emulators;
@@ -10,31 +16,44 @@ using UniEmu.Features.Tags;
 using UniEmu.Features.Telemetry;
 using UniEmu.Runtime;
 
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+
+var currentAssembly = Assembly.GetExecutingAssembly();
+
+Directory.SetCurrentDirectory(Path.GetDirectoryName(currentAssembly.Location)
+                              ?? throw new NullReferenceException("Current dir not found!"));
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
+builder.Host.UseSerilog((context, services, loggerConfiguration) =>
+    loggerConfiguration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext());
+builder.Host.ConfigureContainer<ContainerBuilder>(RegisterUniEmuServices);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<UniEmuDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("UniEmuDb")));
-builder.Services.AddScoped<EmulatorService>();
-builder.Services.AddScoped<TagService>();
-builder.Services.AddScoped<ScriptService>();
-builder.Services.AddScoped<CncProgramService>();
-builder.Services.AddScoped<EventService>();
-builder.Services.AddScoped<TelemetryService>();
-builder.Services.AddScoped<EmulatorScheduleService>();
-builder.Services.AddScoped<TagScriptExecutionService>();
-builder.Services.AddSingleton<TelemetryValueGenerator>();
-builder.Services.AddSingleton<TagRuntimeStateStore>();
-builder.Services.AddHttpClient<TelemetryPacketSender>();
 builder.Services.AddQuartz();
+
+builder.Services.AddHttpClient(nameof(TelemetryPacketSender), configure =>
+{
+    configure.Timeout = TimeSpan.FromSeconds(5);
+}).ConfigurePrimaryHttpMessageHandler(_ => new HttpClientHandler()
+{
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+});
+
 if (!builder.Configuration.GetValue<bool>("UniEmu:DisableRuntime"))
 {
     builder.Services.AddQuartzHostedService(options =>
@@ -84,3 +103,30 @@ if (!app.Configuration.GetValue<bool>("UniEmu:DisableStaticAssets"))
 }
 
 app.Run();
+
+static void RegisterUniEmuServices(ContainerBuilder container)
+{
+    container.RegisterType<EmulatorService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<TagService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<ScriptService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<CncProgramService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<EventService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<TelemetryService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<EmulatorScheduleService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<TagScriptExecutionService>().AsSelf().InstancePerLifetimeScope();
+
+    container.RegisterType<TelemetryValueGenerator>().AsSelf().SingleInstance();
+    container.RegisterType<TagRuntimeStateStore>().AsSelf().SingleInstance();
+
+    container.RegisterType<TelemetryPacketSender>(context =>
+        {
+            var httpClientFactory = context.Resolve<IHttpClientFactory>();
+            var logger = context.Resolve<ILogger<TelemetryPacketSender>>();
+
+            return new TelemetryPacketSender(
+                httpClientFactory.CreateClient(nameof(TelemetryPacketSender)),
+                logger);
+        })
+        .AsSelf()
+        .InstancePerDependency();
+}
