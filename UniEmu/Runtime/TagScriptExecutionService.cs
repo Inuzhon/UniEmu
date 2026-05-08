@@ -1,9 +1,6 @@
 ﻿using System.Globalization;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
@@ -14,7 +11,10 @@ using UniEmu.Domain.Entities;
 
 namespace UniEmu.Runtime;
 
-public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStateStore stateStore)
+public sealed class TagScriptExecutionService(
+    UniEmuDbContext db,
+    TagRuntimeStateStore stateStore,
+    CompiledTagScriptCache scriptCache)
 {
     private static readonly Regex BlockedDirective = new(
         @"^\s*#\s*(r|using)\b",
@@ -53,13 +53,9 @@ public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStat
         var stateValues = UniEmuJson.Deserialize<Dictionary<string, object?>>(state.ValuesJson)
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var globals = BuildGlobals(emulator, tag, timestamp, stateValues);
-        var options = BaseOptions.WithSourceResolver(new DbScriptSourceResolver(scripts));
-        var result = await CSharpScript.EvaluateAsync<object?>(
-            script.Content,
-            options,
-            globals,
-            typeof(TagScriptGlobals),
-            cancellationToken);
+        var compiledScript = scriptCache.GetOrAdd(script.Path, script.Content, scripts, BaseOptions, typeof(TagScriptGlobals));
+        var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
+        var result = scriptState.ReturnValue;
 
         if (globals.State.IsDirty || globals.Tags.IsDirty)
         {
@@ -104,7 +100,7 @@ public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStat
             throw new InvalidOperationException($"Script '{formula.ScriptId}' was not found for tag '{tag.Name}'.");
         }
 
-        return new ScriptContent(NormalizePath(script.Name), script.Content, $"script:{script.Id}");
+        return new ScriptContent(TagScriptPath.Normalize(script.Name), script.Content, $"script:{script.Id}");
     }
 
     private async Task<Dictionary<string, string>> LoadVisibleScriptsAsync(string emulatorId, CancellationToken cancellationToken)
@@ -119,7 +115,7 @@ public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStat
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var script in scripts)
         {
-            var path = NormalizePath(script.Name);
+            var path = TagScriptPath.Normalize(script.Name);
             ValidateDirectives(script.Content);
             result[path] = script.Content;
         }
@@ -224,7 +220,7 @@ public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStat
     {
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var stack = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        Visit(NormalizePath(entryPath), visited, stack, scripts);
+        Visit(TagScriptPath.Normalize(entryPath), visited, stack, scripts);
     }
 
     private static void Visit(
@@ -260,7 +256,7 @@ public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStat
 
     private static string? ResolveLoadPath(string path, string baseFilePath, IReadOnlyDictionary<string, string> scripts)
     {
-        var normalized = NormalizePath(path);
+        var normalized = TagScriptPath.Normalize(path);
         if (scripts.ContainsKey(normalized))
         {
             return normalized;
@@ -272,7 +268,7 @@ public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStat
             return null;
         }
 
-        var relative = NormalizePath($"{baseDir}/{path}");
+        var relative = TagScriptPath.Normalize($"{baseDir}/{path}");
         return scripts.ContainsKey(relative) ? relative : null;
     }
 
@@ -351,66 +347,7 @@ public sealed class TagScriptExecutionService(UniEmuDbContext db, TagRuntimeStat
         };
     }
 
-    private static string NormalizePath(string path)
-    {
-        var normalized = path.Replace('\\', '/').Trim();
-        while (normalized.StartsWith("./", StringComparison.Ordinal))
-        {
-            normalized = normalized[2..];
-        }
-
-        return normalized;
-    }
-
     private sealed record ScriptContent(string Path, string Content, string StateKey);
-
-    private sealed class DbScriptSourceResolver(IReadOnlyDictionary<string, string> scripts) : SourceReferenceResolver
-    {
-        public override string? NormalizePath(string path, string? baseFilePath)
-        {
-            var normalized = TagScriptExecutionService.NormalizePath(path);
-            if (scripts.ContainsKey(normalized))
-            {
-                return normalized;
-            }
-
-            if (!string.IsNullOrWhiteSpace(baseFilePath))
-            {
-                var baseDir = Path.GetDirectoryName(baseFilePath.Replace('\\', '/'))?.Replace('\\', '/');
-                if (!string.IsNullOrWhiteSpace(baseDir))
-                {
-                    var relative = TagScriptExecutionService.NormalizePath($"{baseDir}/{path}");
-                    if (scripts.ContainsKey(relative))
-                    {
-                        return relative;
-                    }
-                }
-            }
-
-            return normalized;
-        }
-
-        public override Stream OpenRead(string resolvedPath)
-        {
-            if (!scripts.TryGetValue(TagScriptExecutionService.NormalizePath(resolvedPath), out var content))
-            {
-                throw new FileNotFoundException($"Script '{resolvedPath}' was not found.");
-            }
-
-            return new MemoryStream(Encoding.UTF8.GetBytes(content));
-        }
-
-        public override string? ResolveReference(string path, string? baseFilePath)
-        {
-            var normalized = NormalizePath(path, baseFilePath);
-            return normalized is not null && scripts.ContainsKey(normalized) ? normalized : null;
-        }
-
-        public override bool Equals(object? other) => ReferenceEquals(this, other);
-
-        public override int GetHashCode() => RuntimeHelpers.GetHashCode(this);
-
-    }
 }
 
 public sealed class TagScriptGlobals(

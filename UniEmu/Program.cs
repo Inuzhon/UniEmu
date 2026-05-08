@@ -117,16 +117,7 @@ static void RegisterUniEmuServices(ContainerBuilder container)
 
     container.RegisterType<TelemetryValueGenerator>().AsSelf().SingleInstance();
     container.RegisterType<TagRuntimeStateStore>().AsSelf().SingleInstance();
+    container.RegisterType<CompiledTagScriptCache>().AsSelf().SingleInstance();
 
-    container.RegisterType<TelemetryPacketSender>(context =>
-        {
-            var httpClientFactory = context.Resolve<IHttpClientFactory>();
-            var logger = context.Resolve<ILogger<TelemetryPacketSender>>();
-
-            return new TelemetryPacketSender(
-                httpClientFactory.CreateClient(nameof(TelemetryPacketSender)),
-                logger);
-        })
-        .AsSelf()
-        .InstancePerDependency();
+    container.RegisterType<TelemetryPacketSender>().AsSelf().InstancePerDependency();
 }
