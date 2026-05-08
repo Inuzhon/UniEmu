@@ -30,6 +30,7 @@ builder.Services.AddScoped<CncProgramService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<TelemetryService>();
 builder.Services.AddScoped<EmulatorScheduleService>();
+builder.Services.AddScoped<TagScriptExecutionService>();
 builder.Services.AddSingleton<TelemetryValueGenerator>();
 builder.Services.AddSingleton<TagRuntimeStateStore>();
 builder.Services.AddHttpClient<TelemetryPacketSender>();
@@ -49,6 +50,7 @@ if (!app.Configuration.GetValue<bool>("UniEmu:SkipStartupDatabase"))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<UniEmuDbContext>();
     await db.Database.EnsureCreatedAsync();
+    await UniEmuSchemaUpdater.ApplyCompatibilityUpdatesAsync(db);
     await UniEmuSeeder.SeedAsync(db);
 
     if (!app.Configuration.GetValue<bool>("UniEmu:DisableRuntime"))

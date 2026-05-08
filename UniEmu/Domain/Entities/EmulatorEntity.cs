@@ -5,6 +5,7 @@ public sealed class EmulatorEntity
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Status { get; set; } = "Stopped";
+    public int ProtocolId { get; set; }
     public string TargetUrl { get; set; } = string.Empty;
     public int IntervalSec { get; set; }
     public DateTimeOffset? LastRun { get; set; }

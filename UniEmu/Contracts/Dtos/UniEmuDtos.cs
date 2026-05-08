@@ -6,6 +6,7 @@ public sealed record EmulatorDto(
     string Id,
     string Name,
     EmulatorStatus Status,
+    int ProtocolId,
     string TargetUrl,
     int IntervalSec,
     DateTimeOffset? LastRun,

@@ -12,6 +12,7 @@ namespace UniEmu.Runtime;
 public sealed class EmulatorPublishJob(
     UniEmuDbContext db,
     TelemetryValueGenerator valueGenerator,
+    TagScriptExecutionService scriptExecutionService,
     TagRuntimeStateStore stateStore,
     TelemetryPacketSender sender,
     ILogger<EmulatorPublishJob> logger) : IJob
@@ -37,7 +38,8 @@ public sealed class EmulatorPublishJob(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var generatedValues = BuildValues(emulator, now);
+        var scheduledAt = context.ScheduledFireTimeUtc ?? now;
+        var generatedValues = await BuildValuesAsync(emulator, now, scheduledAt, cancellationToken);
         var telemetryValues = generatedValues
             .Where(value => value.NumericValue is not null)
             .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
@@ -91,27 +93,40 @@ public sealed class EmulatorPublishJob(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private IReadOnlyList<GeneratedTagValue> BuildValues(EmulatorEntity emulator, DateTimeOffset timestamp)
+    private async Task<IReadOnlyList<GeneratedTagValue>> BuildValuesAsync(
+        EmulatorEntity emulator,
+        DateTimeOffset timestamp,
+        DateTimeOffset scheduledAt,
+        CancellationToken cancellationToken)
     {
         var values = new List<GeneratedTagValue>();
 
         foreach (var tag in emulator.Tags)
         {
-            var generated = valueGenerator.GenerateTag(emulator, tag, timestamp);
-            if (stateStore.TryGet(emulator.Id, tag.Id, out var runtimeValue))
+            if (ShouldWaitForScheduledValue(emulator, tag))
             {
-                values.Add(generated with
+                var freshValue = await stateStore.WaitForValueAsync(
+                    emulator.Id,
+                    tag.Id,
+                    scheduledAt.AddMilliseconds(-50),
+                    GetCalculationWaitTimeout(emulator),
+                    cancellationToken);
+
+                if (freshValue is not null)
                 {
-                    Value = runtimeValue.Value,
-                    NumericValue = runtimeValue.Value,
-                });
+                    values.Add(FromRuntimeValue(tag, freshValue));
+                    continue;
+                }
+            }
+
+            if (stateStore.TryGet(emulator.Id, tag.Id, out var runtimeValue) && ShouldUseStoredValue(emulator, tag))
+            {
+                values.Add(FromRuntimeValue(tag, runtimeValue));
                 continue;
             }
 
-            if (generated.NumericValue is not null)
-            {
-                stateStore.Set(emulator.Id, tag.Id, tag.Name, generated.NumericValue.Value, timestamp);
-            }
+            var generated = await GenerateTagAsync(emulator, tag, timestamp, cancellationToken);
+            stateStore.Set(emulator.Id, tag.Id, tag.Name, generated.Value, generated.NumericValue, timestamp);
 
             values.Add(generated);
         }
@@ -119,11 +134,105 @@ public sealed class EmulatorPublishJob(
         return values;
     }
 
-    private static object GetMachineIntegrationId(EmulatorEntity emulator)
+    private static GeneratedTagValue FromRuntimeValue(EmulatorTagEntity tag, TagRuntimeValue runtimeValue)
     {
-        var digits = new string(emulator.Id.Where(char.IsDigit).ToArray());
-        return int.TryParse(digits, out var value) ? value : emulator.Id;
+        return new GeneratedTagValue(
+            tag.Key,
+            tag.Name,
+            runtimeValue.Value,
+            runtimeValue.NumericValue,
+            GetSpecialParameter(tag));
     }
+
+    private async Task<GeneratedTagValue> GenerateTagAsync(
+        EmulatorEntity emulator,
+        EmulatorTagEntity tag,
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken)
+    {
+        var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+        if (source is not (TagSource.Script or TagSource.Formula))
+        {
+            return valueGenerator.GenerateTag(emulator, tag, timestamp);
+        }
+
+        try
+        {
+            return await scriptExecutionService.GenerateScriptTagAsync(emulator, tag, timestamp, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Script tag generation failed for tag {TagId}", tag.Id);
+            db.SystemEvents.Add(new SystemEventEntity
+            {
+                Id = $"ev-{Guid.NewGuid():N}"[..12],
+                EmulatorId = emulator.Id,
+                EmulatorName = emulator.Name,
+                Level = UniEmuJson.EnumString(EventLevel.Error),
+                Message = $"Ошибка вычисления скрипта тега {tag.Name}: {ex.Message}",
+                Timestamp = timestamp,
+            });
+
+            return valueGenerator.GenerateTag(emulator, tag, timestamp);
+        }
+    }
+
+    private static bool ShouldUseStoredValue(EmulatorEntity emulator, EmulatorTagEntity tag)
+    {
+        var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
+            ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
+
+        if (trigger.Mode != TagTriggerMode.Interval)
+        {
+            return true;
+        }
+
+        var tagInterval = ToTimeSpan(trigger);
+        var publishInterval = TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec));
+        return Math.Abs((tagInterval - publishInterval).TotalMilliseconds) > 0.5;
+    }
+
+    private static bool ShouldWaitForScheduledValue(EmulatorEntity emulator, EmulatorTagEntity tag)
+    {
+        var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
+            ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
+
+        if (trigger.Mode != TagTriggerMode.Interval)
+        {
+            return false;
+        }
+
+        var tagInterval = ToTimeSpan(trigger);
+        var publishInterval = TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec));
+        return Math.Abs((tagInterval - publishInterval).TotalMilliseconds) <= 0.5;
+    }
+
+    private static TimeSpan GetCalculationWaitTimeout(EmulatorEntity emulator)
+    {
+        var publishInterval = TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec));
+        var timeoutMs = Math.Clamp(publishInterval.TotalMilliseconds * 0.75, 50, 5000);
+        return TimeSpan.FromMilliseconds(timeoutMs);
+    }
+
+    private static SpecialParameter? GetSpecialParameter(EmulatorTagEntity tag)
+    {
+        return string.IsNullOrWhiteSpace(tag.SpecialParameter)
+            ? null
+            : UniEmuJson.EnumValue<SpecialParameter>(tag.SpecialParameter);
+    }
+
+    private static TimeSpan ToTimeSpan(TagTriggerDto trigger)
+    {
+        var value = Math.Max(1, trigger.IntervalValue ?? 1);
+        return trigger.IntervalUnit switch
+        {
+            TagIntervalUnit.Ms => TimeSpan.FromMilliseconds(value),
+            TagIntervalUnit.Min => TimeSpan.FromMinutes(value),
+            _ => TimeSpan.FromSeconds(value),
+        };
+    }
+
+    private static object GetMachineIntegrationId(EmulatorEntity emulator) => emulator.ProtocolId;
 
     private DispatcherProgram? ResolveProgram(
         string emulatorId,

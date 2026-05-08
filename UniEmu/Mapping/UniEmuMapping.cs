@@ -17,6 +17,7 @@ public static class UniEmuMapping
             entity.Id,
             entity.Name,
             UniEmuJson.EnumValue<EmulatorStatus>(entity.Status),
+            entity.ProtocolId,
             entity.TargetUrl,
             entity.IntervalSec,
             entity.LastRun,

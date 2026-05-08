@@ -48,6 +48,7 @@ public sealed class EmulatorService(UniEmuDbContext db, EmulatorScheduleService 
             Id = $"em-{Guid.NewGuid():N}"[..12],
             Name = request.Name.Trim(),
             Status = nameof(EmulatorStatus.Stopped),
+            ProtocolId = request.ProtocolId,
             TargetUrl = request.TargetUrl.Trim(),
             IntervalSec = Math.Max(1, request.IntervalSec),
         };
@@ -78,6 +79,11 @@ public sealed class EmulatorService(UniEmuDbContext db, EmulatorScheduleService 
         if (!string.IsNullOrWhiteSpace(request.TargetUrl))
         {
             entity.TargetUrl = request.TargetUrl.Trim();
+        }
+
+        if (request.ProtocolId is not null)
+        {
+            entity.ProtocolId = request.ProtocolId.Value;
         }
 
         if (request.IntervalSec is not null)

@@ -3,9 +3,9 @@ using UniEmu.Contracts.Enums;
 
 namespace UniEmu.Contracts.Requests;
 
-public sealed record CreateEmulatorRequest(string Name, string TargetUrl, int IntervalSec);
+public sealed record CreateEmulatorRequest(string Name, string TargetUrl, int IntervalSec, int ProtocolId);
 
-public sealed record PatchEmulatorRequest(string? Name, string? TargetUrl, int? IntervalSec);
+public sealed record PatchEmulatorRequest(string? Name, string? TargetUrl, int? IntervalSec, int? ProtocolId);
 
 public sealed record PatchEmulatorStatusRequest(EmulatorStatus Status);
 

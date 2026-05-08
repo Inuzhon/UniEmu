@@ -73,7 +73,7 @@ public sealed class TelemetryValueGenerator
         return numericValue.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static double? ToNumericValue(object? value)
+    public static double? ToNumericValue(object? value)
     {
         return value switch
         {
@@ -81,6 +81,8 @@ public sealed class TelemetryValueGenerator
             int intValue => intValue,
             double doubleValue => doubleValue,
             float floatValue => floatValue,
+            long longValue => longValue,
+            decimal decimalValue => (double)decimalValue,
             _ => null,
         };
     }

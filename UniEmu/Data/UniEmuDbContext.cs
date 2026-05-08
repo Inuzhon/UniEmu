@@ -11,6 +11,8 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
 
     public DbSet<ScriptFileEntity> ScriptFiles => Set<ScriptFileEntity>();
 
+    public DbSet<ScriptRuntimeStateEntity> ScriptRuntimeStates => Set<ScriptRuntimeStateEntity>();
+
     public DbSet<CncProgramEntity> CncPrograms => Set<CncProgramEntity>();
 
     public DbSet<TelemetryPointEntity> TelemetryPoints => Set<TelemetryPointEntity>();
@@ -25,6 +27,7 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
             entity.Property(e => e.Id).HasMaxLength(64);
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Status).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.ProtocolId).IsRequired();
             entity.Property(e => e.TargetUrl).HasMaxLength(2048).IsRequired();
             entity.HasMany(e => e.Tags)
                 .WithOne(t => t.Emulator)
@@ -52,6 +55,16 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
             entity.Property(e => e.Scope).HasMaxLength(32).IsRequired();
             entity.Property(e => e.EmulatorId).HasMaxLength(64);
             entity.HasIndex(e => new { e.Scope, e.EmulatorId, e.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<ScriptRuntimeStateEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(64);
+            entity.Property(e => e.EmulatorId).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.ScriptKey).HasMaxLength(260).IsRequired();
+            entity.Property(e => e.ValuesJson).IsRequired();
+            entity.HasIndex(e => new { e.EmulatorId, e.ScriptKey }).IsUnique();
         });
 
         modelBuilder.Entity<CncProgramEntity>(entity =>

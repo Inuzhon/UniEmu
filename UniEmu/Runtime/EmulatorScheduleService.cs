@@ -57,8 +57,6 @@ public sealed class EmulatorScheduleService(
             return;
         }
 
-        await SchedulePublishJobAsync(scheduler, emulator, cancellationToken);
-
         foreach (var tag in emulator.Tags)
         {
             var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
@@ -71,6 +69,8 @@ public sealed class EmulatorScheduleService(
 
             await ScheduleTagJobAsync(scheduler, emulator, tag, trigger, cancellationToken);
         }
+
+        await SchedulePublishJobAsync(scheduler, emulator, cancellationToken);
     }
 
     public async Task UnscheduleEmulatorAsync(string emulatorId, CancellationToken cancellationToken = default)
@@ -181,14 +181,7 @@ public sealed class EmulatorScheduleService(
 
     private static bool ShouldScheduleTag(EmulatorEntity emulator, TagTriggerDto trigger)
     {
-        if (trigger.Mode != TagTriggerMode.Interval)
-        {
-            return true;
-        }
-
-        var tagInterval = ToTimeSpan(trigger);
-        var publishInterval = TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec));
-        return Math.Abs((tagInterval - publishInterval).TotalMilliseconds) > 0.5;
+        return trigger.Mode is TagTriggerMode.Once or TagTriggerMode.Interval or TagTriggerMode.Cron;
     }
 
     private static TimeSpan ToTimeSpan(TagTriggerDto trigger)

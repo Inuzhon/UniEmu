@@ -40,6 +40,7 @@ public sealed class EmulatorRuntimeService(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<UniEmuDbContext>();
         var sender = scope.ServiceProvider.GetRequiredService<TelemetryPacketSender>();
+        var scriptExecutionService = scope.ServiceProvider.GetRequiredService<TagScriptExecutionService>();
         var now = DateTimeOffset.UtcNow;
 
         var emulators = (await db.Emulators
@@ -51,7 +52,7 @@ public sealed class EmulatorRuntimeService(
 
         foreach (var emulator in emulators)
         {
-            var generatedValues = valueGenerator.GenerateTagValues(emulator, emulator.Tags, now);
+            var generatedValues = await GenerateTagValuesAsync(db, scriptExecutionService, emulator, now, cancellationToken);
             var telemetryValues = generatedValues
                 .Where(value => value.NumericValue is not null)
                 .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
@@ -106,10 +107,47 @@ public sealed class EmulatorRuntimeService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static object GetMachineIntegrationId(EmulatorEntity emulator)
+    private static object GetMachineIntegrationId(EmulatorEntity emulator) => emulator.ProtocolId;
+
+    private async Task<IReadOnlyList<GeneratedTagValue>> GenerateTagValuesAsync(
+        UniEmuDbContext db,
+        TagScriptExecutionService scriptExecutionService,
+        EmulatorEntity emulator,
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken)
     {
-        var digits = new string(emulator.Id.Where(char.IsDigit).ToArray());
-        return int.TryParse(digits, out var value) ? value : emulator.Id;
+        var values = new List<GeneratedTagValue>();
+        foreach (var tag in emulator.Tags)
+        {
+            var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+            if (source is not (TagSource.Script or TagSource.Formula))
+            {
+                values.Add(valueGenerator.GenerateTag(emulator, tag, timestamp));
+                continue;
+            }
+
+            try
+            {
+                values.Add(await scriptExecutionService.GenerateScriptTagAsync(emulator, tag, timestamp, cancellationToken));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Script tag generation failed for tag {TagId}", tag.Id);
+                db.SystemEvents.Add(new SystemEventEntity
+                {
+                    Id = $"ev-{Guid.NewGuid():N}"[..12],
+                    EmulatorId = emulator.Id,
+                    EmulatorName = emulator.Name,
+                    Level = UniEmuJson.EnumString(EventLevel.Error),
+                    Message = $"Ошибка вычисления скрипта тега {tag.Name}: {ex.Message}",
+                    Timestamp = timestamp,
+                });
+
+                values.Add(valueGenerator.GenerateTag(emulator, tag, timestamp));
+            }
+        }
+
+        return values;
     }
 
     private static DispatcherProgram? ResolveProgram(

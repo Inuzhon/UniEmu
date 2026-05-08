@@ -11,6 +11,7 @@ namespace UniEmu.Runtime;
 public sealed class TagValueJob(
     UniEmuDbContext db,
     TelemetryValueGenerator valueGenerator,
+    TagScriptExecutionService scriptExecutionService,
     TagRuntimeStateStore stateStore,
     ILogger<TagValueJob> logger) : IJob
 {
@@ -28,6 +29,7 @@ public sealed class TagValueJob(
 
         var tag = await db.EmulatorTags
             .Include(t => t.Emulator)
+            .ThenInclude(e => e!.Tags)
             .FirstOrDefaultAsync(t => t.EmulatorId == emulatorId && t.Id == tagId, cancellationToken);
 
         if (tag?.Emulator is null || tag.Emulator.Status != nameof(EmulatorStatus.Running))
@@ -39,8 +41,12 @@ public sealed class TagValueJob(
         var now = DateTimeOffset.UtcNow;
         try
         {
-            var value = valueGenerator.GenerateTag(tag.Emulator, tag, now);
-            stateStore.Set(emulatorId, tagId, tag.Name, value.NumericValue ?? 0, now);
+            var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+            var value = source is TagSource.Script or TagSource.Formula
+                ? await scriptExecutionService.GenerateScriptTagAsync(tag.Emulator, tag, now, cancellationToken)
+                : valueGenerator.GenerateTag(tag.Emulator, tag, now);
+
+            stateStore.Set(emulatorId, tagId, tag.Name, value.Value, value.NumericValue, now);
         }
         catch (Exception ex)
         {
