@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Quartz;
@@ -43,6 +44,7 @@ public sealed class EmulatorScheduleServiceTests
             schedulerFactory.Object,
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
+            new ConfigurationBuilder().Build(),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
@@ -57,6 +59,19 @@ public sealed class EmulatorScheduleServiceTests
 
         var tagJob = Assert.Single(scheduledTagJobs);
         Assert.Equal("tg-interval", tagJob.JobDataMap.GetString(RuntimeJobKeys.TagId));
+
+        var blockCheckTrigger = scheduler.Invocations
+            .Where(invocation => invocation.Method.Name == nameof(IScheduler.ScheduleJob))
+            .Select(invocation => new
+            {
+                Job = (IJobDetail)invocation.Arguments[0],
+                Trigger = (ITrigger)invocation.Arguments[1],
+            })
+            .Single(item => item.Job.JobType == typeof(DispatcherBlockCheckJob))
+            .Trigger;
+
+        var simpleTrigger = Assert.IsAssignableFrom<ISimpleTrigger>(blockCheckTrigger);
+        Assert.Equal(TimeSpan.FromSeconds(5), simpleTrigger.RepeatInterval);
     }
 
     [Fact]
@@ -72,6 +87,7 @@ public sealed class EmulatorScheduleServiceTests
             Mock.Of<ISchedulerFactory>(),
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
+            new ConfigurationBuilder().Build(),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
@@ -99,6 +115,7 @@ public sealed class EmulatorScheduleServiceTests
             Mock.Of<ISchedulerFactory>(),
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
+            new ConfigurationBuilder().Build(),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));

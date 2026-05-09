@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Quartz;
@@ -58,6 +59,7 @@ public sealed class EmulatorServiceTests
             schedulerFactory.Object,
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
+            new ConfigurationBuilder().Build(),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));

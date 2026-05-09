@@ -11,6 +11,10 @@ public static class RuntimeJobKeys
 
     public static TriggerKey PublishTrigger(string emulatorId) => new($"publish-{emulatorId}", "uniemu-publish");
 
+    public static JobKey DispatcherBlockCheckJob(string emulatorId) => new($"dispatcher-block-{emulatorId}", "uniemu-dispatcher-block");
+
+    public static TriggerKey DispatcherBlockCheckTrigger(string emulatorId) => new($"dispatcher-block-{emulatorId}", "uniemu-dispatcher-block");
+
     public static JobKey TagJob(string emulatorId, string tagId) => new($"tag-{tagId}", TagGroup(emulatorId));
 
     public static TriggerKey TagTrigger(string emulatorId, string tagId) => new($"tag-{tagId}", TagGroup(emulatorId));

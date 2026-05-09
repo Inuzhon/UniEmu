@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Quartz;
@@ -41,6 +42,7 @@ public sealed class TagServiceScriptValidationTests
             Mock.Of<ISchedulerFactory>(),
             new TagRuntimeStateStore(),
             NullLogger<EmulatorScheduleService>.Instance,
+            new ConfigurationBuilder().Build(),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, new TagRuntimeStateStore(), new CompiledTagScriptCache()),
             new RuntimeUpdateService(Mock.Of<IRuntimeUpdateBroadcaster>()));

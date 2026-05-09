@@ -316,20 +316,20 @@ public sealed class EmulatorPublishJob(
         object machineIntegrationId,
         DispatcherProgram? mainProgram,
         DispatcherProgram? subProgram,
-        string answer,
+        DispatcherMonitoringAnswer answer,
         CancellationToken cancellationToken)
     {
-        if (answer.Contains("FileType=1", StringComparison.OrdinalIgnoreCase))
+        if (answer.FileType == 1)
         {
             await sender.SendProgramAsync(emulator.TargetUrl, machineIntegrationId, useInnerId: true, mainProgram, cancellationToken);
         }
 
-        if (answer.Contains("FileType=2", StringComparison.OrdinalIgnoreCase))
+        if (answer.FileType == 2)
         {
             await sender.SendProgramAsync(emulator.TargetUrl, machineIntegrationId, useInnerId: true, subProgram, cancellationToken);
         }
 
-        if (answer.Contains("GetFile=1", StringComparison.OrdinalIgnoreCase))
+        if (answer.GetFile == 1)
         {
             var received = await sender.ReceiveProgramAsync(emulator.TargetUrl, machineIntegrationId, cancellationToken);
             if (received is not null)

@@ -8,7 +8,7 @@
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..</DockerfileContext>
     <SpaRoot>..\UniEmu.Client</SpaRoot>
-    <SpaProxyLaunchCommand>bun.exe run dev</SpaProxyLaunchCommand>
+    <SpaProxyLaunchCommand>yarn run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>http://localhost:8070</SpaProxyServerUrl>
   </PropertyGroup>
 
@@ -41,5 +41,26 @@
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UniEmu.Tests" />
+  </ItemGroup>
+
+  <Target Name="PublishRunWebpack" AfterTargets="ComputeFilesToPublish">
+
+    <Message Condition="'$(SkipYarnInstall)'!='True'" Importance="high" Text="Restoring dependencies using 'yarn'. This may take several minutes..." />
+    <Exec Condition="'$(SkipYarnInstall)'!='True'" WorkingDirectory="$(SpaRoot)" Command="yarn install --ignore-optional --production=true --frozen-lockfile" />
+
+    <Message Text="SPAssets -&gt; yarn build" Importance="high" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release' " />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="yarn build" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release' " />
+
+    <ItemGroup>
+      <DistFiles Include="$(SpaRoot)dist\**;" />
+      <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>%(DistFiles.Identity)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>

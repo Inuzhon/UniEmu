@@ -16,6 +16,7 @@ public sealed class EmulatorScheduleService(
     ISchedulerFactory schedulerFactory,
     TagRuntimeStateStore stateStore,
     ILogger<EmulatorScheduleService> logger,
+    IConfiguration configuration,
     TelemetryValueGenerator valueGenerator,
     TagScriptExecutionService scriptExecutionService,
     RuntimeUpdateService runtimeUpdateService)
@@ -73,6 +74,7 @@ public sealed class EmulatorScheduleService(
         }
 
         await SchedulePublishJobAsync(scheduler, emulator, cancellationToken);
+        await ScheduleDispatcherBlockCheckJobAsync(scheduler, emulator, GetDispatcherBlockCheckInterval(configuration), cancellationToken);
     }
 
     public async Task UnscheduleEmulatorAsync(string emulatorId, CancellationToken cancellationToken = default)
@@ -143,6 +145,7 @@ public sealed class EmulatorScheduleService(
     private static async Task DeleteEmulatorJobsAsync(IScheduler scheduler, string emulatorId, CancellationToken cancellationToken)
     {
         await scheduler.DeleteJob(RuntimeJobKeys.PublishJob(emulatorId), cancellationToken);
+        await scheduler.DeleteJob(RuntimeJobKeys.DispatcherBlockCheckJob(emulatorId), cancellationToken);
 
         var tagJobs = await scheduler.GetJobKeys(
             GroupMatcher<JobKey>.GroupEquals(RuntimeJobKeys.TagGroup(emulatorId)),
@@ -167,6 +170,29 @@ public sealed class EmulatorScheduleService(
             .StartNow()
             .WithSimpleSchedule(schedule => schedule
                 .WithInterval(TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec)))
+                .RepeatForever())
+            .Build();
+
+        await scheduler.ScheduleJob(job, trigger, cancellationToken);
+    }
+
+    private static async Task ScheduleDispatcherBlockCheckJobAsync(
+        IScheduler scheduler,
+        EmulatorEntity emulator,
+        TimeSpan interval,
+        CancellationToken cancellationToken)
+    {
+        var job = JobBuilder.Create<DispatcherBlockCheckJob>()
+            .WithIdentity(RuntimeJobKeys.DispatcherBlockCheckJob(emulator.Id))
+            .UsingJobData(RuntimeJobKeys.EmulatorId, emulator.Id)
+            .Build();
+
+        var trigger = TriggerBuilder.Create()
+            .WithIdentity(RuntimeJobKeys.DispatcherBlockCheckTrigger(emulator.Id))
+            .ForJob(job)
+            .StartNow()
+            .WithSimpleSchedule(schedule => schedule
+                .WithInterval(interval)
                 .RepeatForever())
             .Build();
 
@@ -283,5 +309,11 @@ public sealed class EmulatorScheduleService(
         }
 
         return parts.Length is 6 or 7 ? string.Join(' ', parts) : null;
+    }
+
+    private static TimeSpan GetDispatcherBlockCheckInterval(IConfiguration configuration)
+    {
+        var seconds = configuration.GetValue("UniEmu:DispatcherBlockCheckIntervalSeconds", 5);
+        return TimeSpan.FromSeconds(Math.Clamp(seconds, 5, 10));
     }
 }
