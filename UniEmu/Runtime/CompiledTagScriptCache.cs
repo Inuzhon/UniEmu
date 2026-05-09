@@ -35,7 +35,7 @@ public sealed class CompiledTagScriptCache
         var lazy = pendingCompilations.GetOrAdd(
             key,
             _ => new Lazy<Script<object?>>(
-                () => Compile(content, visibleScripts, baseOptions, globalsType),
+                () => Compile(entryPath, content, visibleScripts, baseOptions, globalsType),
                 LazyThreadSafetyMode.ExecutionAndPublication));
 
         try
@@ -86,12 +86,15 @@ public sealed class CompiledTagScriptCache
     }
 
     private static Script<object?> Compile(
+        string entryPath,
         string content,
         IReadOnlyDictionary<string, string> visibleScripts,
         ScriptOptions baseOptions,
         Type globalsType)
     {
-        var options = baseOptions.WithSourceResolver(new DbScriptSourceResolver(visibleScripts));
+        var options = baseOptions
+            .WithFilePath(TagScriptPath.Normalize(entryPath))
+            .WithSourceResolver(new DbScriptSourceResolver(visibleScripts));
         var script = CSharpScript.Create<object?>(content, options, globalsType);
         var diagnostics = script.Compile();
         var errors = diagnostics.Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToList();

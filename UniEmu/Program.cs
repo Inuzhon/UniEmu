@@ -15,6 +15,7 @@ using UniEmu.Features.Scripts;
 using UniEmu.Features.Tags;
 using UniEmu.Features.Telemetry;
 using UniEmu.Runtime;
+using UniEmu.Runtime.Scripting;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 Activity.DefaultIdFormat = ActivityIdFormat.W3C;
@@ -95,6 +96,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
+app.MapCsxLsp();
+
 app.MapControllers();
 
 if (!app.Configuration.GetValue<bool>("UniEmu:DisableStaticAssets"))
@@ -118,6 +121,8 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<TelemetryValueGenerator>().AsSelf().SingleInstance();
     container.RegisterType<TagRuntimeStateStore>().AsSelf().SingleInstance();
     container.RegisterType<CompiledTagScriptCache>().AsSelf().SingleInstance();
+    container.RegisterType<CsxLanguageService>().AsSelf().SingleInstance();
+    container.RegisterType<CsxDocumentStore>().AsSelf().InstancePerDependency();
 
     container.RegisterType<TelemetryPacketSender>().AsSelf().InstancePerDependency();
 }
