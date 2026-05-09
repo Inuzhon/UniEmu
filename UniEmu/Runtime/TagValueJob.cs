@@ -4,6 +4,7 @@ using UniEmu.Common;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
 
@@ -13,6 +14,7 @@ public sealed class TagValueJob(
     TelemetryValueGenerator valueGenerator,
     TagScriptExecutionService scriptExecutionService,
     TagRuntimeStateStore stateStore,
+    RuntimeUpdateService runtimeUpdateService,
     ILogger<TagValueJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
@@ -47,6 +49,9 @@ public sealed class TagValueJob(
                 : valueGenerator.GenerateTag(tag.Emulator, tag, now);
 
             stateStore.Set(emulatorId, tagId, tag.Name, value.Value, value.NumericValue, now);
+            await runtimeUpdateService.PublishTagValueAsync(
+                new RuntimeTagValueUpdateDto(emulatorId, tagId, tag.Name, value.Value, value.NumericValue, now),
+                cancellationToken);
         }
         catch (Exception ex)
         {

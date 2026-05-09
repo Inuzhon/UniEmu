@@ -5,10 +5,11 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
+using UniEmu.Realtime;
 
 namespace UniEmu.Features.Events;
 
-public sealed class EventService(UniEmuDbContext db)
+public sealed class EventService(UniEmuDbContext db, RuntimeUpdateService runtimeUpdateService)
 {
     public async Task<IReadOnlyList<SystemEventDto>> ListAsync(DateTimeOffset? cursor, int limit, CancellationToken cancellationToken)
     {
@@ -39,6 +40,8 @@ public sealed class EventService(UniEmuDbContext db)
 
         db.SystemEvents.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
-        return entity.ToDto();
+        var dto = entity.ToDto();
+        await runtimeUpdateService.PublishEventCreatedAsync(dto, cancellationToken);
+        return dto;
     }
 }

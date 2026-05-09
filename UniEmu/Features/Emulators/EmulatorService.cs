@@ -5,11 +5,15 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
+using UniEmu.Realtime;
 using UniEmu.Runtime;
 
 namespace UniEmu.Features.Emulators;
 
-public sealed class EmulatorService(UniEmuDbContext db, EmulatorScheduleService scheduleService)
+public sealed class EmulatorService(
+    UniEmuDbContext db,
+    EmulatorScheduleService scheduleService,
+    RuntimeUpdateService runtimeUpdateService)
 {
     public async Task<IReadOnlyList<EmulatorDto>> ListAsync(CancellationToken cancellationToken)
     {
@@ -56,7 +60,9 @@ public sealed class EmulatorService(UniEmuDbContext db, EmulatorScheduleService 
         db.Emulators.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
 
-        return entity.ToDto(tagsCount: 0);
+        var dto = entity.ToDto(tagsCount: 0);
+        await runtimeUpdateService.PublishEmulatorUpdatedAsync(dto, cancellationToken);
+        return dto;
     }
 
     public async Task<EmulatorDto?> PatchAsync(string emulatorId, PatchEmulatorRequest request, CancellationToken cancellationToken)
@@ -102,7 +108,9 @@ public sealed class EmulatorService(UniEmuDbContext db, EmulatorScheduleService 
             await scheduleService.ScheduleEmulatorAsync(entity.Id, cancellationToken);
         }
 
-        return entity.ToDto(entity.Tags.Count);
+        var dto = entity.ToDto(entity.Tags.Count);
+        await runtimeUpdateService.PublishEmulatorUpdatedAsync(dto, cancellationToken);
+        return dto;
     }
 
     public async Task<EmulatorDto?> PatchStatusAsync(string emulatorId, PatchEmulatorStatusRequest request, CancellationToken cancellationToken)
@@ -141,6 +149,8 @@ public sealed class EmulatorService(UniEmuDbContext db, EmulatorScheduleService 
             await scheduleService.UnscheduleEmulatorAsync(entity.Id, cancellationToken);
         }
 
-        return entity.ToDto(entity.Tags.Count);
+        var dto = entity.ToDto(entity.Tags.Count);
+        await runtimeUpdateService.PublishEmulatorUpdatedAsync(dto, cancellationToken);
+        return dto;
     }
 }

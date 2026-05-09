@@ -1,12 +1,12 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Text;
-using System.Text.Json.Serialization;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Serilog;
+using UniEmu.Common;
 using UniEmu.Data;
 using UniEmu.Features.CncPrograms;
 using UniEmu.Features.Emulators;
@@ -14,6 +14,7 @@ using UniEmu.Features.Events;
 using UniEmu.Features.Scripts;
 using UniEmu.Features.Tags;
 using UniEmu.Features.Telemetry;
+using UniEmu.Realtime;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
 
@@ -38,11 +39,16 @@ builder.Host.ConfigureContainer<ContainerBuilder>(RegisterUniEmuServices);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        UniEmuJson.Apply(options.JsonSerializerOptions);
     });
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        UniEmuJson.Apply(options.PayloadSerializerOptions);
+    });
 builder.Services.AddDbContext<UniEmuDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("UniEmuDb")));
 builder.Services.AddQuartz();
@@ -99,6 +105,7 @@ app.UseAuthorization();
 app.MapCsxLsp();
 
 app.MapControllers();
+app.MapHub<RuntimeUpdatesHub>("/hubs/runtime-updates");
 
 if (!app.Configuration.GetValue<bool>("UniEmu:DisableStaticAssets"))
 {
@@ -115,6 +122,8 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<CncProgramService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<EventService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<TelemetryService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<RuntimeUpdateService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<SignalRRuntimeUpdateBroadcaster>().As<IRuntimeUpdateBroadcaster>().InstancePerLifetimeScope();
     container.RegisterType<EmulatorScheduleService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<TagScriptExecutionService>().AsSelf().InstancePerLifetimeScope();
 

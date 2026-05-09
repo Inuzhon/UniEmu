@@ -10,6 +10,14 @@ public static class UniEmuJson
         Converters = { new JsonStringEnumConverter() },
     };
 
+    public static void Apply(JsonSerializerOptions options)
+    {
+        if (!options.Converters.Any(converter => converter is JsonStringEnumConverter))
+        {
+            options.Converters.Add(new JsonStringEnumConverter());
+        }
+    }
+
     public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Options);
 
     public static T? Deserialize<T>(string? value)

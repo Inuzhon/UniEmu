@@ -5,6 +5,8 @@ using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Mapping;
+using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
 
@@ -15,6 +17,7 @@ public sealed class EmulatorPublishJob(
     TagScriptExecutionService scriptExecutionService,
     TagRuntimeStateStore stateStore,
     TelemetryPacketSender sender,
+    RuntimeUpdateService runtimeUpdateService,
     ILogger<EmulatorPublishJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
@@ -53,12 +56,13 @@ public sealed class EmulatorPublishJob(
         var level = EventLevel.Success;
         var message = "Пакет мониторинга отправлен в Dispatcher";
 
-        db.TelemetryPoints.Add(new TelemetryPointEntity
+        var telemetryPoint = new TelemetryPointEntity
         {
             EmulatorId = emulator.Id,
             Timestamp = now,
             ValuesJson = UniEmuJson.Serialize(telemetryValues),
-        });
+        };
+        db.TelemetryPoints.Add(telemetryPoint);
 
         try
         {
@@ -80,7 +84,7 @@ public sealed class EmulatorPublishJob(
         emulator.NextRun = now.AddSeconds(Math.Max(1, emulator.IntervalSec));
         emulator.StartedAt ??= now;
 
-        db.SystemEvents.Add(new SystemEventEntity
+        var systemEvent = new SystemEventEntity
         {
             Id = $"ev-{Guid.NewGuid():N}"[..12],
             EmulatorId = emulator.Id,
@@ -88,9 +92,13 @@ public sealed class EmulatorPublishJob(
             Level = UniEmuJson.EnumString(level),
             Message = message,
             Timestamp = now,
-        });
+        };
+        db.SystemEvents.Add(systemEvent);
 
         await db.SaveChangesAsync(cancellationToken);
+        await runtimeUpdateService.PublishTelemetryAsync(emulator.Id, telemetryPoint.ToDto(), cancellationToken);
+        await runtimeUpdateService.PublishEmulatorUpdatedAsync(emulator.ToDto(emulator.Tags.Count), cancellationToken);
+        await runtimeUpdateService.PublishEventCreatedAsync(systemEvent.ToDto(), cancellationToken);
     }
 
     private async Task<IReadOnlyList<GeneratedTagValue>> BuildValuesAsync(

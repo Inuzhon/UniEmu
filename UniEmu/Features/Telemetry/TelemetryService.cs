@@ -5,10 +5,11 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
+using UniEmu.Realtime;
 
 namespace UniEmu.Features.Telemetry;
 
-public sealed class TelemetryService(UniEmuDbContext db)
+public sealed class TelemetryService(UniEmuDbContext db, RuntimeUpdateService runtimeUpdateService)
 {
     public async Task<IReadOnlyList<TelemetryPointDto>?> GetAsync(string emulatorId, int points, CancellationToken cancellationToken)
     {
@@ -47,6 +48,8 @@ public sealed class TelemetryService(UniEmuDbContext db)
 
         db.TelemetryPoints.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
-        return entity.ToDto();
+        var dto = entity.ToDto();
+        await runtimeUpdateService.PublishTelemetryAsync(request.EmulatorId, dto, cancellationToken);
+        return dto;
     }
 }
