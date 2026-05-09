@@ -23,6 +23,9 @@ public sealed class TagScriptExecutionService(
     private static readonly Regex LoadDirective = new(
         @"^\s*#\s*load\s+""(?<path>[^""]+)""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+    private static readonly Regex FinalReturnStatement = new(
+        @"\breturn\s+(?<expression>.+?)\s*;\s*$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
     private static readonly ScriptOptions BaseOptions = ScriptOptions.Default
         .WithReferences(
@@ -44,17 +47,18 @@ public sealed class TagScriptExecutionService(
         CancellationToken cancellationToken)
     {
         var script = await ResolveEntryScriptAsync(emulator.Id, tag, cancellationToken);
-        ValidateDirectives(script.Content);
+        var entryContent = NormalizeEntryScriptContent(script.Content);
+        ValidateDirectives(entryContent);
 
         var scripts = await LoadVisibleScriptsAsync(emulator.Id, cancellationToken);
-        scripts[script.Path] = script.Content;
+        scripts[script.Path] = entryContent;
         DetectLoadCycles(script.Path, scripts);
 
         var state = await GetOrCreateStateAsync(emulator.Id, script.StateKey, cancellationToken);
         var stateValues = UniEmuJson.Deserialize<Dictionary<string, object?>>(state.ValuesJson)
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var globals = BuildGlobals(emulator, tag, timestamp, stateValues);
-        var compiledScript = scriptCache.GetOrAdd(script.Path, script.Content, scripts, BaseOptions, typeof(TagScriptGlobals));
+        var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, BaseOptions, typeof(TagScriptGlobals));
         var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
         var result = scriptState.ReturnValue;
 
@@ -195,7 +199,7 @@ public sealed class TagScriptExecutionService(
 
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         var typedValue = TelemetryValueGenerator.ApplyTagRounding(tagType, tag, CastResult(tagType, value, tag.Preview));
-        tag.Preview = ToPreview(typedValue);
+        tag.Preview = TelemetryValueGenerator.ToPreview(typedValue);
         stateStore.Set(emulator.Id, tag.Id, tag.Name, typedValue, TelemetryValueGenerator.ToNumericValue(typedValue), timestamp);
         return typedValue;
     }
@@ -207,6 +211,14 @@ public sealed class TagScriptExecutionService(
         {
             throw new InvalidOperationException($"Unsupported script directive '{match.Value.Trim()}'. Use #load for shared scripts.");
         }
+    }
+
+    private static string NormalizeEntryScriptContent(string content)
+    {
+        var match = FinalReturnStatement.Match(content);
+        return match.Success
+            ? content[..match.Index] + match.Groups["expression"].Value
+            : content;
     }
 
     private static void DetectLoadCycles(string entryPath, IReadOnlyDictionary<string, string> scripts)
@@ -277,7 +289,7 @@ public sealed class TagScriptExecutionService(
             TagType.Bool => ToBool(result, preview),
             TagType.Int => (int)Math.Round(ToDouble(result, preview)),
             TagType.Double => ToDouble(result, preview),
-            TagType.String => result.ToString() ?? preview,
+            TagType.String => TelemetryValueGenerator.ToPreview(result),
             _ => result,
         };
     }
@@ -298,17 +310,6 @@ public sealed class TagScriptExecutionService(
     {
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         return CastPreview(tagType, tag.Preview);
-    }
-
-    private static string ToPreview(object? value)
-    {
-        return value switch
-        {
-            null => string.Empty,
-            bool boolValue => boolValue.ToString().ToLowerInvariant(),
-            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-            _ => value.ToString() ?? string.Empty,
-        };
     }
 
     private static bool ToBool(object value, string preview)
@@ -334,7 +335,9 @@ public sealed class TagScriptExecutionService(
             double doubleValue => doubleValue,
             decimal decimalValue => (double)decimalValue,
             bool boolValue => boolValue ? 1 : 0,
-            string stringValue when double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) => result,
+            string stringValue => double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var result)
+                ? result
+                : (double.TryParse(preview, NumberStyles.Float, CultureInfo.InvariantCulture, out var fallback) ? fallback : 0),
             IConvertible convertible => Convert.ToDouble(convertible, CultureInfo.InvariantCulture),
             _ => double.TryParse(preview, NumberStyles.Float, CultureInfo.InvariantCulture, out var fallback) ? fallback : 0,
         };

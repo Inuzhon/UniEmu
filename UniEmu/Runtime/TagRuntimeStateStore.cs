@@ -9,6 +9,14 @@ public sealed record TagRuntimeValue(
     double? NumericValue,
     DateTimeOffset Timestamp);
 
+public sealed record TagRuntimeSnapshotValue(
+    string EmulatorId,
+    string TagId,
+    string TagName,
+    object? Value,
+    double? NumericValue,
+    DateTimeOffset Timestamp);
+
 public sealed class TagRuntimeStateStore
 {
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, TagRuntimeValue>> values = new(StringComparer.Ordinal);
@@ -38,6 +46,19 @@ public sealed class TagRuntimeStateStore
 
         value = default!;
         return false;
+    }
+
+    public IReadOnlyList<TagRuntimeSnapshotValue> Snapshot()
+    {
+        return values
+            .SelectMany(emulator => emulator.Value.Values.Select(value => new TagRuntimeSnapshotValue(
+                emulator.Key,
+                value.TagId,
+                value.TagName,
+                value.Value,
+                value.NumericValue,
+                value.Timestamp)))
+            .ToList();
     }
 
     public async Task<TagRuntimeValue?> WaitForValueAsync(

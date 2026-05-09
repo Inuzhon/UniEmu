@@ -127,9 +127,12 @@ public sealed class EmulatorService(
             return null;
         }
 
+        var previousStatus = entity.Status;
         entity.Status = request.Status.ToString();
+        var wasRunning = previousStatus == nameof(EmulatorStatus.Running);
+        var isRunning = request.Status == EmulatorStatus.Running;
 
-        if (request.Status == EmulatorStatus.Running)
+        if (isRunning)
         {
             var now = DateTimeOffset.UtcNow;
             entity.StartedAt ??= now;
@@ -144,12 +147,22 @@ public sealed class EmulatorService(
 
         await db.SaveChangesAsync(cancellationToken);
         dataCache.InvalidateEmulator(entity.Id);
-        if (request.Status == EmulatorStatus.Running)
+        if (isRunning)
         {
+            if (!wasRunning)
+            {
+                await scheduleService.ExecuteEventTagsAsync(entity.Id, TagTriggerEvent.OnStart, cancellationToken);
+            }
+
             await scheduleService.ScheduleEmulatorAsync(entity.Id, cancellationToken);
         }
         else
         {
+            if (wasRunning && request.Status == EmulatorStatus.Stopped)
+            {
+                await scheduleService.ExecuteEventTagsAsync(entity.Id, TagTriggerEvent.OnStop, cancellationToken);
+            }
+
             await scheduleService.UnscheduleEmulatorAsync(entity.Id, cancellationToken);
         }
 

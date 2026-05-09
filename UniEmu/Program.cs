@@ -82,9 +82,22 @@ if (!app.Configuration.GetValue<bool>("UniEmu:SkipStartupDatabase"))
 
     if (!app.Configuration.GetValue<bool>("UniEmu:DisableRuntime"))
     {
+        var statePersistence = scope.ServiceProvider.GetRequiredService<TagRuntimeStatePersistenceService>();
+        await statePersistence.HydrateFromTagPreviewsAsync();
+
         var scheduler = scope.ServiceProvider.GetRequiredService<EmulatorScheduleService>();
         await scheduler.ScheduleRunningEmulatorsAsync();
     }
+}
+
+if (!app.Configuration.GetValue<bool>("UniEmu:DisableRuntime"))
+{
+    app.Lifetime.ApplicationStopping.Register(() =>
+    {
+        using var scope = app.Services.CreateScope();
+        var statePersistence = scope.ServiceProvider.GetRequiredService<TagRuntimeStatePersistenceService>();
+        statePersistence.PersistToTagPreviewsAsync().GetAwaiter().GetResult();
+    });
 }
 
 if (!app.Configuration.GetValue<bool>("UniEmu:DisableStaticAssets"))
@@ -128,6 +141,7 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<SignalRRuntimeUpdateBroadcaster>().As<IRuntimeUpdateBroadcaster>().InstancePerLifetimeScope();
     container.RegisterType<EmulatorScheduleService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<TagScriptExecutionService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<TagRuntimeStatePersistenceService>().AsSelf().InstancePerLifetimeScope();
 
     container.RegisterType<TelemetryValueGenerator>().AsSelf().SingleInstance();
     container.RegisterType<TagRuntimeStateStore>().AsSelf().SingleInstance();

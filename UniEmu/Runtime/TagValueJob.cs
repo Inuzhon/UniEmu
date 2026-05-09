@@ -48,7 +48,9 @@ public sealed class TagValueJob(
                 ? await scriptExecutionService.GenerateScriptTagAsync(tag.Emulator, tag, now, cancellationToken)
                 : valueGenerator.GenerateTag(tag.Emulator, tag, now);
 
+            tag.Preview = TelemetryValueGenerator.ToPreview(value.Value);
             stateStore.Set(emulatorId, tagId, tag.Name, value.Value, value.NumericValue, now);
+            await db.SaveChangesAsync(cancellationToken);
             await runtimeUpdateService.PublishTagValueAsync(
                 new RuntimeTagValueUpdateDto(emulatorId, tagId, tag.Name, value.Value, value.NumericValue, now),
                 cancellationToken);

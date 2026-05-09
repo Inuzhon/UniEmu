@@ -10,6 +10,7 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Features.Tags;
+using UniEmu.Realtime;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
 
@@ -39,7 +40,10 @@ public sealed class TagServiceScriptValidationTests
             dataCache,
             Mock.Of<ISchedulerFactory>(),
             new TagRuntimeStateStore(),
-            NullLogger<EmulatorScheduleService>.Instance);
+            NullLogger<EmulatorScheduleService>.Instance,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, new TagRuntimeStateStore(), new CompiledTagScriptCache()),
+            new RuntimeUpdateService(Mock.Of<IRuntimeUpdateBroadcaster>()));
 
         return new TagService(db, dataCache, scheduleService, new CsxLanguageService());
     }

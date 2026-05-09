@@ -99,6 +99,31 @@ public sealed class TelemetryValueGenerator
         return numericValue is null ? value : Math.Round(numericValue.Value, digits, MidpointRounding.AwayFromZero);
     }
 
+    public static string ToPreview(object? value)
+    {
+        return value switch
+        {
+            null => string.Empty,
+            bool boolValue => boolValue.ToString().ToLowerInvariant(),
+            DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("O", CultureInfo.InvariantCulture),
+            DateTime dateTime => dateTime.ToString("O", CultureInfo.InvariantCulture),
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty,
+        };
+    }
+
+    public static object? FromPreview(TagType tagType, string preview)
+    {
+        return tagType switch
+        {
+            TagType.Bool => ParsePreview(preview) != 0,
+            TagType.Int => (int)Math.Round(ParsePreview(preview)),
+            TagType.Double => ParsePreview(preview),
+            TagType.String => preview,
+            _ => preview,
+        };
+    }
+
     private static double GenerateTagValue(EmulatorTagEntity tag, double elapsedSec)
     {
         var source = UniEmuJson.EnumValue<TagSource>(tag.Source);

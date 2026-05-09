@@ -78,4 +78,31 @@ public sealed class TagRuntimeStateStoreTests
 
         Assert.Null(value);
     }
+
+    [Fact]
+    public void Snapshot_ReturnsAllStoredValues()
+    {
+        var store = new TagRuntimeStateStore();
+        var firstTimestamp = DateTimeOffset.Parse("2026-05-09T10:00:00Z");
+        var secondTimestamp = DateTimeOffset.Parse("2026-05-09T10:00:01Z");
+        store.Set("emu-1", "tag-1", "Temperature", 42.5, 42.5, firstTimestamp);
+        store.Set("emu-2", "tag-2", "Mode", "Auto", null, secondTimestamp);
+
+        var snapshot = store.Snapshot();
+
+        Assert.Collection(
+            snapshot.OrderBy(value => value.EmulatorId),
+            value =>
+            {
+                Assert.Equal("emu-1", value.EmulatorId);
+                Assert.Equal("tag-1", value.TagId);
+                Assert.Equal(42.5, value.Value);
+            },
+            value =>
+            {
+                Assert.Equal("emu-2", value.EmulatorId);
+                Assert.Equal("tag-2", value.TagId);
+                Assert.Equal("Auto", value.Value);
+            });
+    }
 }

@@ -132,7 +132,16 @@ public sealed class EmulatorPublishJob(
                 continue;
             }
 
+            if (ShouldUsePersistedPreview(tag))
+            {
+                var persisted = FromPersistedPreview(tag);
+                stateStore.Set(emulator.Id, tag.Id, tag.Name, persisted.Value, persisted.NumericValue, timestamp);
+                values.Add(persisted);
+                continue;
+            }
+
             var generated = await GenerateTagAsync(emulator, tag, timestamp, cancellationToken);
+            tag.Preview = TelemetryValueGenerator.ToPreview(generated.Value);
             stateStore.Set(emulator.Id, tag.Id, tag.Name, generated.Value, generated.NumericValue, timestamp);
 
             values.Add(generated);
@@ -159,6 +168,19 @@ public sealed class EmulatorPublishJob(
             tag.Name,
             runtimeValue.Value,
             runtimeValue.NumericValue,
+            GetSpecialParameter(tag));
+    }
+
+    private static GeneratedTagValue FromPersistedPreview(EmulatorTagEntity tag)
+    {
+        var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
+        var value = TelemetryValueGenerator.FromPreview(tagType, tag.Preview);
+
+        return new GeneratedTagValue(
+            tag.Key,
+            tag.Name,
+            value,
+            TelemetryValueGenerator.ToNumericValue(value),
             GetSpecialParameter(tag));
     }
 
@@ -197,8 +219,7 @@ public sealed class EmulatorPublishJob(
 
     private static bool ShouldUseStoredValue(EmulatorEntity emulator, EmulatorTagEntity tag)
     {
-        var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
-            ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
+        var trigger = GetTrigger(tag);
 
         if (trigger.Mode != TagTriggerMode.Interval)
         {
@@ -212,8 +233,7 @@ public sealed class EmulatorPublishJob(
 
     private static bool ShouldWaitForScheduledValue(EmulatorEntity emulator, EmulatorTagEntity tag)
     {
-        var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
-            ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
+        var trigger = GetTrigger(tag);
 
         if (trigger.Mode != TagTriggerMode.Interval)
         {
@@ -223,6 +243,18 @@ public sealed class EmulatorPublishJob(
         var tagInterval = ToTimeSpan(trigger);
         var publishInterval = TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec));
         return Math.Abs((tagInterval - publishInterval).TotalMilliseconds) <= 0.5;
+    }
+
+    private static bool ShouldUsePersistedPreview(EmulatorTagEntity tag)
+    {
+        var trigger = GetTrigger(tag);
+        return trigger.Mode is TagTriggerMode.Once or TagTriggerMode.Cron;
+    }
+
+    private static TagTriggerDto GetTrigger(EmulatorTagEntity tag)
+    {
+        return UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
+               ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
     }
 
     private static TimeSpan GetCalculationWaitTimeout(EmulatorEntity emulator)

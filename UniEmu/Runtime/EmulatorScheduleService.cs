@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Quartz.Impl.Matchers;
 using UniEmu.Common;
@@ -6,6 +6,7 @@ using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
 
@@ -14,7 +15,10 @@ public sealed class EmulatorScheduleService(
     CachedUniEmuDataService dataCache,
     ISchedulerFactory schedulerFactory,
     TagRuntimeStateStore stateStore,
-    ILogger<EmulatorScheduleService> logger)
+    ILogger<EmulatorScheduleService> logger,
+    TelemetryValueGenerator valueGenerator,
+    TagScriptExecutionService scriptExecutionService,
+    RuntimeUpdateService runtimeUpdateService)
 {
     public async Task ScheduleRunningEmulatorsAsync(CancellationToken cancellationToken = default)
     {
@@ -60,7 +64,7 @@ public sealed class EmulatorScheduleService(
             var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
                 ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
 
-            if (!ShouldScheduleTag(emulator, trigger))
+            if (!ShouldScheduleTag(trigger))
             {
                 continue;
             }
@@ -76,6 +80,64 @@ public sealed class EmulatorScheduleService(
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
         await DeleteEmulatorJobsAsync(scheduler, emulatorId, cancellationToken);
         stateStore.ClearEmulator(emulatorId);
+    }
+
+    public async Task ExecuteEventTagsAsync(
+        string emulatorId,
+        TagTriggerEvent triggerEvent,
+        CancellationToken cancellationToken = default)
+    {
+        var emulator = await db.Emulators
+            .Include(e => e.Tags)
+            .FirstOrDefaultAsync(e => e.Id == emulatorId, cancellationToken);
+
+        if (emulator is null)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var matchingTags = emulator.Tags
+            .Where(tag =>
+            {
+                var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
+                    ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
+
+                return trigger.Mode == TagTriggerMode.Once && (trigger.Event ?? TagTriggerEvent.OnStart) == triggerEvent;
+            })
+            .ToList();
+
+        foreach (var tag in matchingTags)
+        {
+            try
+            {
+                var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+                var value = source is TagSource.Script or TagSource.Formula
+                    ? await scriptExecutionService.GenerateScriptTagAsync(emulator, tag, now, cancellationToken)
+                    : valueGenerator.GenerateTag(emulator, tag, now);
+
+                tag.Preview = TelemetryValueGenerator.ToPreview(value.Value);
+                stateStore.Set(emulator.Id, tag.Id, tag.Name, value.Value, value.NumericValue, now);
+                await runtimeUpdateService.PublishTagValueAsync(
+                    new RuntimeTagValueUpdateDto(emulator.Id, tag.Id, tag.Name, value.Value, value.NumericValue, now),
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Event tag generation failed for tag {TagId}", tag.Id);
+                db.SystemEvents.Add(new SystemEventEntity
+                {
+                    Id = $"ev-{Guid.NewGuid():N}"[..12],
+                    EmulatorId = emulator.Id,
+                    EmulatorName = emulator.Name,
+                    Level = UniEmuJson.EnumString(EventLevel.Error),
+                    Message = $"Ошибка вычисления события тега {tag.Name}: {ex.Message}",
+                    Timestamp = now,
+                });
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task DeleteEmulatorJobsAsync(IScheduler scheduler, string emulatorId, CancellationToken cancellationToken)
@@ -153,7 +215,6 @@ public sealed class EmulatorScheduleService(
 
         return trigger.Mode switch
         {
-            TagTriggerMode.Once => builder.Build(),
             TagTriggerMode.Interval => builder
                 .WithSimpleSchedule(schedule => schedule
                     .WithInterval(ToTimeSpan(trigger))
@@ -177,9 +238,9 @@ public sealed class EmulatorScheduleService(
             .Build();
     }
 
-    private static bool ShouldScheduleTag(EmulatorEntity emulator, TagTriggerDto trigger)
+    private static bool ShouldScheduleTag(TagTriggerDto trigger)
     {
-        return trigger.Mode is TagTriggerMode.Once or TagTriggerMode.Interval or TagTriggerMode.Cron;
+        return trigger.Mode is TagTriggerMode.Interval or TagTriggerMode.Cron;
     }
 
     private static TimeSpan ToTimeSpan(TagTriggerDto trigger)
