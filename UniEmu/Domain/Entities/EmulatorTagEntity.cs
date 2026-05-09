@@ -14,6 +14,8 @@ public sealed class EmulatorTagEntity
     public string? CalcJson { get; set; }
     public string? FormulaJson { get; set; }
     public string? ScenarioJson { get; set; }
+    public bool Enabled { get; set; } = true;
+    public int? RoundDigits { get; set; }
     public string? SpecialParameter { get; set; }
     public string? Description { get; set; }
 }

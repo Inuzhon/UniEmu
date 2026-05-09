@@ -66,7 +66,7 @@ public sealed class TagScriptExecutionService(
         }
 
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
-        var value = CastResult(tagType, result, tag.Preview);
+        var value = TelemetryValueGenerator.ApplyTagRounding(tagType, tag, CastResult(tagType, result, tag.Preview));
         SpecialParameter? specialParameter = string.IsNullOrWhiteSpace(tag.SpecialParameter)
             ? null
             : UniEmuJson.EnumValue<SpecialParameter>(tag.SpecialParameter);
@@ -194,7 +194,7 @@ public sealed class TagScriptExecutionService(
         }
 
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
-        var typedValue = CastResult(tagType, value, tag.Preview);
+        var typedValue = TelemetryValueGenerator.ApplyTagRounding(tagType, tag, CastResult(tagType, value, tag.Preview));
         tag.Preview = ToPreview(typedValue);
         stateStore.Set(emulator.Id, tag.Id, tag.Name, typedValue, TelemetryValueGenerator.ToNumericValue(typedValue), timestamp);
         return typedValue;

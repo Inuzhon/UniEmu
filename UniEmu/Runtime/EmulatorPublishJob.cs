@@ -48,9 +48,7 @@ public sealed class EmulatorPublishJob(
             .Where(value => value.NumericValue is not null)
             .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Last().NumericValue!.Value, StringComparer.OrdinalIgnoreCase);
-        var dispatcherValues = generatedValues
-            .Select(value => new UniversalValue(value.Key, value.Value))
-            .ToList();
+        var dispatcherValues = BuildDispatcherValues(emulator.Tags, generatedValues);
         var machineIntegrationId = GetMachineIntegrationId(emulator);
         var mainProgram = await ResolveProgramAsync(emulator.Id, generatedValues, SpecialParameter.PrgName, cancellationToken);
         var subProgram = await ResolveProgramAsync(emulator.Id, generatedValues, SpecialParameter.Subprogram, cancellationToken);
@@ -141,6 +139,17 @@ public sealed class EmulatorPublishJob(
         }
 
         return values;
+    }
+
+    public static List<UniversalValue> BuildDispatcherValues(
+        IReadOnlyList<EmulatorTagEntity> tags,
+        IReadOnlyList<GeneratedTagValue> generatedValues)
+    {
+        return tags
+            .Zip(generatedValues)
+            .Where(pair => pair.First.Enabled)
+            .Select(pair => new UniversalValue(pair.Second.Key, pair.Second.Value))
+            .ToList();
     }
 
     private static GeneratedTagValue FromRuntimeValue(EmulatorTagEntity tag, TagRuntimeValue runtimeValue)

@@ -39,6 +39,20 @@ public static class UniEmuSchemaUpdater
             ON ScriptRuntimeStates (EmulatorId, ScriptKey)
             """,
             cancellationToken);
+
+        if (!await HasColumnAsync(db, "EmulatorTags", "Enabled", cancellationToken))
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE EmulatorTags ADD COLUMN Enabled INTEGER NOT NULL DEFAULT 1",
+                cancellationToken);
+        }
+
+        if (!await HasColumnAsync(db, "EmulatorTags", "RoundDigits", cancellationToken))
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE EmulatorTags ADD COLUMN RoundDigits INTEGER NULL",
+                cancellationToken);
+        }
     }
 
     private static async Task<bool> HasColumnAsync(

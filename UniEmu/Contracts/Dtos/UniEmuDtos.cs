@@ -57,6 +57,8 @@ public sealed record EmulatorTagDto(
     TagCalcConfigDto? Calc,
     TagFormulaConfigDto? Formula,
     TagScenarioConfigDto? Scenario,
+    bool Enabled,
+    int? RoundDigits,
     SpecialParameter? SpecialParameter,
     string? Description);
 

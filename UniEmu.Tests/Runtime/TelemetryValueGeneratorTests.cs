@@ -29,10 +29,11 @@ public sealed class TelemetryValueGeneratorTests
         var generator = new TelemetryValueGenerator();
         var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z") };
         var tag = CreateTag("Temperature", "Temp", TagType.Double, TagSource.Generator, preview: "0");
+        tag.RoundDigits = 2;
         tag.CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(
             CalcType.Line,
-            Start: "10",
-            Finish: "20",
+            Start: "10.111",
+            Finish: "20.999",
             Duration: 10,
             Amplitude: null,
             Period: null,
@@ -41,8 +42,21 @@ public sealed class TelemetryValueGeneratorTests
 
         var value = generator.GenerateTag(emulator, tag, DateTimeOffset.Parse("2026-05-09T10:00:05Z"));
 
-        Assert.Equal(15d, value.Value);
-        Assert.Equal(15d, value.NumericValue);
+        Assert.Equal(15.56, value.Value);
+        Assert.Equal(15.56, value.NumericValue);
+    }
+
+    [Fact]
+    public void GenerateTag_DoesNotRoundDouble_WhenRoundDigitsIsNull()
+    {
+        var generator = new TelemetryValueGenerator();
+        var emulator = new EmulatorEntity { Id = "emu-1" };
+        var tag = CreateTag("Temperature", "Temp", TagType.Double, TagSource.Static, preview: "12.3456");
+
+        var value = generator.GenerateTag(emulator, tag, DateTimeOffset.Parse("2026-05-09T10:00:00Z"));
+
+        Assert.Equal(12.3456, value.Value);
+        Assert.Equal(12.3456, value.NumericValue);
     }
 
     [Fact]

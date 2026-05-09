@@ -44,6 +44,7 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
             entity.Property(e => e.Key).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Type).HasMaxLength(32).IsRequired();
             entity.Property(e => e.Source).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.Enabled).IsRequired().HasDefaultValue(true);
             entity.HasIndex(e => e.EmulatorId);
         });
 

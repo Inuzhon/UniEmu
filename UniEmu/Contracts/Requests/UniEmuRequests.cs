@@ -19,6 +19,8 @@ public sealed record CreateTagRequest(
     TagCalcConfigDto? Calc,
     TagFormulaConfigDto? Formula,
     TagScenarioConfigDto? Scenario,
+    bool? Enabled,
+    int? RoundDigits,
     SpecialParameter? SpecialParameter,
     string? Description);
 
@@ -32,6 +34,8 @@ public sealed record ReplaceTagRequest(
     TagCalcConfigDto? Calc,
     TagFormulaConfigDto? Formula,
     TagScenarioConfigDto? Scenario,
+    bool? Enabled,
+    int? RoundDigits,
     SpecialParameter? SpecialParameter,
     string? Description);
 

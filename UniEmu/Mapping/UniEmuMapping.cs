@@ -41,6 +41,8 @@ public static class UniEmuMapping
             UniEmuJson.Deserialize<TagCalcConfigDto>(entity.CalcJson),
             UniEmuJson.Deserialize<TagFormulaConfigDto>(entity.FormulaJson),
             UniEmuJson.Deserialize<TagScenarioConfigDto>(entity.ScenarioJson),
+            entity.Enabled,
+            entity.RoundDigits,
             string.IsNullOrWhiteSpace(entity.SpecialParameter) ? null : UniEmuJson.EnumValue<SpecialParameter>(entity.SpecialParameter),
             entity.Description);
     }

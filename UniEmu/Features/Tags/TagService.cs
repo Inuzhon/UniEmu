@@ -50,6 +50,8 @@ public sealed class TagService(
             CalcJson = request.Calc is null ? null : UniEmuJson.Serialize(request.Calc),
             FormulaJson = request.Formula is null ? null : UniEmuJson.Serialize(request.Formula),
             ScenarioJson = request.Scenario is null ? null : UniEmuJson.Serialize(request.Scenario),
+            Enabled = request.Enabled ?? true,
+            RoundDigits = NormalizeRoundDigits(request.RoundDigits),
             SpecialParameter = request.SpecialParameter is null ? null : UniEmuJson.EnumString(request.SpecialParameter.Value),
             Description = request.Description,
         };
@@ -80,6 +82,8 @@ public sealed class TagService(
         entity.CalcJson = request.Calc is null ? null : UniEmuJson.Serialize(request.Calc);
         entity.FormulaJson = request.Formula is null ? null : UniEmuJson.Serialize(request.Formula);
         entity.ScenarioJson = request.Scenario is null ? null : UniEmuJson.Serialize(request.Scenario);
+        entity.Enabled = request.Enabled ?? true;
+        entity.RoundDigits = NormalizeRoundDigits(request.RoundDigits);
         entity.SpecialParameter = request.SpecialParameter is null ? null : UniEmuJson.EnumString(request.SpecialParameter.Value);
         entity.Description = request.Description;
 
@@ -102,5 +106,10 @@ public sealed class TagService(
         }
 
         return deleted > 0;
+    }
+
+    private static int? NormalizeRoundDigits(int? value)
+    {
+        return value is null ? null : Math.Clamp(value.Value, 0, 15);
     }
 }

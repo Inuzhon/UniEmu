@@ -33,7 +33,7 @@ public sealed class TelemetryValueGenerator
     {
         var numericValue = GenerateNumericTag(emulator, tag, timestamp);
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
-        var value = CastValue(tagType, tag, numericValue);
+        var value = ApplyTagRounding(tagType, tag, CastValue(tagType, tag, numericValue));
         SpecialParameter? specialParameter = string.IsNullOrWhiteSpace(tag.SpecialParameter)
             ? null
             : UniEmuJson.EnumValue<SpecialParameter>(tag.SpecialParameter);
@@ -85,6 +85,18 @@ public sealed class TelemetryValueGenerator
             decimal decimalValue => (double)decimalValue,
             _ => null,
         };
+    }
+
+    public static object? ApplyTagRounding(TagType tagType, EmulatorTagEntity tag, object? value)
+    {
+        if (tagType != TagType.Double || tag.RoundDigits is null || value is null)
+        {
+            return value;
+        }
+
+        var digits = Math.Clamp(tag.RoundDigits.Value, 0, 15);
+        var numericValue = ToNumericValue(value);
+        return numericValue is null ? value : Math.Round(numericValue.Value, digits, MidpointRounding.AwayFromZero);
     }
 
     private static double GenerateTagValue(EmulatorTagEntity tag, double elapsedSec)
