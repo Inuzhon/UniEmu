@@ -1,5 +1,6 @@
 ﻿using Nerdbank.Streams;
 using OmniSharp.Extensions.LanguageServer.Server;
+using Serilog;
 
 namespace UniEmu.Runtime.Scripting;
 
@@ -16,6 +17,8 @@ public static class CsxLspEndpoint
                 return;
             }
 
+            var logger = context.RequestServices.GetRequiredService<Serilog.ILogger>();
+
             using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
             await using var stream = webSocket.AsStream();
 
@@ -23,7 +26,7 @@ public static class CsxLspEndpoint
                 .WithInput(stream)
                 .WithOutput(stream)
                 .ConfigureLogging(logging => logging
-                    .AddConsole()
+                    .AddSerilog(logger, dispose: true)
                     .SetMinimumLevel(LogLevel.Debug))
                 .WithHandler<CsxTextDocumentSyncHandler>()
                 .WithHandler<CsxCompletionHandler>()
@@ -38,3 +41,5 @@ public static class CsxLspEndpoint
         });
     }
 }
+
+public class LSPLog { }

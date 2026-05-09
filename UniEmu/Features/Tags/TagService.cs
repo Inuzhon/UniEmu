@@ -6,13 +6,15 @@ using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
 using UniEmu.Runtime;
+using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Features.Tags;
 
 public sealed class TagService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
-    EmulatorScheduleService scheduleService)
+    EmulatorScheduleService scheduleService,
+    CsxLanguageService language)
 {
     public async Task<IReadOnlyList<EmulatorTagDto>?> ListAsync(string emulatorId, CancellationToken cancellationToken)
     {
@@ -36,6 +38,8 @@ public sealed class TagService(
         {
             return null;
         }
+
+        await ValidateInlineScriptAsync(emulatorId, $"inline/{request.Name.Trim()}.csx", request.Formula?.InlineScript, cancellationToken);
 
         var entity = new EmulatorTagEntity
         {
@@ -72,6 +76,8 @@ public sealed class TagService(
         {
             return null;
         }
+
+        await ValidateInlineScriptAsync(emulatorId, $"inline/{entity.Id}.csx", request.Formula?.InlineScript, cancellationToken);
 
         entity.Name = request.Name.Trim();
         entity.Key = request.Key.Trim();
@@ -111,5 +117,30 @@ public sealed class TagService(
     private static int? NormalizeRoundDigits(int? value)
     {
         return value is null ? null : Math.Clamp(value.Value, 0, 15);
+    }
+
+    private async Task ValidateInlineScriptAsync(
+        string emulatorId,
+        string entryPath,
+        string? inlineScript,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(inlineScript))
+        {
+            return;
+        }
+
+        var visibleScripts = (await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken))
+            .ToDictionary(script => TagScriptPath.Normalize(script.Name), script => script.Content, StringComparer.OrdinalIgnoreCase);
+
+        var result = language.Analyze(entryPath, inlineScript, visibleScripts, typeof(TagScriptGlobals));
+        var errors = result.Diagnostics
+            .Where(diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error)
+            .ToArray();
+
+        if (errors.Length > 0)
+        {
+            throw new CsxScriptValidationException(errors);
+        }
     }
 }

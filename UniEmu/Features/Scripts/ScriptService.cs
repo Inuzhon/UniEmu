@@ -6,12 +6,15 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
+using UniEmu.Runtime;
+using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Features.Scripts;
 
 public sealed class ScriptService(
     UniEmuDbContext db,
-    CachedUniEmuDataService dataCache)
+    CachedUniEmuDataService dataCache,
+    CsxLanguageService language)
 {
     public async Task<IReadOnlyList<ScriptFileDto>> ListAsync(ScriptScope? scope, string? emulatorId, CancellationToken cancellationToken)
     {
@@ -69,11 +72,22 @@ public sealed class ScriptService(
             return null;
         }
 
+        var nextName = entity.Name;
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            entity.Name = request.Name.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
+            nextName = request.Name.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
                 ? request.Name.Trim()
                 : $"{request.Name.Trim()}.csx";
+        }
+
+        if (request.Content is not null)
+        {
+            await ValidateContentAsync(entity, nextName, request.Content, cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Name))
+        {
+            entity.Name = nextName;
         }
 
         if (request.Content is not null)
@@ -108,5 +122,30 @@ public sealed class ScriptService(
                 && await db.Emulators.AnyAsync(e => e.Id == emulatorId, cancellationToken),
             _ => false,
         };
+    }
+
+    private async Task ValidateContentAsync(
+        ScriptFileEntity entity,
+        string nextName,
+        string nextContent,
+        CancellationToken cancellationToken)
+    {
+        var sharedScope = UniEmuJson.EnumString(ScriptScope.Shared);
+        var visibleScripts = await db.ScriptFiles
+            .AsNoTracking()
+            .Where(script => script.Id != entity.Id && (script.Scope == sharedScope || script.EmulatorId == entity.EmulatorId))
+            .ToDictionaryAsync(script => TagScriptPath.Normalize(script.Name), script => script.Content, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        visibleScripts[TagScriptPath.Normalize(nextName)] = nextContent;
+
+        var result = language.Analyze(nextName, nextContent, visibleScripts, typeof(TagScriptGlobals));
+        var errors = result.Diagnostics
+            .Where(diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error)
+            .ToArray();
+
+        if (errors.Length > 0)
+        {
+            throw new CsxScriptValidationException(errors);
+        }
     }
 }

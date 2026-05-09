@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Requests;
+using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Features.Tags;
 
@@ -23,15 +24,37 @@ public sealed class TagsController(TagService service) : ControllerBase
             return BadRequest("Name and key are required.");
         }
 
-        var tag = await service.CreateAsync(emulatorId, request, cancellationToken);
-        return tag is null ? NotFound() : CreatedAtAction(nameof(List), new { emulatorId }, tag);
+        try
+        {
+            var tag = await service.CreateAsync(emulatorId, request, cancellationToken);
+            return tag is null ? NotFound() : CreatedAtAction(nameof(List), new { emulatorId }, tag);
+        }
+        catch (CsxScriptValidationException ex)
+        {
+            return BadRequest(new
+            {
+                message = "CSX script validation failed.",
+                diagnostics = ex.Diagnostics,
+            });
+        }
     }
 
     [HttpPatch("{tagId}")]
     public async Task<ActionResult<EmulatorTagDto>> Replace(string emulatorId, string tagId, ReplaceTagRequest request, CancellationToken cancellationToken)
     {
-        var tag = await service.ReplaceAsync(emulatorId, tagId, request, cancellationToken);
-        return tag is null ? NotFound() : Ok(tag);
+        try
+        {
+            var tag = await service.ReplaceAsync(emulatorId, tagId, request, cancellationToken);
+            return tag is null ? NotFound() : Ok(tag);
+        }
+        catch (CsxScriptValidationException ex)
+        {
+            return BadRequest(new
+            {
+                message = "CSX script validation failed.",
+                diagnostics = ex.Diagnostics,
+            });
+        }
     }
 
     [HttpDelete("{tagId}")]

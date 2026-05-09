@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
+using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Features.Scripts;
 
@@ -30,8 +31,19 @@ public sealed class ScriptsController(ScriptService service) : ControllerBase
     [HttpPatch("{scriptId}")]
     public async Task<ActionResult<ScriptFileDto>> Patch(string scriptId, PatchScriptRequest request, CancellationToken cancellationToken)
     {
-        var script = await service.PatchAsync(scriptId, request, cancellationToken);
-        return script is null ? NotFound() : Ok(script);
+        try
+        {
+            var script = await service.PatchAsync(scriptId, request, cancellationToken);
+            return script is null ? NotFound() : Ok(script);
+        }
+        catch (CsxScriptValidationException ex)
+        {
+            return BadRequest(new
+            {
+                message = "CSX script validation failed.",
+                diagnostics = ex.Diagnostics,
+            });
+        }
     }
 
     [HttpDelete("{scriptId}")]
