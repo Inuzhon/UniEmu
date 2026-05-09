@@ -11,6 +11,7 @@ namespace UniEmu.Runtime;
 
 public sealed class EmulatorScheduleService(
     UniEmuDbContext db,
+    CachedUniEmuDataService dataCache,
     ISchedulerFactory schedulerFactory,
     TagRuntimeStateStore stateStore,
     ILogger<EmulatorScheduleService> logger)
@@ -46,10 +47,7 @@ public sealed class EmulatorScheduleService(
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
         await DeleteEmulatorJobsAsync(scheduler, emulatorId, cancellationToken);
 
-        var emulator = await db.Emulators
-            .AsNoTracking()
-            .Include(e => e.Tags)
-            .FirstOrDefaultAsync(e => e.Id == emulatorId, cancellationToken);
+        var emulator = await dataCache.GetEmulatorWithTagsAsync(emulatorId, cancellationToken);
 
         if (emulator is null || emulator.Status != nameof(EmulatorStatus.Running))
         {

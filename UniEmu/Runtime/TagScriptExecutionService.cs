@@ -13,6 +13,7 @@ namespace UniEmu.Runtime;
 
 public sealed class TagScriptExecutionService(
     UniEmuDbContext db,
+    CachedUniEmuDataService dataCache,
     TagRuntimeStateStore stateStore,
     CompiledTagScriptCache scriptCache)
 {
@@ -89,11 +90,8 @@ public sealed class TagScriptExecutionService(
             return new ScriptContent($"inline/{tag.Id}.csx", "return null;", $"inline:{tag.Id}");
         }
 
-        var script = await db.ScriptFiles
-            .AsNoTracking()
-            .Where(s => s.Id == formula.ScriptId)
-            .Where(s => s.EmulatorId == emulatorId || s.Scope == UniEmuJson.EnumString(ScriptScope.Shared))
-            .FirstOrDefaultAsync(cancellationToken);
+        var visibleScripts = await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken);
+        var script = visibleScripts.FirstOrDefault(s => s.Id == formula.ScriptId);
 
         if (script is null)
         {
@@ -105,12 +103,7 @@ public sealed class TagScriptExecutionService(
 
     private async Task<Dictionary<string, string>> LoadVisibleScriptsAsync(string emulatorId, CancellationToken cancellationToken)
     {
-        var sharedScope = UniEmuJson.EnumString(ScriptScope.Shared);
-        var scripts = await db.ScriptFiles
-            .AsNoTracking()
-            .Where(s => s.Scope == sharedScope || s.EmulatorId == emulatorId)
-            .OrderBy(s => s.Scope == sharedScope ? 0 : 1)
-            .ToListAsync(cancellationToken);
+        var scripts = await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken);
 
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var script in scripts)

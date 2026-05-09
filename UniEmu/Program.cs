@@ -51,6 +51,7 @@ builder.Services.AddSignalR()
     });
 builder.Services.AddDbContext<UniEmuDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("UniEmuDb")));
+builder.Services.AddMemoryCache();
 builder.Services.AddQuartz();
 
 builder.Services.AddHttpClient(nameof(TelemetryPacketSender), configure =>
@@ -122,6 +123,7 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<CncProgramService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<EventService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<TelemetryService>().AsSelf().InstancePerLifetimeScope();
+    container.RegisterType<CachedUniEmuDataService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<RuntimeUpdateService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<SignalRRuntimeUpdateBroadcaster>().As<IRuntimeUpdateBroadcaster>().InstancePerLifetimeScope();
     container.RegisterType<EmulatorScheduleService>().AsSelf().InstancePerLifetimeScope();

@@ -13,6 +13,7 @@ namespace UniEmu.Runtime;
 [DisallowConcurrentExecution]
 public sealed class EmulatorPublishJob(
     UniEmuDbContext db,
+    CachedUniEmuDataService dataCache,
     TelemetryValueGenerator valueGenerator,
     TagScriptExecutionService scriptExecutionService,
     TagRuntimeStateStore stateStore,
@@ -51,8 +52,8 @@ public sealed class EmulatorPublishJob(
             .Select(value => new UniversalValue(value.Key, value.Value))
             .ToList();
         var machineIntegrationId = GetMachineIntegrationId(emulator);
-        var mainProgram = ResolveProgram(emulator.Id, generatedValues, SpecialParameter.PrgName);
-        var subProgram = ResolveProgram(emulator.Id, generatedValues, SpecialParameter.Subprogram);
+        var mainProgram = await ResolveProgramAsync(emulator.Id, generatedValues, SpecialParameter.PrgName, cancellationToken);
+        var subProgram = await ResolveProgramAsync(emulator.Id, generatedValues, SpecialParameter.Subprogram, cancellationToken);
         var level = EventLevel.Success;
         var message = "Пакет мониторинга отправлен в Dispatcher";
 
@@ -242,10 +243,11 @@ public sealed class EmulatorPublishJob(
 
     private static object GetMachineIntegrationId(EmulatorEntity emulator) => emulator.ProtocolId;
 
-    private DispatcherProgram? ResolveProgram(
+    private async Task<DispatcherProgram?> ResolveProgramAsync(
         string emulatorId,
         IReadOnlyList<GeneratedTagValue> values,
-        SpecialParameter specialParameter)
+        SpecialParameter specialParameter,
+        CancellationToken cancellationToken)
     {
         var programName = values
             .FirstOrDefault(value => value.SpecialParameter == specialParameter)
@@ -257,8 +259,8 @@ public sealed class EmulatorPublishJob(
             return null;
         }
 
-        var match = db.CncPrograms
-            .AsEnumerable()
+        var programs = await dataCache.GetVisibleCncProgramsAsync(emulatorId, cancellationToken);
+        var match = programs
             .Where(program => program.Name.Equals(programName, StringComparison.OrdinalIgnoreCase))
             .Where(program => program.Scope == UniEmuJson.EnumString(CncScope.Shared) || program.EmulatorId == emulatorId)
             .OrderByDescending(program => program.Description.StartsWith("[dispatcher-received]", StringComparison.OrdinalIgnoreCase))
@@ -317,6 +319,7 @@ public sealed class EmulatorPublishJob(
                 UpdatedAt = DateTimeOffset.UtcNow,
                 UploadedAt = DateTimeOffset.UtcNow,
             });
+            dataCache.InvalidateCncPrograms();
             return;
         }
 
@@ -324,5 +327,6 @@ public sealed class EmulatorPublishJob(
         existing.Content = content;
         existing.SizeBytes = program.Bytes.Length;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
+        dataCache.InvalidateCncPrograms();
     }
 }

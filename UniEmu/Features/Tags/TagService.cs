@@ -9,7 +9,10 @@ using UniEmu.Runtime;
 
 namespace UniEmu.Features.Tags;
 
-public sealed class TagService(UniEmuDbContext db, EmulatorScheduleService scheduleService)
+public sealed class TagService(
+    UniEmuDbContext db,
+    CachedUniEmuDataService dataCache,
+    EmulatorScheduleService scheduleService)
 {
     public async Task<IReadOnlyList<EmulatorTagDto>?> ListAsync(string emulatorId, CancellationToken cancellationToken)
     {
@@ -53,6 +56,7 @@ public sealed class TagService(UniEmuDbContext db, EmulatorScheduleService sched
 
         db.EmulatorTags.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateEmulator(emulatorId);
         await scheduleService.RescheduleIfRunningAsync(emulatorId, cancellationToken);
         return entity.ToDto();
     }
@@ -80,6 +84,7 @@ public sealed class TagService(UniEmuDbContext db, EmulatorScheduleService sched
         entity.Description = request.Description;
 
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateEmulator(emulatorId);
         await scheduleService.RescheduleIfRunningAsync(emulatorId, cancellationToken);
         return entity.ToDto();
     }
@@ -92,6 +97,7 @@ public sealed class TagService(UniEmuDbContext db, EmulatorScheduleService sched
 
         if (deleted > 0)
         {
+            dataCache.InvalidateEmulator(emulatorId);
             await scheduleService.RescheduleIfRunningAsync(emulatorId, cancellationToken);
         }
 

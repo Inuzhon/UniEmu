@@ -9,7 +9,9 @@ using UniEmu.Mapping;
 
 namespace UniEmu.Features.CncPrograms;
 
-public sealed class CncProgramService(UniEmuDbContext db)
+public sealed class CncProgramService(
+    UniEmuDbContext db,
+    CachedUniEmuDataService dataCache)
 {
     public async Task<IReadOnlyList<CncProgramDto>> ListAsync(CncScope? scope, string? emulatorId, CancellationToken cancellationToken)
     {
@@ -59,6 +61,7 @@ public sealed class CncProgramService(UniEmuDbContext db)
 
         db.CncPrograms.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateCncPrograms();
         return entity.ToDto();
     }
 
@@ -88,12 +91,19 @@ public sealed class CncProgramService(UniEmuDbContext db)
 
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateCncPrograms();
         return entity.ToDto();
     }
 
     public async Task<bool> DeleteAsync(string programId, CancellationToken cancellationToken)
     {
-        return await db.CncPrograms.Where(p => p.Id == programId).ExecuteDeleteAsync(cancellationToken) > 0;
+        var deleted = await db.CncPrograms.Where(p => p.Id == programId).ExecuteDeleteAsync(cancellationToken);
+        if (deleted > 0)
+        {
+            dataCache.InvalidateCncPrograms();
+        }
+
+        return deleted > 0;
     }
 
     private async Task<bool> IsScopeValidAsync(CncScope scope, string? emulatorId, CancellationToken cancellationToken)

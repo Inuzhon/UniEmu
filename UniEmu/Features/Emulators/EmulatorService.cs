@@ -12,6 +12,7 @@ namespace UniEmu.Features.Emulators;
 
 public sealed class EmulatorService(
     UniEmuDbContext db,
+    CachedUniEmuDataService dataCache,
     EmulatorScheduleService scheduleService,
     RuntimeUpdateService runtimeUpdateService)
 {
@@ -59,6 +60,7 @@ public sealed class EmulatorService(
 
         db.Emulators.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateEmulator(entity.Id);
 
         var dto = entity.ToDto(tagsCount: 0);
         await runtimeUpdateService.PublishEmulatorUpdatedAsync(dto, cancellationToken);
@@ -103,6 +105,7 @@ public sealed class EmulatorService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateEmulator(entity.Id);
         if (shouldReschedule)
         {
             await scheduleService.ScheduleEmulatorAsync(entity.Id, cancellationToken);
@@ -140,6 +143,7 @@ public sealed class EmulatorService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateEmulator(entity.Id);
         if (request.Status == EmulatorStatus.Running)
         {
             await scheduleService.ScheduleEmulatorAsync(entity.Id, cancellationToken);

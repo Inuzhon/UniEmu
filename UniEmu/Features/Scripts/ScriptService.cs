@@ -9,7 +9,9 @@ using UniEmu.Mapping;
 
 namespace UniEmu.Features.Scripts;
 
-public sealed class ScriptService(UniEmuDbContext db)
+public sealed class ScriptService(
+    UniEmuDbContext db,
+    CachedUniEmuDataService dataCache)
 {
     public async Task<IReadOnlyList<ScriptFileDto>> ListAsync(ScriptScope? scope, string? emulatorId, CancellationToken cancellationToken)
     {
@@ -55,6 +57,7 @@ public sealed class ScriptService(UniEmuDbContext db)
 
         db.ScriptFiles.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateScripts();
         return entity.ToDto();
     }
 
@@ -81,12 +84,19 @@ public sealed class ScriptService(UniEmuDbContext db)
 
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateScripts();
         return entity.ToDto();
     }
 
     public async Task<bool> DeleteAsync(string scriptId, CancellationToken cancellationToken)
     {
-        return await db.ScriptFiles.Where(s => s.Id == scriptId).ExecuteDeleteAsync(cancellationToken) > 0;
+        var deleted = await db.ScriptFiles.Where(s => s.Id == scriptId).ExecuteDeleteAsync(cancellationToken);
+        if (deleted > 0)
+        {
+            dataCache.InvalidateScripts();
+        }
+
+        return deleted > 0;
     }
 
     private async Task<bool> IsScopeValidAsync(ScriptScope scope, string? emulatorId, CancellationToken cancellationToken)
