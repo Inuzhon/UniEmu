@@ -1,14 +1,15 @@
+using System.IO.Pipelines;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using UniEmu.Common;
+using Nerdbank.Streams;
+using OmniSharp.Extensions.LanguageServer.Server;
+using Serilog;
 
 namespace UniEmu.Runtime.Scripting;
 
 public static class CsxLspEndpoint
 {
-    private static readonly JsonSerializerOptions JsonOptions = UniEmuJson.Options;
+    private static readonly byte[] HeaderSeparator = "\r\n\r\n"u8.ToArray();
 
     public static void MapCsxLsp(this WebApplication app)
     {
@@ -21,319 +22,245 @@ public static class CsxLspEndpoint
                 return;
             }
 
+            var logger = context.RequestServices.GetRequiredService<Serilog.ILogger>();
+
             using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            var session = new CsxLspWebSocketSession(
-                webSocket,
-                context.RequestServices.GetRequiredService<CsxDocumentStore>(),
-                context.RequestServices.GetRequiredService<CsxLanguageService>(),
-                context.RequestServices.GetRequiredService<ILogger<CsxLspWebSocketSession>>());
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
 
-            await session.RunAsync(context.RequestAborted);
-        });
-    }
+            var clientToServer = new Pipe();
+            var serverToClient = new Pipe();
+            var duplexPipe = new DuplexPipe(clientToServer.Reader, serverToClient.Writer);
+            await using var stream = duplexPipe.AsStream();
 
-    private sealed class CsxLspWebSocketSession(
-        WebSocket webSocket,
-        CsxDocumentStore documents,
-        CsxLanguageService language,
-        ILogger<CsxLspWebSocketSession> logger)
-    {
-        public async Task RunAsync(CancellationToken cancellationToken)
-        {
-            while (webSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
-            {
-                var message = await ReceiveMessageAsync(cancellationToken);
-                if (message is null)
-                {
-                    break;
-                }
-
-                await HandleMessageAsync(message, cancellationToken);
-            }
-        }
-
-        private async Task<JsonObject?> ReceiveMessageAsync(CancellationToken cancellationToken)
-        {
-            var buffer = new byte[16 * 1024];
-            using var stream = new MemoryStream();
-
-            while (true)
-            {
-                var result = await webSocket.ReceiveAsync(buffer, cancellationToken);
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    return null;
-                }
-
-                stream.Write(buffer, 0, result.Count);
-                if (result.EndOfMessage)
-                {
-                    break;
-                }
-            }
-
-            var json = Encoding.UTF8.GetString(stream.ToArray());
-            return JsonNode.Parse(json)?.AsObject();
-        }
-
-        private async Task HandleMessageAsync(JsonObject message, CancellationToken cancellationToken)
-        {
-            var method = message["method"]?.GetValue<string>();
-            var id = message["id"]?.DeepClone();
+            var incoming = PumpWebSocketToLanguageServerAsync(webSocket, clientToServer.Writer, cancellation.Token);
+            var outgoing = PumpLanguageServerToWebSocketAsync(serverToClient.Reader, webSocket, cancellation.Token);
 
             try
             {
-                switch (method)
-                {
-                    case "initialize":
-                        await SendResponseAsync(id, InitializeResult(), cancellationToken);
-                        break;
-                    case "shutdown":
-                        await SendResponseAsync(id, null, cancellationToken);
-                        break;
-                    case "exit":
-                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "LSP exit", cancellationToken);
-                        break;
-                    case "textDocument/didOpen":
-                        await HandleDidOpenAsync(message, cancellationToken);
-                        break;
-                    case "textDocument/didChange":
-                        await HandleDidChangeAsync(message, cancellationToken);
-                        break;
-                    case "textDocument/didClose":
-                        await HandleDidCloseAsync(message, cancellationToken);
-                        break;
-                    case "textDocument/completion":
-                        await SendResponseAsync(id, await HandleCompletionAsync(message, cancellationToken), cancellationToken);
-                        break;
-                    default:
-                        if (id is not null)
-                        {
-                            await SendResponseAsync(id, null, cancellationToken);
-                        }
+                var server = await LanguageServer.From(options => options
+                    .WithInput(stream)
+                    .WithOutput(stream)
+                    .ConfigureLogging(logging => logging
+                        .AddSerilog(logger, dispose: true)
+                        .SetMinimumLevel(LogLevel.Debug))
+                    .WithHandler<CsxTextDocumentSyncHandler>()
+                    .WithHandler<CsxCompletionHandler>()
+                    .WithServices(services =>
+                    {
+                        services.AddSingleton(context.RequestServices.GetRequiredService<CsxDocumentStore>());
+                        services.AddSingleton(context.RequestServices.GetRequiredService<CsxLanguageService>());
+                        services.AddSingleton(context.RequestServices.GetRequiredService<IServiceScopeFactory>());
+                    }));
 
-                        break;
+                await server.WaitForExit;
+            }
+            finally
+            {
+                await StopPumpsAsync(cancellation, clientToServer, serverToClient, incoming, outgoing);
+            }
+        });
+    }
+
+    private static async Task PumpWebSocketToLanguageServerAsync(
+        WebSocket webSocket,
+        PipeWriter writer,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[16 * 1024];
+
+        try
+        {
+            while (webSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+            {
+                using var message = new MemoryStream();
+                WebSocketReceiveResult result;
+
+                do
+                {
+                    result = await webSocket.ReceiveAsync(buffer, cancellationToken);
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        return;
+                    }
+
+                    message.Write(buffer, 0, result.Count);
+                }
+                while (!result.EndOfMessage);
+
+                var body = message.ToArray();
+                var header = Encoding.ASCII.GetBytes($"Content-Length: {body.Length}\r\n\r\n");
+
+                await writer.WriteAsync(header, cancellationToken);
+                await writer.WriteAsync(body, cancellationToken);
+                var flush = await writer.FlushAsync(cancellationToken);
+                if (flush.IsCompleted || flush.IsCanceled)
+                {
+                    return;
                 }
             }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to handle CSX LSP method {Method}", method);
-                if (id is not null)
-                {
-                    await SendErrorAsync(id, -32603, ex.Message, cancellationToken);
-                }
-            }
         }
-
-        private async Task HandleDidOpenAsync(JsonObject message, CancellationToken cancellationToken)
+        finally
         {
-            var document = message["params"]?["textDocument"]?.AsObject();
-            if (document is null)
-            {
-                return;
-            }
-
-            var uri = document["uri"]?.GetValue<string>();
-            var text = document["text"]?.GetValue<string>() ?? string.Empty;
-            var version = document["version"]?.GetValue<int?>();
-            if (uri is null)
-            {
-                return;
-            }
-
-            documents.Open(uri, text, version);
-            await PublishDiagnosticsAsync(uri, text, version, cancellationToken);
-        }
-
-        private async Task HandleDidChangeAsync(JsonObject message, CancellationToken cancellationToken)
-        {
-            var textDocument = message["params"]?["textDocument"]?.AsObject();
-            var changes = message["params"]?["contentChanges"]?.AsArray();
-            var uri = textDocument?["uri"]?.GetValue<string>();
-            var version = textDocument?["version"]?.GetValue<int?>();
-            var text = changes?.LastOrDefault()?["text"]?.GetValue<string>();
-            if (uri is null || text is null)
-            {
-                return;
-            }
-
-            documents.Update(uri, text, version);
-            await PublishDiagnosticsAsync(uri, text, version, cancellationToken);
-        }
-
-        private async Task HandleDidCloseAsync(JsonObject message, CancellationToken cancellationToken)
-        {
-            var uri = message["params"]?["textDocument"]?["uri"]?.GetValue<string>();
-            if (uri is null)
-            {
-                return;
-            }
-
-            documents.Close(uri);
-            await SendNotificationAsync("textDocument/publishDiagnostics", new JsonObject
-            {
-                ["uri"] = uri,
-                ["diagnostics"] = new JsonArray(),
-            }, cancellationToken);
-        }
-
-        private async Task<JsonObject> HandleCompletionAsync(JsonObject message, CancellationToken cancellationToken)
-        {
-            var uri = message["params"]?["textDocument"]?["uri"]?.GetValue<string>();
-            if (uri is null || !documents.TryGet(uri, out var document))
-            {
-                return CompletionList([]);
-            }
-
-            var line = message["params"]?["position"]?["line"]?.GetValue<int>() ?? 0;
-            var character = message["params"]?["position"]?["character"]?.GetValue<int>() ?? 0;
-            var visibleScripts = await documents.LoadVisibleScriptsAsync(document.Uri, cancellationToken);
-            var completions = language.GetCompletions(
-                document.Uri,
-                document.Text,
-                ToOffset(document.Text, line, character),
-                visibleScripts,
-                typeof(TagScriptGlobals));
-
-            return CompletionList(completions.Select(item => new JsonObject
-            {
-                ["label"] = item.Label,
-                ["insertText"] = item.InsertText,
-                ["sortText"] = item.SortText,
-                ["filterText"] = item.FilterText,
-                ["kind"] = 2,
-            }));
-        }
-
-        private async Task PublishDiagnosticsAsync(
-            string uri,
-            string text,
-            int? version,
-            CancellationToken cancellationToken)
-        {
-            var visibleScripts = await documents.LoadVisibleScriptsAsync(uri, cancellationToken);
-            var result = language.Analyze(uri, text, visibleScripts, typeof(TagScriptGlobals));
-            var diagnostics = new JsonArray(result.Diagnostics.Select(ToLspDiagnostic).ToArray<JsonNode?>());
-            await SendNotificationAsync("textDocument/publishDiagnostics", new JsonObject
-            {
-                ["uri"] = uri,
-                ["version"] = version,
-                ["diagnostics"] = diagnostics,
-            }, cancellationToken);
-        }
-
-        private async Task SendResponseAsync(JsonNode? id, JsonNode? result, CancellationToken cancellationToken)
-        {
-            await SendAsync(new JsonObject
-            {
-                ["jsonrpc"] = "2.0",
-                ["id"] = id?.DeepClone(),
-                ["result"] = result?.DeepClone(),
-            }, cancellationToken);
-        }
-
-        private async Task SendErrorAsync(JsonNode id, int code, string message, CancellationToken cancellationToken)
-        {
-            await SendAsync(new JsonObject
-            {
-                ["jsonrpc"] = "2.0",
-                ["id"] = id.DeepClone(),
-                ["error"] = new JsonObject
-                {
-                    ["code"] = code,
-                    ["message"] = message,
-                },
-            }, cancellationToken);
-        }
-
-        private async Task SendNotificationAsync(string method, JsonObject parameters, CancellationToken cancellationToken)
-        {
-            await SendAsync(new JsonObject
-            {
-                ["jsonrpc"] = "2.0",
-                ["method"] = method,
-                ["params"] = parameters,
-            }, cancellationToken);
-        }
-
-        private async Task SendAsync(JsonObject message, CancellationToken cancellationToken)
-        {
-            var json = JsonSerializer.Serialize(message, JsonOptions);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            await webSocket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
-        }
-
-        private static JsonObject InitializeResult() => new()
-        {
-            ["capabilities"] = new JsonObject
-            {
-                ["textDocumentSync"] = new JsonObject
-                {
-                    ["openClose"] = true,
-                    ["change"] = 1,
-                    ["save"] = new JsonObject
-                    {
-                        ["includeText"] = true,
-                    },
-                },
-                ["completionProvider"] = new JsonObject
-                {
-                    ["resolveProvider"] = false,
-                    ["triggerCharacters"] = new JsonArray(".", "#", "\""),
-                },
-            },
-        };
-
-        private static JsonObject CompletionList(IEnumerable<JsonObject> items)
-        {
-            return new JsonObject
-            {
-                ["isIncomplete"] = false,
-                ["items"] = new JsonArray(items.ToArray<JsonNode?>()),
-            };
-        }
-
-        private static JsonObject ToLspDiagnostic(CsxDiagnostic diagnostic)
-        {
-            return new JsonObject
-            {
-                ["code"] = diagnostic.Code,
-                ["source"] = "UniEmu CSX",
-                ["message"] = diagnostic.Message,
-                ["severity"] = (int)diagnostic.Severity,
-                ["range"] = new JsonObject
-                {
-                    ["start"] = new JsonObject
-                    {
-                        ["line"] = diagnostic.StartLine,
-                        ["character"] = diagnostic.StartCharacter,
-                    },
-                    ["end"] = new JsonObject
-                    {
-                        ["line"] = diagnostic.EndLine,
-                        ["character"] = diagnostic.EndCharacter,
-                    },
-                },
-            };
-        }
-
-        private static int ToOffset(string text, int line, int character)
-        {
-            var currentLine = 0;
-            var offset = 0;
-            while (currentLine < line && offset < text.Length)
-            {
-                var next = text.IndexOf('\n', offset);
-                if (next < 0)
-                {
-                    return text.Length;
-                }
-
-                offset = next + 1;
-                currentLine++;
-            }
-
-            return Math.Clamp(offset + character, 0, text.Length);
+            await writer.CompleteAsync();
         }
     }
+
+    private static async Task PumpLanguageServerToWebSocketAsync(
+        PipeReader reader,
+        WebSocket webSocket,
+        CancellationToken cancellationToken)
+    {
+        var pending = new List<byte>();
+
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var result = await reader.ReadAsync(cancellationToken);
+                foreach (var segment in result.Buffer)
+                {
+                    pending.AddRange(segment.Span.ToArray());
+                }
+
+                reader.AdvanceTo(result.Buffer.End);
+
+                while (TryTakeLspMessage(pending, out var body))
+                {
+                    if (webSocket.State != WebSocketState.Open)
+                    {
+                        return;
+                    }
+
+                    await webSocket.SendAsync(body, WebSocketMessageType.Text, true, cancellationToken);
+                }
+
+                if (result.IsCompleted)
+                {
+                    return;
+                }
+            }
+        }
+        finally
+        {
+            await reader.CompleteAsync();
+        }
+    }
+
+    private static bool TryTakeLspMessage(List<byte> pending, out byte[] body)
+    {
+        body = [];
+
+        var separatorIndex = IndexOf(pending, HeaderSeparator);
+        if (separatorIndex < 0)
+        {
+            return false;
+        }
+
+        var header = Encoding.ASCII.GetString(pending.GetRange(0, separatorIndex).ToArray());
+        var contentLength = ParseContentLength(header);
+        if (contentLength is null)
+        {
+            pending.RemoveRange(0, separatorIndex + HeaderSeparator.Length);
+            return false;
+        }
+
+        var bodyStart = separatorIndex + HeaderSeparator.Length;
+        if (pending.Count - bodyStart < contentLength.Value)
+        {
+            return false;
+        }
+
+        body = pending.GetRange(bodyStart, contentLength.Value).ToArray();
+        pending.RemoveRange(0, bodyStart + contentLength.Value);
+        return true;
+    }
+
+    private static int? ParseContentLength(string header)
+    {
+        foreach (var line in header.Split("\r\n", StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = line.IndexOf(':');
+            if (separator < 0)
+            {
+                continue;
+            }
+
+            var name = line[..separator].Trim();
+            if (!string.Equals(name, "Content-Length", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = line[(separator + 1)..].Trim();
+            if (int.TryParse(value, out var length) && length >= 0)
+            {
+                return length;
+            }
+        }
+
+        return null;
+    }
+
+    private static int IndexOf(List<byte> buffer, byte[] value)
+    {
+        for (var i = 0; i <= buffer.Count - value.Length; i++)
+        {
+            var matched = true;
+            for (var j = 0; j < value.Length; j++)
+            {
+                if (buffer[i + j] == value[j])
+                {
+                    continue;
+                }
+
+                matched = false;
+                break;
+            }
+
+            if (matched)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static async Task StopPumpsAsync(
+        CancellationTokenSource cancellation,
+        Pipe clientToServer,
+        Pipe serverToClient,
+        Task incoming,
+        Task outgoing)
+    {
+        await cancellation.CancelAsync();
+
+        await clientToServer.Writer.CompleteAsync();
+        await serverToClient.Reader.CompleteAsync();
+
+        try
+        {
+            await Task.WhenAll(incoming, outgoing);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (WebSocketException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private sealed class DuplexPipe(PipeReader input, PipeWriter output) : IDuplexPipe
+    {
+        public PipeReader Input { get; } = input;
+
+        public PipeWriter Output { get; } = output;
+    }
+}
+
+public class LSPLog
+{
 }

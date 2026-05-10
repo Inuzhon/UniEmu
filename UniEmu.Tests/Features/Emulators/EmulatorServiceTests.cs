@@ -21,6 +21,30 @@ namespace UniEmu.Tests.Features.Emulators;
 public sealed class EmulatorServiceTests
 {
     [Fact]
+    public async Task DeleteAsync_RemovesEmulatorAndOwnedRows()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        stateStore.Set("em-1", "tg-start", "Start script", 1d, 1d, DateTimeOffset.UtcNow);
+        var service = CreateService(db, stateStore);
+
+        var deleted = await service.DeleteAsync("em-1", CancellationToken.None);
+        var deletedAgain = await service.DeleteAsync("em-1", CancellationToken.None);
+
+        Assert.True(deleted);
+        Assert.False(deletedAgain);
+        Assert.Empty(await db.Emulators.ToListAsync());
+        Assert.Empty(await db.EmulatorTags.ToListAsync());
+        Assert.Empty(await db.ScriptFiles.ToListAsync());
+        Assert.Empty(await db.CncPrograms.ToListAsync());
+        Assert.Empty(await db.TelemetryPoints.ToListAsync());
+        Assert.Empty(await db.SystemEvents.ToListAsync());
+        Assert.Empty(await db.ScriptRuntimeStates.ToListAsync());
+        Assert.False(stateStore.TryGet("em-1", "tg-start", out _));
+    }
+
+    [Fact]
     public async Task PatchStatusAsync_DoesNotEvaluateOnStartTags_WhenEmulatorIsAlreadyRunning()
     {
         await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
@@ -36,10 +60,10 @@ public sealed class EmulatorServiceTests
         Assert.Equal("0", tag.Preview);
     }
 
-    private static EmulatorService CreateService(UniEmuDbContext db)
+    private static EmulatorService CreateService(UniEmuDbContext db, TagRuntimeStateStore? stateStore = null)
     {
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
-        var stateStore = new TagRuntimeStateStore();
+        stateStore ??= new TagRuntimeStateStore();
         var scheduler = new Mock<IScheduler>();
         scheduler
             .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
@@ -47,6 +71,12 @@ public sealed class EmulatorServiceTests
         scheduler
             .Setup(s => s.GetJobKeys(It.IsAny<GroupMatcher<JobKey>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<JobKey>());
+        scheduler
+            .Setup(s => s.DeleteJob(It.IsAny<JobKey>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        scheduler
+            .Setup(s => s.DeleteJobs(It.IsAny<IReadOnlyCollection<JobKey>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var schedulerFactory = new Mock<ISchedulerFactory>();
         schedulerFactory
@@ -107,6 +137,7 @@ public sealed class EmulatorServiceTests
 
         private static async Task SeedAsync(UniEmuDbContext db)
         {
+            var now = DateTimeOffset.UtcNow;
             db.Emulators.Add(new EmulatorEntity
             {
                 Id = "em-1",
@@ -128,6 +159,51 @@ public sealed class EmulatorServiceTests
                 Preview = "0",
                 TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
                 FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, "return 11;")),
+            });
+            db.ScriptFiles.Add(new ScriptFileEntity
+            {
+                Id = "scr-1",
+                EmulatorId = "em-1",
+                Name = "machine.csx",
+                Scope = "emulator",
+                Content = "return 1;",
+                UpdatedAt = now,
+                SizeBytes = 9,
+            });
+            db.CncPrograms.Add(new CncProgramEntity
+            {
+                Id = "cnc-1",
+                EmulatorId = "em-1",
+                Name = "machine.nc",
+                Scope = "emulator",
+                Content = "M30",
+                Description = "Owned program",
+                UpdatedAt = now,
+                UploadedAt = now,
+                SizeBytes = 3,
+            });
+            db.TelemetryPoints.Add(new TelemetryPointEntity
+            {
+                EmulatorId = "em-1",
+                Timestamp = now,
+                ValuesJson = "{}",
+            });
+            db.SystemEvents.Add(new SystemEventEntity
+            {
+                Id = "ev-1",
+                EmulatorId = "em-1",
+                EmulatorName = "Main emulator",
+                Level = "info",
+                Message = "Created",
+                Timestamp = now,
+            });
+            db.ScriptRuntimeStates.Add(new ScriptRuntimeStateEntity
+            {
+                Id = "state-1",
+                EmulatorId = "em-1",
+                ScriptKey = "machine.csx",
+                ValuesJson = "{}",
+                UpdatedAt = now,
             });
 
             await db.SaveChangesAsync();

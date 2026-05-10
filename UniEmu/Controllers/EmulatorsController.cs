@@ -56,4 +56,10 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
         var emulator = await service.PatchStatusAsync(emulatorId, request, cancellationToken);
         return emulator is null ? NotFound() : Ok(emulator);
     }
+
+    [HttpDelete("{emulatorId}")]
+    public async Task<IActionResult> Delete(string emulatorId, CancellationToken cancellationToken)
+    {
+        return await service.DeleteAsync(emulatorId, cancellationToken) ? NoContent() : NotFound();
+    }
 }

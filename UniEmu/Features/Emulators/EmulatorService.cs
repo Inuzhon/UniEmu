@@ -170,4 +170,22 @@ public sealed class EmulatorService(
         await runtimeUpdateService.PublishEmulatorUpdatedAsync(dto, cancellationToken);
         return dto;
     }
+
+    public async Task<bool> DeleteAsync(string emulatorId, CancellationToken cancellationToken)
+    {
+        var deleted = await db.Emulators
+            .Where(e => e.Id == emulatorId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (deleted == 0)
+        {
+            return false;
+        }
+
+        await scheduleService.UnscheduleEmulatorAsync(emulatorId, cancellationToken);
+        dataCache.InvalidateEmulator(emulatorId);
+        dataCache.InvalidateScripts();
+        dataCache.InvalidateCncPrograms();
+        return true;
+    }
 }
