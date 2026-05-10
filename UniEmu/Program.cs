@@ -14,6 +14,7 @@ using UniEmu.Features.Events;
 using UniEmu.Features.Scripts;
 using UniEmu.Features.Tags;
 using UniEmu.Features.Telemetry;
+using UniEmu.Hosting;
 using UniEmu.Realtime;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
@@ -27,6 +28,9 @@ Directory.SetCurrentDirectory(Path.GetDirectoryName(currentAssembly.Location)
                               ?? throw new NullReferenceException("Current dir not found!"));
 
 var builder = WebApplication.CreateBuilder(args);
+var backendPortOptions = BackendPortOptions.Resolve(builder.Configuration);
+
+builder.WebHost.UseUrls(backendPortOptions.HttpUrl);
 
 builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 builder.Host.UseSerilog((context, services, loggerConfiguration) =>
@@ -126,7 +130,10 @@ if (!app.Configuration.GetValue<bool>("UniEmu:DisableStaticAssets"))
     app.MapFallbackToFile("/index.html");
 }
 
-app.Run();
+app.Lifetime.ApplicationStarted.Register(() =>
+    app.Logger.LogInformation("UniEmu backend listening on port {Port}", backendPortOptions.Port));
+
+await app.RunAsync();
 
 static void RegisterUniEmuServices(ContainerBuilder container)
 {
