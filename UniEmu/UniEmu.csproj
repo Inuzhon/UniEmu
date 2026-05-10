@@ -12,6 +12,11 @@
     <SpaProxyServerUrl>http://localhost:8070</SpaProxyServerUrl>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <StaticWebAssetPublishCompressAllAssets>false</StaticWebAssetPublishCompressAllAssets>
+    <CompressionEnabled>false</CompressionEnabled>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="11.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
