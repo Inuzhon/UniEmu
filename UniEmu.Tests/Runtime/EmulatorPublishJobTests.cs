@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -35,6 +37,123 @@ public sealed class EmulatorPublishJobTests
         var value = Assert.Single(dispatcherValues);
         Assert.Equal("Temp", value.Key);
         Assert.Equal(42.5, value.Value);
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_CalculatesFrameFromSubprogram_WhenSubprogramIsSet()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.Emulators.Add(new EmulatorEntity { Id = "emu-1", Status = nameof(EmulatorStatus.Running), IntervalSec = 1 });
+        db.CncPrograms.AddRange(
+            CreateProgram("cnc-main", "Main.nc", CncScope.Shared, null, "MAIN0\nMAIN1\nMAIN2"),
+            CreateProgram("cnc-sub", "Sub.nc", CncScope.Emulator, "emu-1", "SUB0\nSUB1\nSUB2"));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var timestamp = DateTimeOffset.Parse("2026-05-10T12:00:02Z");
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            StartedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z"),
+            Tags =
+            [
+                CreateSpecialTag("tg-prg", "Program", "PrgName", TagType.String, TagSource.Static, "Main.nc", SpecialParameter.PrgName),
+                CreateSpecialTag("tg-sub", "Subprogram", "Subprogram", TagType.String, TagSource.Static, "Sub.nc", SpecialParameter.Subprogram),
+                CreateSpecialTag("tg-frame-num", "Frame number", "FrameNum", TagType.Int, TagSource.Static, "0", SpecialParameter.FrameNum),
+                CreateSpecialTag("tg-frame-text", "Frame text", "FrameText", TagType.String, TagSource.Static, "", SpecialParameter.FrameText),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+
+        Assert.Equal(2, values.Single(value => value.SpecialParameter == SpecialParameter.FrameNum).Value);
+        Assert.Equal("SUB2", values.Single(value => value.SpecialParameter == SpecialParameter.FrameText).Value);
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_CalculatesFrameFromMainProgram_WhenSubprogramIsEmpty()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.CncPrograms.Add(CreateProgram("cnc-main", "Main.nc", CncScope.Shared, null, "MAIN0\nMAIN1\nMAIN2"));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var timestamp = DateTimeOffset.Parse("2026-05-10T12:00:01Z");
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            StartedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z"),
+            Tags =
+            [
+                CreateSpecialTag("tg-prg", "Program", "PrgName", TagType.String, TagSource.Static, "Main.nc", SpecialParameter.PrgName),
+                CreateSpecialTag("tg-sub", "Subprogram", "Subprogram", TagType.String, TagSource.Static, "", SpecialParameter.Subprogram),
+                CreateSpecialTag("tg-frame-num", "Frame number", "FrameNum", TagType.Int, TagSource.Static, "0", SpecialParameter.FrameNum),
+                CreateSpecialTag("tg-frame-text", "Frame text", "FrameText", TagType.String, TagSource.Static, "", SpecialParameter.FrameText),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+
+        Assert.Equal(1, values.Single(value => value.SpecialParameter == SpecialParameter.FrameNum).Value);
+        Assert.Equal("MAIN1", values.Single(value => value.SpecialParameter == SpecialParameter.FrameText).Value);
+    }
+
+    [Fact]
+    public async Task HandleDispatcherAnswerAsync_StoresReceivedProgramNameInStaticPrgName()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var programBytes = Encoding.UTF8.GetBytes("G1 X1\nM30");
+        var sender = CreateSender(new DispatcherReceiveHandler(programBytes, machineIntegrationId: 18));
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            ProtocolId = 18,
+            TargetUrl = "http://dispatcher.test",
+            Tags =
+            [
+                CreateSpecialTag("tg-prg", "Program", "PrgName", TagType.String, TagSource.Static, "Old.nc", SpecialParameter.PrgName),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore, sender);
+
+        await InvokeHandleDispatcherAnswerAsync(job, emulator, 18, new DispatcherMonitoringAnswer(FileType: 0, GetFile: 1));
+
+        Assert.Equal("received_program_machine_id_18.txt", emulator.Tags.Single().Preview);
+        Assert.True(stateStore.TryGet("emu-1", "tg-prg", out var runtimeValue));
+        Assert.Equal("received_program_machine_id_18.txt", runtimeValue.Value);
     }
 
     [Fact]
@@ -205,6 +324,51 @@ public sealed class EmulatorPublishJobTests
         };
     }
 
+    private static CncProgramEntity CreateProgram(
+        string id,
+        string name,
+        CncScope scope,
+        string? emulatorId,
+        string content)
+    {
+        return new CncProgramEntity
+        {
+            Id = id,
+            Name = name,
+            Scope = UniEmuJson.EnumString(scope),
+            EmulatorId = emulatorId,
+            Description = string.Empty,
+            Content = content,
+            SizeBytes = Encoding.UTF8.GetByteCount(content),
+            UpdatedAt = DateTimeOffset.UtcNow,
+            UploadedAt = DateTimeOffset.UtcNow,
+        };
+    }
+
+    private static EmulatorTagEntity CreateSpecialTag(
+        string id,
+        string name,
+        string key,
+        TagType type,
+        TagSource source,
+        string preview,
+        SpecialParameter specialParameter)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = id,
+            EmulatorId = "emu-1",
+            Name = name,
+            Key = key,
+            Type = UniEmuJson.EnumString(type),
+            Source = UniEmuJson.EnumString(source),
+            Preview = preview,
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+            SpecialParameter = UniEmuJson.EnumString(specialParameter),
+            Enabled = true,
+        };
+    }
+
     private static EmulatorTagEntity CreateScriptTag(
         string id,
         string name,
@@ -228,10 +392,29 @@ public sealed class EmulatorPublishJobTests
         };
     }
 
+    private static EmulatorPublishJob CreateJob(
+        UniEmuDbContext db,
+        CachedUniEmuDataService dataCache,
+        TagRuntimeStateStore stateStore,
+        TelemetryPacketSender? sender = null)
+    {
+        return new EmulatorPublishJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            sender ?? CreateSender(),
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<EmulatorPublishJob>.Instance);
+    }
+
     private static async Task<IReadOnlyList<GeneratedTagValue>> InvokeBuildValuesAsync(
         EmulatorPublishJob job,
-        EmulatorEntity emulator)
+        EmulatorEntity emulator,
+        DateTimeOffset? timestamp = null)
     {
+        var now = timestamp ?? DateTimeOffset.UtcNow;
         var method = typeof(EmulatorPublishJob).GetMethod(
             "BuildValuesAsync",
             BindingFlags.Instance | BindingFlags.NonPublic);
@@ -239,19 +422,72 @@ public sealed class EmulatorPublishJobTests
 
         var task = (Task<IReadOnlyList<GeneratedTagValue>>)method.Invoke(
             job,
-            [emulator, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, CancellationToken.None])!;
+            [emulator, now, now, CancellationToken.None])!;
 
         return await task;
     }
 
-    private static TelemetryPacketSender CreateSender()
+    private static async Task InvokeHandleDispatcherAnswerAsync(
+        EmulatorPublishJob job,
+        EmulatorEntity emulator,
+        object machineIntegrationId,
+        DispatcherMonitoringAnswer answer)
+    {
+        var method = typeof(EmulatorPublishJob).GetMethod(
+            "HandleDispatcherAnswerAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var task = (Task)method.Invoke(
+            job,
+            [emulator, machineIntegrationId, null, null, answer, CancellationToken.None])!;
+
+        await task;
+    }
+
+    private static TelemetryPacketSender CreateSender(HttpMessageHandler? handler = null)
     {
         var factory = new Mock<IHttpClientFactory>();
         factory
             .Setup(f => f.CreateClient(nameof(TelemetryPacketSender)))
-            .Returns(new HttpClient());
+            .Returns(new HttpClient(handler ?? new HttpClientHandler()));
 
         return new TelemetryPacketSender(factory.Object, NullLogger<TelemetryPacketSender>.Instance);
+    }
+
+    private sealed class DispatcherReceiveHandler(byte[] programBytes, object machineIntegrationId) : HttpMessageHandler
+    {
+        private bool sentChunk;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var query = request.RequestUri?.Query ?? string.Empty;
+            if (query.Contains($"machine_id={machineIntegrationId}", StringComparison.OrdinalIgnoreCase) &&
+                query.Contains("file_type=1", StringComparison.OrdinalIgnoreCase))
+            {
+                var hash = Convert.ToBase64String(MD5.HashData(programBytes));
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent($"Hash={hash}"),
+                });
+            }
+
+            if (query.Contains($"machine_id={machineIntegrationId}", StringComparison.OrdinalIgnoreCase) &&
+                query.Contains("file_type=0", StringComparison.OrdinalIgnoreCase))
+            {
+                var answer = sentChunk ? "EOF" : Convert.ToBase64String(programBytes);
+                sentChunk = true;
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(answer),
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+            {
+                Content = new StringContent("not found"),
+            });
+        }
     }
 
     private sealed class NoopRuntimeUpdateBroadcaster : IRuntimeUpdateBroadcaster

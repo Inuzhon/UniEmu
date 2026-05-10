@@ -147,6 +147,8 @@ public sealed class EmulatorPublishJob(
             values.Add(generated);
         }
 
+        values = await ApplySpecializedProgramValuesAsync(emulator, values, timestamp, cancellationToken);
+
         return values;
     }
 
@@ -215,6 +217,51 @@ public sealed class EmulatorPublishJob(
 
             return valueGenerator.GenerateTag(emulator, tag, timestamp);
         }
+    }
+
+    private async Task<List<GeneratedTagValue>> ApplySpecializedProgramValuesAsync(
+        EmulatorEntity emulator,
+        List<GeneratedTagValue> values,
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken)
+    {
+        if (!emulator.Tags.Any(IsCalculatedProgramFrameTag))
+        {
+            return values;
+        }
+
+        var programs = await dataCache.GetVisibleCncProgramsAsync(emulator.Id, cancellationToken);
+        var mainProgram = ResolveProgram(programs, emulator.Id, GetSpecialStringValue(values, SpecialParameter.PrgName));
+        var subProgram = ResolveProgram(programs, emulator.Id, GetSpecialStringValue(values, SpecialParameter.Subprogram));
+        var frame = CalculateProgramFrame(emulator, timestamp, subProgram ?? mainProgram);
+        var enriched = values.ToList();
+
+        for (var i = 0; i < emulator.Tags.Count && i < enriched.Count; i++)
+        {
+            var tag = emulator.Tags[i];
+            if (!IsCalculatedProgramFrameTag(tag))
+            {
+                continue;
+            }
+
+            var specialParameter = GetSpecialParameter(tag);
+            object value = specialParameter == SpecialParameter.FrameNum
+                ? frame.Number
+                : frame.Text;
+
+            var generated = new GeneratedTagValue(
+                enriched[i].Key,
+                enriched[i].Name,
+                value,
+                TelemetryValueGenerator.ToNumericValue(value),
+                specialParameter);
+
+            enriched[i] = generated;
+            tag.Preview = TelemetryValueGenerator.ToPreview(value);
+            stateStore.Set(emulator.Id, tag.Id, tag.Name, generated.Value, generated.NumericValue, timestamp);
+        }
+
+        return enriched;
     }
 
     private static bool ShouldUseStoredValue(EmulatorEntity emulator, EmulatorTagEntity tag)
@@ -301,12 +348,7 @@ public sealed class EmulatorPublishJob(
         }
 
         var programs = await dataCache.GetVisibleCncProgramsAsync(emulatorId, cancellationToken);
-        var match = programs
-            .Where(program => program.Name.Equals(programName, StringComparison.OrdinalIgnoreCase))
-            .Where(program => program.Scope == UniEmuJson.EnumString(CncScope.Shared) || program.EmulatorId == emulatorId)
-            .OrderByDescending(program => program.Description.StartsWith("[dispatcher-received]", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(program => program.EmulatorId == emulatorId)
-            .FirstOrDefault();
+        var match = ResolveProgram(programs, emulatorId, programName);
 
         return match is null ? null : TelemetryPacketSender.FromTextProgram(match.Name, match.Content);
     }
@@ -335,8 +377,25 @@ public sealed class EmulatorPublishJob(
             if (received is not null)
             {
                 UpsertReceivedProgram(emulator.Id, received);
+                StoreReceivedProgramName(emulator, received.Name);
             }
         }
+    }
+
+    private void StoreReceivedProgramName(EmulatorEntity emulator, string programName)
+    {
+        var tag = emulator.Tags.FirstOrDefault(tag =>
+            tag.Enabled &&
+            GetSpecialParameter(tag) == SpecialParameter.PrgName &&
+            UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Static);
+
+        if (tag is null)
+        {
+            return;
+        }
+
+        tag.Preview = programName;
+        stateStore.Set(emulator.Id, tag.Id, tag.Name, programName, numericValue: null, DateTimeOffset.UtcNow);
     }
 
     private void UpsertReceivedProgram(string emulatorId, DispatcherProgram program)
@@ -370,4 +429,80 @@ public sealed class EmulatorPublishJob(
         existing.UpdatedAt = DateTimeOffset.UtcNow;
         dataCache.InvalidateCncPrograms();
     }
+
+    private static CncProgramEntity? ResolveProgram(
+        IReadOnlyList<CncProgramEntity> programs,
+        string emulatorId,
+        string? programName)
+    {
+        if (string.IsNullOrWhiteSpace(programName))
+        {
+            return null;
+        }
+
+        return programs
+            .Where(program => program.Name.Equals(programName, StringComparison.OrdinalIgnoreCase))
+            .Where(program => program.Scope == UniEmuJson.EnumString(CncScope.Shared) || program.EmulatorId == emulatorId)
+            .OrderByDescending(program => program.Description.StartsWith("[dispatcher-received]", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(program => program.EmulatorId == emulatorId)
+            .FirstOrDefault();
+    }
+
+    private static string? GetSpecialStringValue(IReadOnlyList<GeneratedTagValue> values, SpecialParameter specialParameter)
+    {
+        return values
+            .FirstOrDefault(value => value.SpecialParameter == specialParameter)
+            ?.Value
+            ?.ToString();
+    }
+
+    private static bool IsCalculatedProgramFrameTag(EmulatorTagEntity tag)
+    {
+        var specialParameter = GetSpecialParameter(tag);
+        if (specialParameter is not (SpecialParameter.FrameNum or SpecialParameter.FrameText))
+        {
+            return false;
+        }
+
+        var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+        return source is TagSource.Static or TagSource.Scenario;
+    }
+
+    private static ProgramFrame CalculateProgramFrame(
+        EmulatorEntity emulator,
+        DateTimeOffset timestamp,
+        CncProgramEntity? program)
+    {
+        var lines = SplitProgramLines(program?.Content);
+        if (lines.Length == 0)
+        {
+            return new ProgramFrame(0, string.Empty);
+        }
+
+        var elapsedSec = emulator.StartedAt is null
+            ? 0
+            : Math.Max(0, (timestamp - emulator.StartedAt.Value).TotalSeconds);
+        var stepSeconds = Math.Max(1, emulator.IntervalSec);
+        var frameNumber = (int)(Math.Floor(elapsedSec / stepSeconds) % lines.Length);
+
+        return new ProgramFrame(frameNumber, lines[frameNumber]);
+    }
+
+    private static string[] SplitProgramLines(string? content)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return [];
+        }
+
+        var lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+        if (lines.Length > 0 && lines[^1].Length == 0)
+        {
+            return lines[..^1];
+        }
+
+        return lines;
+    }
+
+    private sealed record ProgramFrame(int Number, string Text);
 }
