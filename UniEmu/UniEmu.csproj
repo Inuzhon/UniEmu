@@ -7,7 +7,7 @@
     <UserSecretsId>4c9af4b9-5df6-410d-81b4-fbe6e70debc1</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..</DockerfileContext>
-    <SpaRoot>..\UniEmu.Client</SpaRoot>
+    <SpaRoot>..\UniEmu.Client\</SpaRoot>
     <SpaProxyLaunchCommand>yarn run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>http://localhost:8070</SpaProxyServerUrl>
   </PropertyGroup>
@@ -46,16 +46,16 @@
     <InternalsVisibleTo Include="UniEmu.Tests" />
   </ItemGroup>
 
-  <Target Name="PublishRunWebpack" AfterTargets="ComputeFilesToPublish">
+  <Target Name="BuildClientApp" BeforeTargets="ComputeFilesToPublish" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release'">
+    <Message Text="ClientApp -&gt; yarn install" Importance="high" Condition="!Exists('$(SpaRoot)node_modules')" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="yarn install --frozen-lockfile" Condition="!Exists('$(SpaRoot)node_modules')" />
+    <!--<Message Text="ClientApp -&gt; yarn build" Importance="high" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="yarn build" />-->
+  </Target>
 
-    <Message Condition="'$(SkipYarnInstall)'!='True'" Importance="high" Text="Restoring dependencies using 'yarn'. This may take several minutes..." />
-    <Exec Condition="'$(SkipYarnInstall)'!='True'" WorkingDirectory="$(SpaRoot)" Command="yarn install --ignore-optional --production=true --frozen-lockfile" />
-
-    <Message Text="SPAssets -&gt; yarn build" Importance="high" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release' " />
-    <Exec WorkingDirectory="$(SpaRoot)" Command="yarn build" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release' " />
-
+  <Target Name="PublishClientApp" AfterTargets="ComputeFilesToPublish" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release'">
     <ItemGroup>
-      <DistFiles Include="$(SpaRoot)dist\**;" />
+      <DistFiles Include="$(SpaRoot)**\*.*" />
       <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
         <RelativePath>%(DistFiles.Identity)</RelativePath>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

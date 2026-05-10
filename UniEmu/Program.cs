@@ -103,6 +103,7 @@ if (!app.Configuration.GetValue<bool>("UniEmu:DisableRuntime"))
 if (!app.Configuration.GetValue<bool>("UniEmu:DisableStaticAssets"))
 {
     app.UseDefaultFiles();
+    app.UseStaticFiles();
     app.MapStaticAssets();
 }
 

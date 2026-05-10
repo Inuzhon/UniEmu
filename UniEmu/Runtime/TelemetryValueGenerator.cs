@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
@@ -146,16 +147,60 @@ public sealed class TelemetryValueGenerator
         var finish = ParsePreview(calc.Finish ?? preview);
         var duration = Math.Max(1, calc.Duration ?? 60);
         var period = Math.Max(1, calc.Period ?? duration);
+        var progress = Math.Clamp(elapsedSec / duration, 0, 1);
+        var phase = (elapsedSec % period) / period;
+        var amplitude = calc.Amplitude ?? Math.Abs(finish - start);
 
         return calc.Type switch
         {
-            CalcType.Line => start + (finish - start) * Math.Clamp(elapsedSec / duration, 0, 1),
-            CalcType.Random => Random.Shared.NextDouble() * (finish - start) + start,
-            CalcType.Sinusoid => start + Math.Sin(elapsedSec / period * Math.Tau) * (calc.Amplitude ?? Math.Abs(finish - start)),
-            CalcType.Square => start + (Math.Sin(elapsedSec / period * Math.Tau) >= 0 ? calc.Amplitude ?? Math.Abs(finish - start) : 0),
-            CalcType.Sawtooth => start + (finish - start) * ((elapsedSec % period) / period),
+            CalcType.Line => start + (finish - start) * progress,
+            CalcType.Curve => start + (finish - start) * Math.Pow(progress, calc.Curvature ?? 2),
+            CalcType.Sequence => GenerateFromSequence(calc.Start, progress, preview),
+            CalcType.Random => GenerateRandom(start, finish),
+            CalcType.Sinusoid => start + Math.Sin(elapsedSec / period * Math.Tau) * amplitude,
+            CalcType.Square => start + (phase < 0.5 ? amplitude : -amplitude),
+            CalcType.Sawtooth => start + amplitude * (2 * phase - 1),
+            CalcType.SquircleEarly => start + (finish - start) * (1 - Math.Pow(1 - progress, 2)),
+            CalcType.SquircleLate => start + (finish - start) * Math.Pow(progress, 2),
             _ => ParsePreview(preview),
         };
+    }
+
+    private static double GenerateRandom(double start, double finish)
+    {
+        var min = Math.Min(start, finish);
+        var max = Math.Max(start, finish);
+        return Random.Shared.NextDouble() * (max - min) + min;
+    }
+
+    private static double GenerateFromSequence(string? sequenceJson, double progress, string preview)
+    {
+        if (string.IsNullOrWhiteSpace(sequenceJson))
+        {
+            return ParsePreview(preview);
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(sequenceJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
+            {
+                return ParsePreview(preview);
+            }
+
+            var index = Math.Min(document.RootElement.GetArrayLength() - 1, (int)Math.Floor(progress * document.RootElement.GetArrayLength()));
+            var element = document.RootElement[index];
+            return element.ValueKind switch
+            {
+                JsonValueKind.Number when element.TryGetDouble(out var value) => value,
+                JsonValueKind.String => ParsePreview(element.GetString()),
+                _ => ParsePreview(preview),
+            };
+        }
+        catch (JsonException)
+        {
+            return ParsePreview(preview);
+        }
     }
 
     private static double GenerateFromScenario(TagScenarioConfigDto? scenario, double elapsedSec, string preview)

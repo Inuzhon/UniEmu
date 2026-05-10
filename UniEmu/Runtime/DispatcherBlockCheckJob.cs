@@ -49,7 +49,9 @@ public sealed class DispatcherBlockCheckJob(
             }
 
             var message = $"Протокол {protocolId} заблокирован Dispatcher";
+            emulator.Status = nameof(EmulatorStatus.Error);
             emulator.LastError = message;
+            emulator.NextRun = null;
             var systemEvent = new SystemEventEntity
             {
                 Id = $"ev-{Guid.NewGuid():N}"[..12],
