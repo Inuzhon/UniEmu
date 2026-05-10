@@ -393,3 +393,4 @@ IndustryTestProject/ConnectTest.cs
 
 # UniEmu local SQLite database
 UniEmu/uniemu.db*
+/docs

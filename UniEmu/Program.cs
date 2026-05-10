@@ -81,7 +81,9 @@ if (!app.Configuration.GetValue<bool>("UniEmu:SkipStartupDatabase"))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<UniEmuDbContext>();
     await db.Database.MigrateAsync();
-    await UniEmuSeeder.SeedAsync(db);
+
+    if (app.Configuration.GetValue<bool>("UniEmu:SeedData"))
+        await UniEmuSeeder.SeedAsync(db);
 
     if (!app.Configuration.GetValue<bool>("UniEmu:DisableRuntime"))
     {

@@ -1,4 +1,4 @@
-using UniEmu.Common;
+﻿using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Domain.Entities;
@@ -10,9 +10,7 @@ public static class UniEmuSeeder
     public static async Task SeedAsync(UniEmuDbContext db, CancellationToken cancellationToken = default)
     {
         if (db.Emulators.Any())
-        {
             return;
-        }
 
         var now = DateTimeOffset.UtcNow;
         var emulators = new[]
