@@ -55,6 +55,10 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
             entity.Property(e => e.Name).HasMaxLength(260).IsRequired();
             entity.Property(e => e.Scope).HasMaxLength(32).IsRequired();
             entity.Property(e => e.EmulatorId).HasMaxLength(64);
+            entity.HasOne<EmulatorEntity>()
+                .WithMany()
+                .HasForeignKey(e => e.EmulatorId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.Scope, e.EmulatorId, e.Name }).IsUnique();
         });
 
@@ -65,6 +69,10 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
             entity.Property(e => e.EmulatorId).HasMaxLength(64).IsRequired();
             entity.Property(e => e.ScriptKey).HasMaxLength(260).IsRequired();
             entity.Property(e => e.ValuesJson).IsRequired();
+            entity.HasOne<EmulatorEntity>()
+                .WithMany()
+                .HasForeignKey(e => e.EmulatorId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.EmulatorId, e.ScriptKey }).IsUnique();
         });
 
@@ -75,6 +83,10 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
             entity.Property(e => e.Name).HasMaxLength(260).IsRequired();
             entity.Property(e => e.Scope).HasMaxLength(32).IsRequired();
             entity.Property(e => e.EmulatorId).HasMaxLength(64);
+            entity.HasOne<EmulatorEntity>()
+                .WithMany()
+                .HasForeignKey(e => e.EmulatorId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.Scope, e.EmulatorId, e.Name }).IsUnique();
         });
 
@@ -82,6 +94,10 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.EmulatorId).HasMaxLength(64).IsRequired();
+            entity.HasOne<EmulatorEntity>()
+                .WithMany()
+                .HasForeignKey(e => e.EmulatorId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.EmulatorId, e.Timestamp });
         });
 
@@ -91,6 +107,10 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
             entity.Property(e => e.Id).HasMaxLength(64);
             entity.Property(e => e.EmulatorId).HasMaxLength(64).IsRequired();
             entity.Property(e => e.Level).HasMaxLength(32).IsRequired();
+            entity.HasOne<EmulatorEntity>()
+                .WithMany()
+                .HasForeignKey(e => e.EmulatorId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => e.Timestamp);
         });
     }
