@@ -75,6 +75,57 @@ public sealed class EmulatorScheduleServiceTests
     }
 
     [Fact]
+    public async Task ScheduleEmulatorAsync_SchedulesCronTagsWithNormalizedUnixCron()
+    {
+        await using var fixture = await ScheduleDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(ScheduleDbFixture.CreateCronTag("tg-cron", "Cron script", "0 0 * * *"));
+        await db.SaveChangesAsync();
+
+        var scheduler = new Mock<IScheduler>();
+        scheduler
+            .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTimeOffset.UtcNow);
+        scheduler
+            .Setup(s => s.GetJobKeys(It.IsAny<GroupMatcher<JobKey>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<JobKey>());
+
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduler.Object);
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var service = new EmulatorScheduleService(
+            db,
+            dataCache,
+            schedulerFactory.Object,
+            stateStore,
+            NullLogger<EmulatorScheduleService>.Instance,
+            new ConfigurationBuilder().Build(),
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
+
+        await service.ScheduleEmulatorAsync("em-1", CancellationToken.None);
+
+        var scheduledCron = scheduler.Invocations
+            .Where(invocation => invocation.Method.Name == nameof(IScheduler.ScheduleJob))
+            .Select(invocation => new
+            {
+                Job = (IJobDetail)invocation.Arguments[0],
+                Trigger = (ITrigger)invocation.Arguments[1],
+            })
+            .Single(item => item.Job.JobType == typeof(TagValueJob)
+                            && item.Job.JobDataMap.GetString(RuntimeJobKeys.TagId) == "tg-cron");
+
+        var cronTrigger = Assert.IsAssignableFrom<ICronTrigger>(scheduledCron.Trigger);
+        Assert.Equal("0 0 0 * * ?", cronTrigger.CronExpressionString);
+        Assert.Equal(RuntimeJobKeys.TagTrigger("em-1", "tg-cron"), cronTrigger.Key);
+    }
+
+    [Fact]
     public async Task ExecuteEventTagsAsync_EvaluatesOnStopScriptTag()
     {
         await using var fixture = await ScheduleDbFixture.CreateAsync();
@@ -213,6 +264,22 @@ public sealed class EmulatorScheduleServiceTests
                 Preview = "0",
                 TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
                 FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, script)),
+            };
+        }
+
+        public static EmulatorTagEntity CreateCronTag(string id, string name, string cron)
+        {
+            return new EmulatorTagEntity
+            {
+                Id = id,
+                EmulatorId = "em-1",
+                Name = name,
+                Key = id,
+                Type = UniEmuJson.EnumString(TagType.Double),
+                Source = UniEmuJson.EnumString(TagSource.Script),
+                Preview = "0",
+                TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Cron, null, cron, null, null)),
+                FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, "return 11;")),
             };
         }
     }

@@ -99,6 +99,97 @@ public sealed class EmulatorPublishJobTests
             value => Assert.Equal("cron-old", value.Value));
     }
 
+    [Fact]
+    public async Task BuildValuesAsync_UsesRuntimeStateForCronTags_WhenCronJobAlreadyCalculatedValue()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            Tags =
+            [
+                CreateScriptTag(
+                    "tg-cron",
+                    "CronDate",
+                    TagTriggerMode.Cron,
+                    null,
+                    "cron-old",
+                    "return \"cron-script-should-not-run\";"),
+            ],
+        };
+        stateStore.Set(emulator.Id, "tg-cron", "CronDate", "cron-new", null, DateTimeOffset.UtcNow);
+        var job = new EmulatorPublishJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            CreateSender(),
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<EmulatorPublishJob>.Instance);
+
+        var values = await InvokeBuildValuesAsync(job, emulator);
+
+        var value = Assert.Single(values);
+        Assert.Equal("cron-new", value.Value);
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_DoesNotEvaluateCronScriptOnPublish_WhenRuntimeStateIsEmpty()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            Tags =
+            [
+                CreateScriptTag(
+                    "tg-cron",
+                    "CronDate",
+                    TagTriggerMode.Cron,
+                    null,
+                    "cron-old",
+                    "throw new InvalidOperationException(\"publish must not calculate cron\");"),
+            ],
+        };
+        var job = new EmulatorPublishJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            CreateSender(),
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<EmulatorPublishJob>.Instance);
+
+        var values = await InvokeBuildValuesAsync(job, emulator);
+
+        var value = Assert.Single(values);
+        Assert.Equal("cron-old", value.Value);
+    }
+
     private static EmulatorTagEntity CreateTag(string name, string key, bool enabled)
     {
         return new EmulatorTagEntity

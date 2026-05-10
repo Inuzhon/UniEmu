@@ -82,6 +82,9 @@ public sealed class TagValueJobTests
 
         var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-cron");
         Assert.Equal("17", tag.Preview);
+        Assert.True(stateStore.TryGet("em-1", "tg-cron", out var value));
+        Assert.Equal(17d, value.Value);
+        Assert.Equal(17d, value.NumericValue);
     }
 
     private static IJobExecutionContext CreateContext(string tagId)
