@@ -222,7 +222,7 @@ public sealed class TelemetryValueGenerator
             position = scenario.ContinueOnFormulaEnd switch
             {
                 ContinueOnFormulaEnd.Repeat => position % total,
-                ContinueOnFormulaEnd.Zero => 0,
+                ContinueOnFormulaEnd.Zero => double.NaN,
                 ContinueOnFormulaEnd.Stretch => total,
                 _ => double.NaN,
             };
