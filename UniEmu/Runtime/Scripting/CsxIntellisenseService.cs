@@ -1,8 +1,8 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
-using UniEmu.Runtime;
+using UniEmu.Runtime.Models;
 
 namespace UniEmu.Runtime.Scripting;
 

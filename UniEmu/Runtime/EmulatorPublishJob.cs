@@ -48,6 +48,7 @@ public sealed class EmulatorPublishJob(
             .Where(value => value.NumericValue is not null)
             .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Last().NumericValue!.Value, StringComparer.OrdinalIgnoreCase);
+
         var dispatcherValues = BuildDispatcherValues(emulator.Tags, generatedValues);
         var machineIntegrationId = GetMachineIntegrationId(emulator);
         var mainProgram = await ResolveProgramAsync(emulator.Id, generatedValues, SpecialParameter.PrgName, cancellationToken);

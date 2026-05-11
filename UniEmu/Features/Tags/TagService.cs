@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Requests;
@@ -6,6 +6,7 @@ using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
 using UniEmu.Runtime;
+using UniEmu.Runtime.Models;
 using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Features.Tags;
