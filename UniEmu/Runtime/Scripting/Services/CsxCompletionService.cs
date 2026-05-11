@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis.Completion;
+using System.Reflection;
 using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Runtime.Scripting.Workspace;
 using RoslynCompletionService = Microsoft.CodeAnalysis.Completion.CompletionService;
@@ -58,12 +59,15 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
                     CsxRoslynSymbolHelpers.GetCompletionKind(item.Tags))));
         }
 
+        var globalObjectLabels = GetGlobalObjectLabels(globalsType);
+
         return candidates
             .Where(IsAllowedCompletion)
+            .DistinctBy(candidate => candidate.Item.Label, StringComparer.Ordinal)
+            .OrderBy(candidate => GetCompletionPriority(candidate, globalObjectLabels))
+            .ThenBy(candidate => candidate.Item.SortText, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.Item.Label, StringComparer.Ordinal)
             .Select(candidate => candidate.Item)
-            .DistinctBy(item => item.Label, StringComparer.Ordinal)
-            .OrderBy(item => item.SortText, StringComparer.Ordinal)
-            .ThenBy(item => item.Label, StringComparer.Ordinal)
             .ToList();
     }
 
@@ -81,6 +85,75 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         }
 
         return candidate.Documentation?.Contains("UniEmu.Scripting.Api.", StringComparison.Ordinal) == true;
+    }
+
+    private static int GetCompletionPriority(CompletionCandidate candidate, IReadOnlySet<string> globalObjectLabels)
+    {
+        if (globalObjectLabels.Contains(candidate.Item.Label))
+        {
+            return 0;
+        }
+
+        if (IsScriptSpecificCompletion(candidate))
+        {
+            return 1;
+        }
+
+        if (IsScriptingApiCompletion(candidate))
+        {
+            return 2;
+        }
+
+        return 3;
+    }
+
+    private static bool IsScriptSpecificCompletion(CompletionCandidate candidate)
+    {
+        return candidate.Tags.Any(tag => tag is "method" or "property" or "field" or "local" or "parameter")
+            && !IsScriptingApiCompletion(candidate)
+            && !IsSystemCompletion(candidate);
+    }
+
+    private static bool IsScriptingApiCompletion(CompletionCandidate candidate)
+    {
+        return candidate.Documentation?.Contains("UniEmu.Scripting.Api.", StringComparison.Ordinal) == true;
+    }
+
+    private static bool IsSystemCompletion(CompletionCandidate candidate)
+    {
+        return candidate.Documentation?.Contains("System.", StringComparison.Ordinal) == true;
+    }
+
+    private static IReadOnlySet<string> GetGlobalObjectLabels(Type globalsType)
+    {
+        var labels = new HashSet<string>(StringComparer.Ordinal);
+        AddGlobalObjectLabels(globalsType, labels, []);
+        return labels;
+    }
+
+    private static void AddGlobalObjectLabels(Type type, HashSet<string> labels, HashSet<Type> visited)
+    {
+        if (!visited.Add(type))
+        {
+            return;
+        }
+
+        foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+        {
+            labels.Add(property.Name);
+            if (property.PropertyType.Namespace == "UniEmu.Scripting.Api")
+            {
+                AddGlobalObjectLabels(property.PropertyType, labels, visited);
+            }
+        }
+
+        foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+        {
+            if (!method.IsSpecialName)
+            {
+                labels.Add(method.Name);
+            }
+        }
     }
 
     private sealed record CompletionCandidate(

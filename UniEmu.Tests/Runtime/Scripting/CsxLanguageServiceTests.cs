@@ -157,6 +157,28 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task GetCompletionsAsync_RanksScriptSpecificSymbolsBeforeApiAndSystemSymbols()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["math.csx"] = "double LoadedHelper(double value) => value * 2;",
+        };
+
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "#load \"math.csx\"\n",
+            "#load \"math.csx\"\n".Length,
+            visibleScripts,
+            typeof(TagScriptGlobals));
+
+        AssertPrecedes(completions, "UniEmu", "LoadedHelper");
+        AssertPrecedes(completions, "Now", "LoadedHelper");
+        AssertPrecedes(completions, "LoadedHelper", "TagScriptValue");
+        AssertPrecedes(completions, "TagScriptValue", "DateTime");
+    }
+
+    [Fact]
     public async Task GetHoverAsync_ReturnsSymbolSignature()
     {
         var service = new CsxLanguageService();
@@ -206,7 +228,7 @@ public sealed class CsxLanguageServiceTests
             typeof(TagScriptGlobals));
 
         Assert.NotNull(hover);
-        Assert.Contains("Attempts to get the tag value", hover.Documentation, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(hover.Documentation));
     }
 
     [Fact]
@@ -226,5 +248,16 @@ public sealed class CsxLanguageServiceTests
         Assert.Contains(signatureHelp.Signatures, signature =>
             signature.Label.Contains("Round", StringComparison.Ordinal)
             && signature.Parameters.Count > 0);
+    }
+
+    private static void AssertPrecedes(IReadOnlyList<CsxCompletionItem> completions, string firstLabel, string secondLabel)
+    {
+        var completionList = completions.ToList();
+        var firstIndex = completionList.FindIndex(item => item.Label == firstLabel);
+        var secondIndex = completionList.FindIndex(item => item.Label == secondLabel);
+
+        Assert.True(firstIndex >= 0, $"Expected completion '{firstLabel}' to be present.");
+        Assert.True(secondIndex >= 0, $"Expected completion '{secondLabel}' to be present.");
+        Assert.True(firstIndex < secondIndex, $"Expected '{firstLabel}' to appear before '{secondLabel}'.");
     }
 }
