@@ -25,7 +25,7 @@ public sealed class TelemetryPacketSender
     }
 
     private const int ProgramChunkSize = 4096;
-    private static readonly JsonSerializerOptions DispatcherJsonOptions = new(JsonSerializerDefaults.General);
+    private static readonly JsonSerializerOptions s_dispatcherJsonOptions = new(JsonSerializerDefaults.General);
 
     public async Task<DispatcherMonitoringAnswer> SendMonitoringAsync(
         string targetUrl,
@@ -34,7 +34,7 @@ public sealed class TelemetryPacketSender
     {
         var uri = BuildDispatcherUri(targetUrl, "PostUniversalMonitoringDataJson");
 
-        using var response = await _httpClient.PostAsJsonAsync(uri, request, DispatcherJsonOptions, cancellationToken);
+        using var response = await _httpClient.PostAsJsonAsync(uri, request, s_dispatcherJsonOptions, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning("Dispatcher monitoring POST to {TargetUrl} failed with {StatusCode}", uri, response.StatusCode);
@@ -84,7 +84,7 @@ public sealed class TelemetryPacketSender
             }
 
             var request = new UniversalPostRequest(machineIntegrationId.ToString() ?? string.Empty, useInnerId, values);
-            using var response = await _httpClient.PostAsJsonAsync(uri, request, DispatcherJsonOptions, cancellationToken);
+            using var response = await _httpClient.PostAsJsonAsync(uri, request, s_dispatcherJsonOptions, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Dispatcher file POST to {TargetUrl} failed with {StatusCode}", uri, response.StatusCode);

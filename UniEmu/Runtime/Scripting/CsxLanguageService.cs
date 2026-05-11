@@ -14,11 +14,11 @@ namespace UniEmu.Runtime.Scripting;
 
 public sealed class CsxLanguageService
 {
-    private static readonly Regex LoadDirective = new(
+    private static readonly Regex s_loadDirective = new(
         @"^\s*#\s*load\s+""(?<path>[^""]+)""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
-    private static readonly ScriptOptions BaseOptions = ScriptOptions.Default
+    private static readonly ScriptOptions s_baseOptions = ScriptOptions.Default
         .WithReferences(
             typeof(object).Assembly,
             typeof(Enumerable).Assembly,
@@ -30,13 +30,13 @@ public sealed class CsxLanguageService
             "System.Globalization",
             "System.Linq",
             "UniEmu.Runtime");
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<MetadataReference>> MetadataReferenceCache = new();
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<MetadataReference>> s_metadataReferenceCache = new();
 
-    internal static int MetadataReferenceCacheCount => MetadataReferenceCache.Count;
+    internal static int MetadataReferenceCacheCount => s_metadataReferenceCache.Count;
 
     internal static void ClearMetadataReferenceCacheForTests()
     {
-        MetadataReferenceCache.Clear();
+        s_metadataReferenceCache.Clear();
     }
 
     public CsxAnalysisResult Analyze(
@@ -45,7 +45,7 @@ public sealed class CsxLanguageService
         IReadOnlyDictionary<string, string> visibleScripts,
         Type? globalsType = null)
     {
-        var options = BaseOptions
+        var options = s_baseOptions
             .WithFilePath(TagScriptPath.Normalize(entryPath))
             .WithSourceResolver(new DbScriptSourceResolver(visibleScripts));
         var script = CSharpScript.Create<object?>(
@@ -197,7 +197,7 @@ public sealed class CsxLanguageService
             .WithKind(SourceCodeKind.Script)
             .WithLanguageVersion(LanguageVersion.Preview);
         var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            .WithUsings(BaseOptions.Imports);
+            .WithUsings(s_baseOptions.Imports);
 
         var references = CreateMetadataReferences(globalsType ?? typeof(object));
         var solution = workspace.CurrentSolution
@@ -218,7 +218,7 @@ public sealed class CsxLanguageService
 
     private static IReadOnlyList<MetadataReference> CreateMetadataReferences(Type globalsType)
     {
-        return MetadataReferenceCache.GetOrAdd(globalsType, static type => BaseOptions.MetadataReferences
+        return s_metadataReferenceCache.GetOrAdd(globalsType, static type => s_baseOptions.MetadataReferences
             .Concat([MetadataReference.CreateFromFile(type.Assembly.Location)])
             .Concat(type.Assembly.GetReferencedAssemblies()
                 .Select(assemblyName => MetadataReference.CreateFromFile(AssemblyPath(assemblyName))))
@@ -233,7 +233,7 @@ public sealed class CsxLanguageService
         IReadOnlyDictionary<string, string> visibleScripts)
     {
         var prefix = new List<string>();
-        foreach (Match match in LoadDirective.Matches(content))
+        foreach (Match match in s_loadDirective.Matches(content))
         {
             var loadPath = ResolveLoadPath(match.Groups["path"].Value, entryPath, visibleScripts);
             if (loadPath is null || !visibleScripts.TryGetValue(loadPath, out var loadedContent))

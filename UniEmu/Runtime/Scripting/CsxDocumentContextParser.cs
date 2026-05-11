@@ -5,7 +5,7 @@ namespace UniEmu.Runtime.Scripting;
 
 public static class CsxDocumentContextParser
 {
-    private static readonly Regex ScriptIdPattern = new(
+    private static readonly Regex s_scriptIdPattern = new(
         @"(?:^|/)scripts/(?<id>[^/?/#]+)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
@@ -22,7 +22,7 @@ public static class CsxDocumentContextParser
         var path = queryIndex >= 0 ? value[..queryIndex] : value;
         var parameters = ParseQuery(query);
 
-        var idMatch = ScriptIdPattern.Match(path);
+        var idMatch = s_scriptIdPattern.Match(path);
         var scriptId = idMatch.Success ? idMatch.Groups["id"].Value : null;
         var scriptName = parameters.TryGetValue("name", out var name) && !string.IsNullOrWhiteSpace(name)
             ? name

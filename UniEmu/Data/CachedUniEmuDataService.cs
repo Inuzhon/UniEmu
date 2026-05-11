@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using UniEmu.Domain.Entities;
 
@@ -8,7 +8,7 @@ public sealed class CachedUniEmuDataService(
     UniEmuDbContext db,
     IMemoryCache cache)
 {
-    private static readonly MemoryCacheEntryOptions CacheOptions = new()
+    private static readonly MemoryCacheEntryOptions s_cacheOptions = new()
     {
         AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1),
         SlidingExpiration = TimeSpan.FromSeconds(20),
@@ -20,7 +20,7 @@ public sealed class CachedUniEmuDataService(
             EmulatorKey(emulatorId),
             entry =>
             {
-                entry.SetOptions(CacheOptions);
+                entry.SetOptions(s_cacheOptions);
                 return db.Emulators
                     .AsNoTracking()
                     .Include(e => e.Tags.OrderBy(t => t.Name))
@@ -36,7 +36,7 @@ public sealed class CachedUniEmuDataService(
             VisibleScriptsKey(emulatorId),
             async entry =>
             {
-                entry.SetOptions(CacheOptions);
+                entry.SetOptions(s_cacheOptions);
                 var scripts = await db.ScriptFiles
                     .AsNoTracking()
                     .Where(s => s.Scope == "shared" || s.EmulatorId == emulatorId)
@@ -56,7 +56,7 @@ public sealed class CachedUniEmuDataService(
             VisibleCncProgramsKey(emulatorId),
             async entry =>
             {
-                entry.SetOptions(CacheOptions);
+                entry.SetOptions(s_cacheOptions);
                 var programs = await db.CncPrograms
                     .AsNoTracking()
                     .Where(p => p.Scope == "shared" || p.EmulatorId == emulatorId)
@@ -78,13 +78,13 @@ public sealed class CachedUniEmuDataService(
     public void InvalidateScripts()
     {
         cache.Remove(ScriptCacheVersionKey);
-        cache.Set(ScriptCacheVersionKey, Guid.NewGuid().ToString("N"), CacheOptions);
+        cache.Set(ScriptCacheVersionKey, Guid.NewGuid().ToString("N"), s_cacheOptions);
     }
 
     public void InvalidateCncPrograms()
     {
         cache.Remove(CncProgramCacheVersionKey);
-        cache.Set(CncProgramCacheVersionKey, Guid.NewGuid().ToString("N"), CacheOptions);
+        cache.Set(CncProgramCacheVersionKey, Guid.NewGuid().ToString("N"), s_cacheOptions);
     }
 
     private string GetScriptCacheVersion()
@@ -93,7 +93,7 @@ public sealed class CachedUniEmuDataService(
             ScriptCacheVersionKey,
             entry =>
             {
-                entry.SetOptions(CacheOptions);
+                entry.SetOptions(s_cacheOptions);
                 return Guid.NewGuid().ToString("N");
             })!;
     }
@@ -104,7 +104,7 @@ public sealed class CachedUniEmuDataService(
             CncProgramCacheVersionKey,
             entry =>
             {
-                entry.SetOptions(CacheOptions);
+                entry.SetOptions(s_cacheOptions);
                 return Guid.NewGuid().ToString("N");
             })!;
     }

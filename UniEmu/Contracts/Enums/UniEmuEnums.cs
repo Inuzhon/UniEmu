@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace UniEmu.Contracts.Enums;
 
@@ -114,9 +114,11 @@ public enum SpecialParameter
     AxisLoad = 20,
     AxisPosition = 21,
     Message = 22,
+    // ReSharper disable once InconsistentNaming
     CNCModel = 23,
     FirmwareVersion = 24,
     SerialNumber = 25,
+    // ReSharper disable once InconsistentNaming
     PLCVersion = 26,
     Subprogram = 27,
 }

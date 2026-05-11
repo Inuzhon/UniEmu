@@ -133,7 +133,7 @@ if (!app.Configuration.GetValue<bool>("UniEmu:DisableStaticAssets"))
 }
 
 app.Lifetime.ApplicationStarted.Register(() =>
-    app.Logger.LogInformation("UniEmu backend listening on port {Port}", backendPortOptions.Port));
+    app.Logger.LogInformation("Listening on port {Port}", backendPortOptions.Port));
 
 await app.RunAsync();
 

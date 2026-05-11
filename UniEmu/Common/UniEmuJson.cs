@@ -1,11 +1,11 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace UniEmu.Common;
 
 public static class UniEmuJson
 {
-    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    public static readonly JsonSerializerOptions s_options = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
     };
@@ -18,11 +18,11 @@ public static class UniEmuJson
         }
     }
 
-    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Options);
+    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, s_options);
 
     public static T? Deserialize<T>(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? default : JsonSerializer.Deserialize<T>(value, Options);
+        return string.IsNullOrWhiteSpace(value) ? default : JsonSerializer.Deserialize<T>(value, s_options);
     }
 
     public static string EnumString<T>(T value)
@@ -34,6 +34,6 @@ public static class UniEmuJson
     public static T EnumValue<T>(string value)
         where T : struct, Enum
     {
-        return JsonSerializer.Deserialize<T>($"\"{value}\"", Options);
+        return JsonSerializer.Deserialize<T>($"\"{value}\"", s_options);
     }
 }

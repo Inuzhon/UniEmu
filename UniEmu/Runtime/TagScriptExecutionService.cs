@@ -19,17 +19,17 @@ public sealed class TagScriptExecutionService(
     TagRuntimeStateStore stateStore,
     CompiledTagScriptCache scriptCache)
 {
-    private static readonly Regex BlockedDirective = new(
+    private static readonly Regex s_blockedDirective = new(
         @"^\s*#\s*(r|using)\b",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-    private static readonly Regex LoadDirective = new(
+    private static readonly Regex s_loadDirective = new(
         @"^\s*#\s*load\s+""(?<path>[^""]+)""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-    private static readonly Regex FinalReturnStatement = new(
+    private static readonly Regex s_finalReturnStatement = new(
         @"\breturn\s+(?<expression>.+?)\s*;\s*$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
-    private static readonly ScriptOptions BaseOptions = ScriptOptions.Default
+    private static readonly ScriptOptions s_baseOptions = ScriptOptions.Default
         .WithReferences(
             typeof(object).Assembly,
             typeof(Enumerable).Assembly,
@@ -60,7 +60,7 @@ public sealed class TagScriptExecutionService(
         var stateValues = UniEmuJson.Deserialize<Dictionary<string, object?>>(state.ValuesJson)
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var globals = BuildGlobals(emulator, tag, timestamp, stateValues);
-        var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, BaseOptions, typeof(TagScriptGlobals));
+        var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, s_baseOptions, typeof(TagScriptGlobals));
         var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
         var result = scriptState.ReturnValue;
 
@@ -209,7 +209,7 @@ public sealed class TagScriptExecutionService(
 
     private static void ValidateDirectives(string content)
     {
-        var match = BlockedDirective.Match(content);
+        var match = s_blockedDirective.Match(content);
         if (match.Success)
         {
             throw new InvalidOperationException($"Unsupported script directive '{match.Value.Trim()}'. Use #load for shared scripts.");
@@ -218,7 +218,7 @@ public sealed class TagScriptExecutionService(
 
     private static string NormalizeEntryScriptContent(string content)
     {
-        var match = FinalReturnStatement.Match(content);
+        var match = s_finalReturnStatement.Match(content);
         return match.Success
             ? content[..match.Index] + match.Groups["expression"].Value
             : content;
@@ -248,7 +248,7 @@ public sealed class TagScriptExecutionService(
         }
 
         stack.Add(path);
-        foreach (Match match in LoadDirective.Matches(content))
+        foreach (Match match in s_loadDirective.Matches(content))
         {
             var loadPath = ResolveLoadPath(match.Groups["path"].Value, path, scripts);
             if (loadPath is null)

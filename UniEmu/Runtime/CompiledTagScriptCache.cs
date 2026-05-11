@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,23 +9,23 @@ namespace UniEmu.Runtime;
 
 public sealed class CompiledTagScriptCache
 {
-    private readonly int capacity;
-    private readonly object gate = new();
-    private readonly Dictionary<string, CacheEntry> entries = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, Lazy<Script<object?>>> pendingCompilations = new(StringComparer.Ordinal);
+    private readonly int _capacity;
+    private readonly Lock _gate = new();
+    private readonly Dictionary<string, CacheEntry> _entries = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<Script<object?>>> _pendingCompilations = new(StringComparer.Ordinal);
 
     public CompiledTagScriptCache(int capacity = 256)
     {
-        this.capacity = Math.Max(1, capacity);
+        this._capacity = Math.Max(1, capacity);
     }
 
     public int Count
     {
         get
         {
-            lock (gate)
+            lock (_gate)
             {
-                return entries.Count;
+                return _entries.Count;
             }
         }
     }
@@ -39,11 +39,9 @@ public sealed class CompiledTagScriptCache
     {
         var key = BuildKey(entryPath, content, visibleScripts, baseOptions, globalsType);
         if (TryGet(key, out var cached))
-        {
             return cached;
-        }
 
-        var lazy = pendingCompilations.GetOrAdd(
+        var lazy = _pendingCompilations.GetOrAdd(
             key,
             _ => new Lazy<Script<object?>>(
                 () => Compile(entryPath, content, visibleScripts, baseOptions, globalsType),
@@ -57,29 +55,27 @@ public sealed class CompiledTagScriptCache
         }
         finally
         {
-            pendingCompilations.TryRemove(key, out _);
+            _pendingCompilations.TryRemove(key, out _);
         }
     }
 
     public void Clear()
     {
         var hadEntries = false;
-        lock (gate)
+        lock (_gate)
         {
-            hadEntries = entries.Count > 0;
-            entries.Clear();
+            hadEntries = _entries.Count > 0;
+            _entries.Clear();
         }
 
-        if (!pendingCompilations.IsEmpty)
+        if (!_pendingCompilations.IsEmpty)
         {
             hadEntries = true;
-            pendingCompilations.Clear();
+            _pendingCompilations.Clear();
         }
 
         if (!hadEntries)
-        {
             return;
-        }
 
         GC.Collect();
         GC.WaitForPendingFinalizers();
@@ -88,9 +84,9 @@ public sealed class CompiledTagScriptCache
 
     private bool TryGet(string key, out Script<object?> script)
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (entries.TryGetValue(key, out var entry))
+            if (_entries.TryGetValue(key, out var entry))
             {
                 entry.LastUsed = DateTimeOffset.UtcNow;
                 script = entry.Script;
@@ -104,20 +100,20 @@ public sealed class CompiledTagScriptCache
 
     private void Add(string key, Script<object?> script)
     {
-        lock (gate)
+        lock (_gate)
         {
-            entries[key] = new CacheEntry(script, DateTimeOffset.UtcNow);
-            if (entries.Count <= capacity)
+            _entries[key] = new CacheEntry(script, DateTimeOffset.UtcNow);
+            if (_entries.Count <= _capacity)
             {
                 return;
             }
 
-            var oldest = entries
+            var oldest = _entries
                 .OrderBy(pair => pair.Value.LastUsed)
                 .First()
                 .Key;
 
-            entries.Remove(oldest);
+            _entries.Remove(oldest);
         }
     }
 
@@ -134,10 +130,9 @@ public sealed class CompiledTagScriptCache
         var script = CSharpScript.Create<object?>(content, options, globalsType);
         var diagnostics = script.Compile();
         var errors = diagnostics.Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToList();
+
         if (errors.Count > 0)
-        {
             throw new CompilationErrorException("Script compilation failed.", errors.ToImmutableArray());
-        }
 
         return script;
     }
@@ -149,7 +144,7 @@ public sealed class CompiledTagScriptCache
         ScriptOptions options,
         Type globalsType)
     {
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
         Append(hash, "entry");
         Append(hash, TagScriptPath.Normalize(entryPath));
         Append(hash, content);
@@ -180,9 +175,9 @@ public sealed class CompiledTagScriptCache
     private static void Append(IncrementalHash hash, string value)
     {
         var bytes = Encoding.UTF8.GetBytes(value);
-        Span<byte> length = stackalloc byte[sizeof(int)];
-        BitConverter.TryWriteBytes(length, bytes.Length);
-        hash.AppendData(length);
+        //Span<byte> length = stackalloc byte[sizeof(int)];
+        //BitConverter.TryWriteBytes(length, bytes.Length);
+        //hash.AppendData(length);
         hash.AppendData(bytes);
     }
 

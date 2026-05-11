@@ -19,16 +19,16 @@ public sealed record TagRuntimeSnapshotValue(
 
 public sealed class TagRuntimeStateStore
 {
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, TagRuntimeValue>> values = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<TagRuntimeValue>>> waiters = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, TagRuntimeValue>> _values = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<TagRuntimeValue>>> _waiters = new(StringComparer.Ordinal);
 
     public void Set(string emulatorId, string tagId, string tagName, object? value, double? numericValue, DateTimeOffset timestamp)
     {
-        var emulatorValues = values.GetOrAdd(emulatorId, _ => new ConcurrentDictionary<string, TagRuntimeValue>(StringComparer.Ordinal));
+        var emulatorValues = _values.GetOrAdd(emulatorId, _ => new ConcurrentDictionary<string, TagRuntimeValue>(StringComparer.Ordinal));
         var runtimeValue = new TagRuntimeValue(tagId, tagName, value, numericValue, timestamp);
         emulatorValues[tagId] = runtimeValue;
 
-        if (waiters.TryGetValue(emulatorId, out var emulatorWaiters)
+        if (_waiters.TryGetValue(emulatorId, out var emulatorWaiters)
             && emulatorWaiters.TryRemove(tagId, out var waiter))
         {
             waiter.TrySetResult(runtimeValue);
@@ -37,7 +37,7 @@ public sealed class TagRuntimeStateStore
 
     public bool TryGet(string emulatorId, string tagId, out TagRuntimeValue value)
     {
-        if (values.TryGetValue(emulatorId, out var emulatorValues)
+        if (_values.TryGetValue(emulatorId, out var emulatorValues)
             && emulatorValues.TryGetValue(tagId, out var runtimeValue))
         {
             value = runtimeValue;
@@ -50,7 +50,7 @@ public sealed class TagRuntimeStateStore
 
     public IReadOnlyList<TagRuntimeSnapshotValue> Snapshot()
     {
-        return values
+        return _values
             .SelectMany(emulator => emulator.Value.Values.Select(value => new TagRuntimeSnapshotValue(
                 emulator.Key,
                 value.TagId,
@@ -73,7 +73,7 @@ public sealed class TagRuntimeStateStore
             return existingValue;
         }
 
-        var emulatorWaiters = waiters.GetOrAdd(emulatorId, _ => new ConcurrentDictionary<string, TaskCompletionSource<TagRuntimeValue>>(StringComparer.Ordinal));
+        var emulatorWaiters = _waiters.GetOrAdd(emulatorId, _ => new ConcurrentDictionary<string, TaskCompletionSource<TagRuntimeValue>>(StringComparer.Ordinal));
         var waiter = new TaskCompletionSource<TagRuntimeValue>(TaskCreationOptions.RunContinuationsAsynchronously);
         emulatorWaiters[tagId] = waiter;
 
@@ -103,12 +103,12 @@ public sealed class TagRuntimeStateStore
 
     public void Remove(string emulatorId, string tagId)
     {
-        if (values.TryGetValue(emulatorId, out var emulatorValues))
+        if (_values.TryGetValue(emulatorId, out var emulatorValues))
         {
             emulatorValues.TryRemove(tagId, out _);
         }
 
-        if (waiters.TryGetValue(emulatorId, out var emulatorWaiters)
+        if (_waiters.TryGetValue(emulatorId, out var emulatorWaiters)
             && emulatorWaiters.TryRemove(tagId, out var waiter))
         {
             waiter.TrySetCanceled();
@@ -117,9 +117,9 @@ public sealed class TagRuntimeStateStore
 
     public void ClearEmulator(string emulatorId)
     {
-        values.TryRemove(emulatorId, out _);
+        _values.TryRemove(emulatorId, out _);
 
-        if (waiters.TryRemove(emulatorId, out var emulatorWaiters))
+        if (_waiters.TryRemove(emulatorId, out var emulatorWaiters))
         {
             foreach (var waiter in emulatorWaiters.Values)
             {
