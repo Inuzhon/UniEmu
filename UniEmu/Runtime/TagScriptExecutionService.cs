@@ -9,7 +9,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Hosting;
-using UniEmu.Runtime.Scripting.UserScripts;
+using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime;
 
@@ -33,7 +33,8 @@ public sealed class TagScriptExecutionService(
         .WithReferences(
             typeof(object).Assembly,
             typeof(Enumerable).Assembly,
-            typeof(DateTimeOffset).Assembly
+            typeof(DateTimeOffset).Assembly,
+            typeof(TagScriptGlobals).Assembly
             //typeof(UniEmuJson).Assembly
         )
         .WithImports(
@@ -41,7 +42,7 @@ public sealed class TagScriptExecutionService(
             "System.Collections.Generic",
             "System.Globalization",
             "System.Linq",
-            "UniEmu.Runtime");
+            "UniEmu.Scripting.Api");
 
     public async Task<GeneratedTagValue> GenerateScriptTagAsync(
         EmulatorEntity emulator,
@@ -152,10 +153,11 @@ public sealed class TagScriptExecutionService(
             .Select(t =>
             {
                 var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
+                var scriptTagType = ToScriptValueType(tagType);
                 if (stateStore.TryGet(emulator.Id, t.Id, out var runtimeValue))
-                    return new TagScriptValue(t.Key, t.Name, runtimeValue.Value, tagType, runtimeValue.Timestamp);
+                    return new TagScriptValue(t.Key, t.Name, runtimeValue.Value, scriptTagType, runtimeValue.Timestamp);
 
-                return new TagScriptValue(t.Key, t.Name, ConvertPreview(t), tagType, timestamp);
+                return new TagScriptValue(t.Key, t.Name, ConvertPreview(t), scriptTagType, timestamp);
             })
             .GroupBy(value => value.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.OrderByDescending(x => x.Timestamp).First(), StringComparer.OrdinalIgnoreCase);
@@ -166,7 +168,7 @@ public sealed class TagScriptExecutionService(
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         return new TagScriptGlobals(
             scriptNow,
-            new TagScriptValue(tag.Key, tag.Name, previous, tagType, previous?.Timestamp),
+            new TagScriptValue(tag.Key, tag.Name, previous, ToScriptValueType(tagType), previous?.Timestamp),
             new TagScriptTagAccessor(
                 values,
                 (tagName, value) => SetStaticTag(emulator, tagName, value, timestamp)),
@@ -180,6 +182,15 @@ public sealed class TagScriptExecutionService(
             )
         );
     }
+
+    private static TagScriptValueType ToScriptValueType(TagType type) => type switch
+    {
+        TagType.Bool => TagScriptValueType.Bool,
+        TagType.Int => TagScriptValueType.Int,
+        TagType.Double => TagScriptValueType.Double,
+        TagType.String => TagScriptValueType.String,
+        _ => TagScriptValueType.String,
+    };
 
     private object? SetStaticTag(EmulatorEntity emulator, string tagName, object? value, DateTimeOffset timestamp)
     {

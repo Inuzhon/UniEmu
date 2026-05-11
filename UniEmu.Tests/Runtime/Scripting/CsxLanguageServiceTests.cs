@@ -1,3 +1,4 @@
+using UniEmu.Scripting.Api;
 using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Tests.Runtime.Scripting;
@@ -33,6 +34,32 @@ public sealed class CsxLanguageServiceTests
             visibleScripts);
 
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Analyze_AcceptsScriptGlobalsFromScriptingApi()
+    {
+        var service = new CsxLanguageService();
+
+        var result = service.Analyze(
+            "inline/tag-1.csx",
+            "return UniEmu.Tag.Type == TagScriptValueType.Double ? Now.Offset.TotalHours : 0;",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void CreateMetadataReferences_ExposesScriptingApiWithoutBackendAssembly()
+    {
+        var references = CsxLanguageService.CreateMetadataReferencesForTests(typeof(TagScriptGlobals));
+        var displays = references
+            .Select(reference => Path.GetFileName(reference.Display ?? string.Empty))
+            .ToList();
+
+        Assert.Contains("UniEmu.Scripting.Api.dll", displays);
+        Assert.DoesNotContain("UniEmu.dll", displays);
     }
 
     [Fact]

@@ -2,7 +2,7 @@
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
-using UniEmu.Runtime.Scripting.UserScripts;
+using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime.Scripting;
 

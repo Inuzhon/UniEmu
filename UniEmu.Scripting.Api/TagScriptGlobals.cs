@@ -1,47 +1,44 @@
-﻿namespace UniEmu.Runtime.Scripting.UserScripts;
+namespace UniEmu.Scripting.Api;
 
 public sealed class TagScriptGlobals
 {
     /// <summary>
-    /// Время вычисления тега
+    /// Current tag calculation time in the application time zone.
     /// </summary>
     public DateTimeOffset Now { get; }
 
-    public UniEmu UniEmu { get; init; }
+    public UniEmuScriptContext UniEmu { get; init; }
 
     public TagScriptGlobals(
         DateTimeOffset now,
         TagScriptValue tag,
         TagScriptTagAccessor tags,
         TagScriptEmulatorContext emulator,
-        TagScriptStateContext state
-    )
+        TagScriptStateContext state)
     {
         Now = now;
-        UniEmu = new(emulator, state, tag, tags);
+        UniEmu = new UniEmuScriptContext(emulator, state, tag, tags);
     }
 }
 
-public sealed class UniEmu
+public sealed class UniEmuScriptContext
 {
     public TagScriptEmulatorContext Emulator { get; }
 
     public TagScriptStateContext State { get; }
 
     /// <summary>
-    /// Информация о текущем теге
+    /// Current tag information.
     /// </summary>
     public TagScriptValue Tag { get; }
 
     public TagScriptTagAccessor Tags { get; }
 
-
-    public UniEmu(
+    public UniEmuScriptContext(
         TagScriptEmulatorContext emulator,
         TagScriptStateContext state,
         TagScriptValue tag,
-        TagScriptTagAccessor tags
-    )
+        TagScriptTagAccessor tags)
     {
         Emulator = emulator;
         State = state;

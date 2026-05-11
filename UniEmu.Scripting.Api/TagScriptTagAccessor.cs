@@ -1,4 +1,4 @@
-﻿namespace UniEmu.Runtime.Scripting.UserScripts;
+namespace UniEmu.Scripting.Api;
 
 public sealed class TagScriptTagAccessor
 {
@@ -14,7 +14,7 @@ public sealed class TagScriptTagAccessor
     }
 
     /// <summary>
-    /// Attempts to get the TagScriptValue associated with the specified key.
+    /// Attempts to get the tag value associated with the specified key.
     /// </summary>
     /// <param name="keyName">The key whose associated value is requested.</param>
     /// <param name="tagValue">When this method returns, contains the value associated with the specified key if found; otherwise, null.</param>
@@ -25,14 +25,11 @@ public sealed class TagScriptTagAccessor
     }
 
     /// <summary>
-    /// Attempts to set the value for the specified key in the internal collection, converting the provided value as
-    /// required and updating the stored entry.
+    /// Attempts to set a static tag value by key.
     /// </summary>
-    /// <remarks>Returns false if the key does not exist or the stored entry is null. On success, the stored
-    /// entry is updated and the object's dirty state is set.</remarks>
-    /// <param name="keyName">The key of the entry to update.</param>
-    /// <param name="value">The value to assign to the entry; converted by the configured conversion function prior to storage.</param>
-    /// <returns>true if the entry existed and was updated; otherwise, false.</returns>
+    /// <param name="keyName">The key of the tag to update.</param>
+    /// <param name="value">The value to assign to the tag.</param>
+    /// <returns>true if the tag existed and was updated; otherwise, false.</returns>
     public bool TrySetValue(string keyName, object? value)
     {
         if (!TryGetValue(keyName, out var tagScriptValue) || tagScriptValue is null)

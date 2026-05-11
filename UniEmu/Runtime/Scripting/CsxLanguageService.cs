@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.CodeAnalysis.Text;
 using UniEmu.Common;
+using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime.Scripting;
 
@@ -22,7 +23,8 @@ public sealed class CsxLanguageService
         .WithReferences(
             typeof(object).Assembly,
             typeof(Enumerable).Assembly,
-            typeof(DateTimeOffset).Assembly
+            typeof(DateTimeOffset).Assembly,
+            typeof(TagScriptGlobals).Assembly
         //typeof(UniEmuJson).Assembly
         )
         .WithImports(
@@ -30,7 +32,7 @@ public sealed class CsxLanguageService
             "System.Collections.Generic",
             "System.Globalization",
             "System.Linq",
-            "UniEmu.Runtime.Scripting.UserScripts");
+            "UniEmu.Scripting.Api");
     private static readonly ConcurrentDictionary<Type, IReadOnlyList<MetadataReference>> s_metadataReferenceCache = new();
 
     internal static int MetadataReferenceCacheCount => s_metadataReferenceCache.Count;
@@ -38,6 +40,11 @@ public sealed class CsxLanguageService
     internal static void ClearMetadataReferenceCacheForTests()
     {
         s_metadataReferenceCache.Clear();
+    }
+
+    internal static IReadOnlyList<MetadataReference> CreateMetadataReferencesForTests(Type globalsType)
+    {
+        return CreateMetadataReferences(globalsType);
     }
 
     public CsxAnalysisResult Analyze(
@@ -211,12 +218,30 @@ public sealed class CsxLanguageService
     private static IReadOnlyList<MetadataReference> CreateMetadataReferences(Type globalsType)
     {
         return s_metadataReferenceCache.GetOrAdd(globalsType, static type => s_baseOptions.MetadataReferences
-            //TODO: Не надо запихивать в подсказки весь проект
-            //.Concat([MetadataReference.CreateFromFile(type.Assembly.Location)])
-            //.Concat(type.Assembly.GetReferencedAssemblies()
-            //    .Select(assemblyName => MetadataReference.CreateFromFile(AssemblyPath(assemblyName))))
+            .Concat(CreateApiReferences(type))
             .DistinctBy(reference => reference.Display)
             .ToList());
+    }
+
+    private static IReadOnlyList<MetadataReference> CreateApiReferences(Type globalsType)
+    {
+        var references = new List<MetadataReference>();
+
+        AddAssemblyReference(references, typeof(TagScriptGlobals).Assembly);
+        if (globalsType.Assembly == typeof(TagScriptGlobals).Assembly)
+        {
+            AddAssemblyReference(references, globalsType.Assembly);
+        }
+
+        return references;
+    }
+
+    private static void AddAssemblyReference(List<MetadataReference> references, System.Reflection.Assembly assembly)
+    {
+        if (string.IsNullOrWhiteSpace(assembly.Location))
+            return;
+
+        references.Add(MetadataReference.CreateFromFile(assembly.Location));
     }
 
     private static ExpandedScript ExpandLoadedScripts(
@@ -280,18 +305,6 @@ public sealed class CsxLanguageService
             start.Character,
             end.Line,
             end.Character);
-    }
-
-    private static string AssemblyPath(System.Reflection.AssemblyName assemblyName)
-    {
-        try
-        {
-            return System.Reflection.Assembly.Load(assemblyName).Location;
-        }
-        catch
-        {
-            return typeof(object).Assembly.Location;
-        }
     }
 
     private static ISymbol? ResolveSymbol(SemanticModel semanticModel, SyntaxToken token)

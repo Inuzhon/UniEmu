@@ -7,7 +7,7 @@ using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
-using UniEmu.Runtime.Scripting.UserScripts;
+using UniEmu.Scripting.Api;
 
 namespace UniEmu.Features.Tags;
 

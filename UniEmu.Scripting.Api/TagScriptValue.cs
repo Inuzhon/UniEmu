@@ -1,17 +1,18 @@
-﻿using UniEmu.Contracts.Enums;
-
-namespace UniEmu.Runtime.Scripting.UserScripts;
+namespace UniEmu.Scripting.Api;
 
 public sealed class TagScriptValue
 {
     public string Key { get; }
+
     public string Name { get; }
+
     public object? Value { get; set; }
-    public TagType Type { get; }
+
+    public TagScriptValueType Type { get; }
 
     public DateTimeOffset? Timestamp { get; }
 
-    public TagScriptValue(string key, string name, object? value, TagType type, DateTimeOffset? timestamp)
+    public TagScriptValue(string key, string name, object? value, TagScriptValueType type, DateTimeOffset? timestamp)
     {
         Key = key;
         Name = name;

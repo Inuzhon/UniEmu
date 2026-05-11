@@ -1,6 +1,7 @@
-﻿using System.Globalization;
+using System.Globalization;
+using System.Text.Json;
 
-namespace UniEmu.Runtime.Scripting.UserScripts;
+namespace UniEmu.Scripting.Api;
 
 public sealed class TagScriptStateContext(
     bool isRunning,
@@ -10,9 +11,13 @@ public sealed class TagScriptStateContext(
     Dictionary<string, TagScriptValue> values)
 {
     public bool IsRunning { get; } = isRunning;
+
     public object? PrevValue { get; } = prevValue;
+
     public double? PrevNumericValue { get; } = prevNumericValue;
+
     public DateTimeOffset? PrevTimestamp { get; } = prevTimestamp;
+
     public bool IsDirty { get; private set; }
 
     public TagScriptValue? this[string key] => Get(key);
@@ -36,7 +41,7 @@ public sealed class TagScriptStateContext(
 
         tagScriptValue.Value = value;
         values[key] = tagScriptValue;
-        
+
         IsDirty = true;
     }
 
@@ -88,17 +93,17 @@ public sealed class TagScriptStateContext(
 
     private static object? UnwrapJsonValue(object? value)
     {
-        if (value is not System.Text.Json.JsonElement json)
+        if (value is not JsonElement json)
             return value;
 
         return json.ValueKind switch
         {
-            System.Text.Json.JsonValueKind.True => true,
-            System.Text.Json.JsonValueKind.False => false,
-            System.Text.Json.JsonValueKind.Number when json.TryGetInt64(out var longValue) => longValue,
-            System.Text.Json.JsonValueKind.Number when json.TryGetDouble(out var doubleValue) => doubleValue,
-            System.Text.Json.JsonValueKind.String => json.GetString(),
-            System.Text.Json.JsonValueKind.Null => null,
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number when json.TryGetInt64(out var longValue) => longValue,
+            JsonValueKind.Number when json.TryGetDouble(out var doubleValue) => doubleValue,
+            JsonValueKind.String => json.GetString(),
+            JsonValueKind.Null => null,
             _ => json.GetRawText(),
         };
     }
