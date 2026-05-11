@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Completion;
@@ -29,6 +30,14 @@ public sealed class CsxLanguageService
             "System.Globalization",
             "System.Linq",
             "UniEmu.Runtime");
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<MetadataReference>> MetadataReferenceCache = new();
+
+    internal static int MetadataReferenceCacheCount => MetadataReferenceCache.Count;
+
+    internal static void ClearMetadataReferenceCacheForTests()
+    {
+        MetadataReferenceCache.Clear();
+    }
 
     public CsxAnalysisResult Analyze(
         string entryPath,
@@ -209,12 +218,12 @@ public sealed class CsxLanguageService
 
     private static IReadOnlyList<MetadataReference> CreateMetadataReferences(Type globalsType)
     {
-        return BaseOptions.MetadataReferences
-            .Concat([MetadataReference.CreateFromFile(globalsType.Assembly.Location)])
-            .Concat(globalsType.Assembly.GetReferencedAssemblies()
+        return MetadataReferenceCache.GetOrAdd(globalsType, static type => BaseOptions.MetadataReferences
+            .Concat([MetadataReference.CreateFromFile(type.Assembly.Location)])
+            .Concat(type.Assembly.GetReferencedAssemblies()
                 .Select(assemblyName => MetadataReference.CreateFromFile(AssemblyPath(assemblyName))))
             .DistinctBy(reference => reference.Display)
-            .ToList();
+            .ToList());
     }
 
     private static ExpandedScript ExpandLoadedScripts(

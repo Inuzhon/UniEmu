@@ -15,7 +15,8 @@ namespace UniEmu.Features.Scripts;
 public sealed class ScriptService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
-    CsxLanguageService language)
+    CsxLanguageService language,
+    CompiledTagScriptCache compiledScripts)
 {
     public async Task<IReadOnlyList<ScriptFileDto>> ListAsync(ScriptScope? scope, string? emulatorId, CancellationToken cancellationToken)
     {
@@ -62,6 +63,7 @@ public sealed class ScriptService(
         db.ScriptFiles.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
         dataCache.InvalidateScripts();
+        compiledScripts.Clear();
         return entity.ToDto();
     }
 
@@ -100,6 +102,7 @@ public sealed class ScriptService(
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         dataCache.InvalidateScripts();
+        compiledScripts.Clear();
         return entity.ToDto();
     }
 
@@ -109,6 +112,7 @@ public sealed class ScriptService(
         if (deleted > 0)
         {
             dataCache.InvalidateScripts();
+            compiledScripts.Clear();
         }
 
         return deleted > 0;

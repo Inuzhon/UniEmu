@@ -6,6 +6,7 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Features.Scripts;
+using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Tests.Features.Scripts;
@@ -45,10 +46,36 @@ public sealed class ScriptServiceTests
         Assert.Equal("#load \"common.csx\"\nreturn Add(1, 2);", script.Content);
     }
 
-    private static ScriptService CreateService(UniEmuDbContext db)
+    [Fact]
+    public async Task PatchAsync_ClearsCompiledScriptCache_WhenScriptChanges()
+    {
+        await using var fixture = await ScriptDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var compiledCache = new CompiledTagScriptCache();
+        var service = CreateService(db, compiledCache);
+
+        compiledCache.GetOrAdd(
+            "machine.csx",
+            "return 1;",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.Create<object?>("return 0;").Options,
+            typeof(object));
+
+        Assert.Equal(1, compiledCache.Count);
+
+        var script = await service.PatchAsync(
+            "scr-machine",
+            new PatchScriptRequest(null, "return 2;"),
+            CancellationToken.None);
+
+        Assert.NotNull(script);
+        Assert.Equal(0, compiledCache.Count);
+    }
+
+    private static ScriptService CreateService(UniEmuDbContext db, CompiledTagScriptCache? compiledCache = null)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
-        return new ScriptService(db, new CachedUniEmuDataService(db, cache), new CsxLanguageService());
+        return new ScriptService(db, new CachedUniEmuDataService(db, cache), new CsxLanguageService(), compiledCache ?? new CompiledTagScriptCache());
     }
 
     private sealed class ScriptDbFixture : IAsyncDisposable

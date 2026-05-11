@@ -99,6 +99,22 @@ public sealed class CompiledTagScriptCacheTests
     }
 
     [Fact]
+    public void Clear_RemovesCompiledScripts()
+    {
+        var cache = new CompiledTagScriptCache(capacity: 8);
+        var options = CSharpScript.Create<object?>("return 0;").Options;
+        var scripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var first = cache.GetOrAdd("one.csx", "return 1;", scripts, options, typeof(object));
+
+        cache.Clear();
+
+        Assert.Equal(0, cache.Count);
+        var recompiled = cache.GetOrAdd("one.csx", "return 1;", scripts, options, typeof(object));
+        Assert.NotSame(first, recompiled);
+    }
+
+    [Fact]
     public void GetOrAdd_ThrowsCompilationErrorException_WhenScriptDoesNotCompile()
     {
         var cache = new CompiledTagScriptCache(capacity: 8);

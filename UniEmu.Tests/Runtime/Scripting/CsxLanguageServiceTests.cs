@@ -38,6 +38,7 @@ public sealed class CsxLanguageServiceTests
     [Fact]
     public void GetCompletions_ReturnsSymbolsFromLoadedScripts()
     {
+        CsxLanguageService.ClearMetadataReferenceCacheForTests();
         var service = new CsxLanguageService();
         var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -52,6 +53,15 @@ public sealed class CsxLanguageServiceTests
             visibleScripts);
 
         Assert.Contains(completions, item => item.Label == "LoadedHelper");
+        Assert.Equal(1, CsxLanguageService.MetadataReferenceCacheCount);
+
+        _ = service.GetCompletions(
+            "inline/tag-1.csx",
+            content,
+            content.Length,
+            visibleScripts);
+
+        Assert.Equal(1, CsxLanguageService.MetadataReferenceCacheCount);
     }
 
     [Fact]

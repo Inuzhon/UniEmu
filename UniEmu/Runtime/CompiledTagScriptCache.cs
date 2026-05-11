@@ -19,6 +19,17 @@ public sealed class CompiledTagScriptCache
         this.capacity = Math.Max(1, capacity);
     }
 
+    public int Count
+    {
+        get
+        {
+            lock (gate)
+            {
+                return entries.Count;
+            }
+        }
+    }
+
     public Script<object?> GetOrAdd(
         string entryPath,
         string content,
@@ -48,6 +59,31 @@ public sealed class CompiledTagScriptCache
         {
             pendingCompilations.TryRemove(key, out _);
         }
+    }
+
+    public void Clear()
+    {
+        var hadEntries = false;
+        lock (gate)
+        {
+            hadEntries = entries.Count > 0;
+            entries.Clear();
+        }
+
+        if (!pendingCompilations.IsEmpty)
+        {
+            hadEntries = true;
+            pendingCompilations.Clear();
+        }
+
+        if (!hadEntries)
+        {
+            return;
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     private bool TryGet(string key, out Script<object?> script)
