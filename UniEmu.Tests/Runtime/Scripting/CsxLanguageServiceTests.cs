@@ -276,6 +276,29 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task GetCompletionsAsync_EmitsSortTextThatPreservesApiRankingInMonaco()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["math.csx"] = "double LoadedHelper(double value) => value * 2;",
+        };
+
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "#load \"math.csx\"\n",
+            "#load \"math.csx\"\n".Length,
+            visibleScripts,
+            typeof(TagScriptGlobals));
+
+        AssertSortTextPrecedes(completions, "UniEmu", "LoadedHelper");
+        AssertSortTextPrecedes(completions, "Now", "LoadedHelper");
+        AssertSortTextPrecedes(completions, "LoadedHelper", "TagScriptValue");
+        AssertSortTextPrecedes(completions, "TagScriptValue", "DateTime");
+        AssertSortTextPrecedes(completions, "TagScriptValue", "double");
+    }
+
+    [Fact]
     public async Task GetHoverAsync_ReturnsSymbolSignature()
     {
         var service = new CsxLanguageService();
@@ -529,5 +552,15 @@ public sealed class CsxLanguageServiceTests
         Assert.True(firstIndex >= 0, $"Expected completion '{firstLabel}' to be present.");
         Assert.True(secondIndex >= 0, $"Expected completion '{secondLabel}' to be present.");
         Assert.True(firstIndex < secondIndex, $"Expected '{firstLabel}' to appear before '{secondLabel}'.");
+    }
+
+    private static void AssertSortTextPrecedes(IReadOnlyList<CsxCompletionItem> completions, string firstLabel, string secondLabel)
+    {
+        var first = Assert.Single(completions, item => item.Label == firstLabel);
+        var second = Assert.Single(completions, item => item.Label == secondLabel);
+
+        Assert.True(
+            string.CompareOrdinal(first.SortText, second.SortText) < 0,
+            $"Expected sortText for '{firstLabel}' ('{first.SortText}') to sort before '{secondLabel}' ('{second.SortText}').");
     }
 }

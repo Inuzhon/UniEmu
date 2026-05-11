@@ -70,7 +70,10 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
             .OrderBy(candidate => GetCompletionPriority(candidate, globalObjectLabels))
             .ThenBy(candidate => candidate.Item.SortText, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Item.Label, StringComparer.Ordinal)
-            .Select(candidate => candidate.Item)
+            .Select(candidate => candidate.Item with
+            {
+                SortText = GetRankedSortText(candidate, globalObjectLabels),
+            })
             .ToList();
     }
 
@@ -112,6 +115,11 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         }
 
         return 3;
+    }
+
+    private static string GetRankedSortText(CompletionCandidate candidate, IReadOnlySet<string> globalObjectLabels)
+    {
+        return $"{GetCompletionPriority(candidate, globalObjectLabels):D2}_{candidate.Item.SortText}_{candidate.Item.Label}";
     }
 
     private static bool IsScriptSpecificCompletion(CompletionCandidate candidate)
