@@ -3,16 +3,19 @@ namespace UniEmu.Scripting.Api;
 /// <summary>
 /// Глобальные объекты, доступные скрипту при вычислении тега.
 /// </summary>
+[ScriptingApi]
 public sealed class TagScriptGlobals
 {
     /// <summary>
     /// Текущее время вычисления тега в часовом поясе приложения.
     /// </summary>
+    [ScriptingApi]
     public DateTimeOffset Now { get; }
 
     /// <summary>
     /// Контекст UniEmu с данными эмулятора, текущего тега, других тегов и состояния скрипта.
     /// </summary>
+    [ScriptingApi]
     public UniEmuScriptContext UniEmu { get; init; }
 
     /// <summary>
@@ -38,26 +41,31 @@ public sealed class TagScriptGlobals
 /// <summary>
 /// Контекст UniEmu, доступный скрипту тега.
 /// </summary>
+[ScriptingApi]
 public sealed class UniEmuScriptContext
 {
     /// <summary>
     /// Эмулятор, для которого выполняется скрипт.
     /// </summary>
+    [ScriptingApi]
     public TagScriptEmulatorContext Emulator { get; }
 
     /// <summary>
     /// Состояние скрипта, сохраняемое между вычислениями тега.
     /// </summary>
+    [ScriptingApi]
     public TagScriptStateContext State { get; }
 
     /// <summary>
     /// Информация о текущем вычисляемом теге.
     /// </summary>
+    [ScriptingApi]
     public TagScriptValue Tag { get; }
 
     /// <summary>
     /// Доступ к значениям тегов, доступных текущему скрипту.
     /// </summary>
+    [ScriptingApi]
     public TagScriptTagAccessor Tags { get; }
 
     /// <summary>

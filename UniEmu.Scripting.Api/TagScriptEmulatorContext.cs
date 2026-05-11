@@ -7,4 +7,9 @@ namespace UniEmu.Scripting.Api;
 /// <param name="Name">Отображаемое имя эмулятора.</param>
 /// <param name="Status">Текущий статус эмулятора.</param>
 /// <param name="StartTime">Время запуска эмулятора, если оно известно.</param>
-public sealed record TagScriptEmulatorContext(string Id, string Name, string Status, DateTimeOffset? StartTime);
+[ScriptingApi]
+public sealed record TagScriptEmulatorContext(
+    [property: ScriptingApi] string Id,
+    [property: ScriptingApi] string Name,
+    [property: ScriptingApi] string Status,
+    [property: ScriptingApi] DateTimeOffset? StartTime);

@@ -3,6 +3,7 @@ namespace UniEmu.Scripting.Api;
 /// <summary>
 /// Предоставляет скрипту доступ к значениям тегов и позволяет изменять статические теги.
 /// </summary>
+[ScriptingApi]
 public sealed class TagScriptTagAccessor
 {
     private readonly IDictionary<string, TagScriptValue> _values;
@@ -11,6 +12,7 @@ public sealed class TagScriptTagAccessor
     /// <summary>
     /// Показывает, изменял ли скрипт значения тегов через этот объект.
     /// </summary>
+    [ScriptingApi]
     public bool IsDirty { get; private set; }
 
     /// <summary>
@@ -30,6 +32,7 @@ public sealed class TagScriptTagAccessor
     /// <param name="keyName">Ключ тега.</param>
     /// <param name="tagValue">Найденное значение тега или <see langword="null"/>, если тег не найден.</param>
     /// <returns><see langword="true"/>, если тег найден; иначе <see langword="false"/>.</returns>
+    [ScriptingApi]
     public bool TryGetValue(string keyName, out TagScriptValue? tagValue)
     {
         return _values.TryGetValue(keyName, out tagValue);
@@ -41,6 +44,7 @@ public sealed class TagScriptTagAccessor
     /// <param name="keyName">Ключ изменяемого тега.</param>
     /// <param name="value">Новое значение тега.</param>
     /// <returns><see langword="true"/>, если тег найден и обновлен; иначе <see langword="false"/>.</returns>
+    [ScriptingApi]
     public bool TrySetValue(string keyName, object? value)
     {
         if (!TryGetValue(keyName, out var tagScriptValue) || tagScriptValue is null)

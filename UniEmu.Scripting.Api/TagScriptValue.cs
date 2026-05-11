@@ -3,31 +3,37 @@ namespace UniEmu.Scripting.Api;
 /// <summary>
 /// Значение тега вместе с его метаданными, доступное из скрипта.
 /// </summary>
+[ScriptingApi]
 public sealed class TagScriptValue
 {
     /// <summary>
     /// Уникальный ключ тега, используемый для обращения к нему в скриптах.
     /// </summary>
+    [ScriptingApi]
     public string Key { get; }
 
     /// <summary>
     /// Отображаемое имя тега.
     /// </summary>
+    [ScriptingApi]
     public string Name { get; }
 
     /// <summary>
     /// Текущее значение тега.
     /// </summary>
+    [ScriptingApi]
     public object? Value { get; set; }
 
     /// <summary>
     /// Тип текущего значения тега.
     /// </summary>
+    [ScriptingApi]
     public TagScriptValueType Type { get; }
 
     /// <summary>
     /// Время получения или изменения значения, если оно известно.
     /// </summary>
+    [ScriptingApi]
     public DateTimeOffset? Timestamp { get; }
 
     /// <summary>

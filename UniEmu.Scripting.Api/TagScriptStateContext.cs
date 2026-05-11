@@ -11,6 +11,7 @@ namespace UniEmu.Scripting.Api;
 /// <param name="prevNumericValue">Предыдущее рассчитанное значение тега, приведенное к числу, если это возможно.</param>
 /// <param name="prevTimestamp">Время предыдущего рассчитанного значения тега, если оно известно.</param>
 /// <param name="values">Сохраненные пользовательские значения состояния.</param>
+[ScriptingApi]
 public sealed class TagScriptStateContext(
     bool isRunning,
     object? prevValue,
@@ -21,26 +22,31 @@ public sealed class TagScriptStateContext(
     /// <summary>
     /// Показывает, что для тега уже было хотя бы одно вычисление.
     /// </summary>
+    [ScriptingApi]
     public bool IsRunning { get; } = isRunning;
 
     /// <summary>
     /// Предыдущее рассчитанное значение тега.
     /// </summary>
+    [ScriptingApi]
     public object? PrevValue { get; } = prevValue;
 
     /// <summary>
     /// Предыдущее рассчитанное значение тега, приведенное к числу, если это возможно.
     /// </summary>
+    [ScriptingApi]
     public double? PrevNumericValue { get; } = prevNumericValue;
 
     /// <summary>
     /// Время предыдущего рассчитанного значения тега, если оно известно.
     /// </summary>
+    [ScriptingApi]
     public DateTimeOffset? PrevTimestamp { get; } = prevTimestamp;
 
     /// <summary>
     /// Показывает, изменялось ли состояние во время текущего выполнения скрипта.
     /// </summary>
+    [ScriptingApi]
     public bool IsDirty { get; private set; }
 
     /// <summary>
@@ -48,6 +54,7 @@ public sealed class TagScriptStateContext(
     /// </summary>
     /// <param name="key">Ключ значения состояния.</param>
     /// <returns>Значение состояния или <see langword="null"/>, если ключ не найден.</returns>
+    [ScriptingApi]
     public TagScriptValue? this[string key] => Get(key);
 
     /// <summary>
@@ -55,6 +62,7 @@ public sealed class TagScriptStateContext(
     /// </summary>
     /// <param name="key">Ключ значения состояния.</param>
     /// <returns>Значение состояния или <see langword="null"/>, если ключ не найден.</returns>
+    [ScriptingApi]
     public TagScriptValue? Get(string key)
     {
         return values.GetValueOrDefault(key);
@@ -67,6 +75,7 @@ public sealed class TagScriptStateContext(
     /// <param name="key">Ключ значения состояния.</param>
     /// <param name="fallback">Значение, возвращаемое при отсутствии ключа или ошибке приведения типа.</param>
     /// <returns>Сохраненное значение, приведенное к типу <typeparamref name="T"/>, либо <paramref name="fallback"/>.</returns>
+    [ScriptingApi]
     public T? Get<T>(string key, T? fallback = default)
     {
         return values.TryGetValue(key, out var tagScriptValue)
@@ -79,6 +88,7 @@ public sealed class TagScriptStateContext(
     /// </summary>
     /// <param name="key">Ключ значения состояния.</param>
     /// <param name="value">Новое значение состояния.</param>
+    [ScriptingApi]
     public void Set(string key, object? value)
     {
         if (!values.TryGetValue(key, out var tagScriptValue))
@@ -99,6 +109,7 @@ public sealed class TagScriptStateContext(
     /// </summary>
     /// <param name="key">Ключ удаляемого значения состояния.</param>
     /// <returns><see langword="true"/>, если значение было найдено и удалено; иначе <see langword="false"/>.</returns>
+    [ScriptingApi]
     public bool Remove(string key)
     {
         var removed = values.Remove(key);
@@ -109,6 +120,7 @@ public sealed class TagScriptStateContext(
     /// <summary>
     /// Очищает все сохраненные значения состояния.
     /// </summary>
+    [ScriptingApi]
     public void Clear()
     {
         if (values.Count == 0)
@@ -122,6 +134,7 @@ public sealed class TagScriptStateContext(
     /// Создает снимок сохраненного состояния в виде словаря простых значений.
     /// </summary>
     /// <returns>Словарь значений состояния, где ключом является имя значения.</returns>
+    [ScriptingApi]
     public IReadOnlyDictionary<string, object?> Snapshot()
     {
         return values.ToDictionary(

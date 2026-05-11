@@ -126,6 +126,22 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task GetCompletionsAsync_ReturnsMarkedScriptingApiMembers()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "UniEmu.State.",
+            13,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(completions, item => item.Label == "Get");
+        Assert.Contains(completions, item => item.Label == "Set");
+    }
+
+    [Fact]
     public async Task GetCompletionsAsync_DoesNotExposeRemovedTopLevelTagAlias()
     {
         var service = new CsxLanguageService();
@@ -154,6 +170,21 @@ public sealed class CsxLanguageServiceTests
 
         Assert.DoesNotContain(completions, item => item.Label == "AccessViolationException");
         Assert.DoesNotContain(completions, item => item.Label == "Activator");
+    }
+
+    [Fact]
+    public async Task GetCompletionsAsync_HidesUnmarkedScriptingApiSymbols()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "Scripting",
+            9,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.DoesNotContain(completions, item => item.Label == "ScriptingApiAttribute");
     }
 
     [Fact]

@@ -2,12 +2,15 @@ using Microsoft.CodeAnalysis.Completion;
 using System.Reflection;
 using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Runtime.Scripting.Workspace;
+using UniEmu.Scripting.Api;
 using RoslynCompletionService = Microsoft.CodeAnalysis.Completion.CompletionService;
 
 namespace UniEmu.Runtime.Scripting.Services;
 
 public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
 {
+    private const string ScriptingApiNamespace = "UniEmu.Scripting.Api";
+
     private static readonly HashSet<string> s_allowedSystemTypeLabels = new(StringComparer.Ordinal)
     {
         "Convert",
@@ -74,6 +77,11 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
     private static bool IsAllowedCompletion(CompletionCandidate candidate)
     {
         var item = candidate.Item;
+        if (IsScriptingApiCompletion(candidate))
+        {
+            return HasScriptingApiAttribute(candidate);
+        }
+
         if (candidate.Tags.Any(tag => tag is "keyword" or "method" or "property" or "field" or "local" or "parameter"))
         {
             return true;
@@ -83,8 +91,7 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         {
             return true;
         }
-
-        return candidate.Documentation?.Contains("UniEmu.Scripting.Api.", StringComparison.Ordinal) == true;
+        return false;
     }
 
     private static int GetCompletionPriority(CompletionCandidate candidate, IReadOnlySet<string> globalObjectLabels)
@@ -116,12 +123,42 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
 
     private static bool IsScriptingApiCompletion(CompletionCandidate candidate)
     {
-        return candidate.Documentation?.Contains("UniEmu.Scripting.Api.", StringComparison.Ordinal) == true;
+        return candidate.Documentation?.Contains(ScriptingApiNamespace + ".", StringComparison.Ordinal) == true;
     }
 
     private static bool IsSystemCompletion(CompletionCandidate candidate)
     {
         return candidate.Documentation?.Contains("System.", StringComparison.Ordinal) == true;
+    }
+
+    private static bool HasScriptingApiAttribute(CompletionCandidate candidate)
+    {
+        if (candidate.Documentation is not { } documentation)
+        {
+            return false;
+        }
+
+        foreach (var type in typeof(ScriptingApiAttribute).Assembly.GetTypes())
+        {
+            if (type.FullName is null || !documentation.Contains(type.FullName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (type.Name == candidate.Item.Label)
+            {
+                return type.IsDefined(typeof(ScriptingApiAttribute), inherit: false);
+            }
+
+            const BindingFlags memberFlags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static;
+            if (type.GetMember(candidate.Item.Label, memberFlags)
+                .Any(member => member.IsDefined(typeof(ScriptingApiAttribute), inherit: false)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static IReadOnlySet<string> GetGlobalObjectLabels(Type globalsType)
