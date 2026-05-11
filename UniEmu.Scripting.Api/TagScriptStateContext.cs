@@ -37,7 +37,11 @@ public sealed class TagScriptStateContext(
     public void Set(string key, object? value)
     {
         if (!values.TryGetValue(key, out var tagScriptValue))
+        {
+            values[key] = new TagScriptValue(key, key, value, InferType(value), null);
+            IsDirty = true;
             return;
+        }
 
         tagScriptValue.Value = value;
         values[key] = tagScriptValue;
@@ -61,10 +65,21 @@ public sealed class TagScriptStateContext(
         IsDirty = true;
     }
 
-    public IReadOnlyDictionary<string, TagScriptValue> Snapshot()
+    public IReadOnlyDictionary<string, object?> Snapshot()
     {
-        return new Dictionary<string, TagScriptValue>(values, StringComparer.OrdinalIgnoreCase);
+        return values.ToDictionary(
+            value => value.Key,
+            value => value.Value.Value,
+            StringComparer.OrdinalIgnoreCase);
     }
+
+    private static TagScriptValueType InferType(object? value) => UnwrapJsonValue(value) switch
+    {
+        bool => TagScriptValueType.Bool,
+        byte or short or int or long => TagScriptValueType.Int,
+        float or double or decimal => TagScriptValueType.Double,
+        _ => TagScriptValueType.String,
+    };
 
     private static T? ConvertStateValue<T>(object? value, T? fallback)
     {

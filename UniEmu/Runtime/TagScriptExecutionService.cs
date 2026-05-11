@@ -152,7 +152,7 @@ public sealed class TagScriptExecutionService(
         var values = emulator.Tags
             .Select(t =>
             {
-                var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
+                var tagType = UniEmuJson.EnumValue<TagType>(t.Type);
                 var scriptTagType = ToScriptValueType(tagType);
                 if (stateStore.TryGet(emulator.Id, t.Id, out var runtimeValue))
                     return new TagScriptValue(t.Key, t.Name, runtimeValue.Value, scriptTagType, runtimeValue.Timestamp);
@@ -168,7 +168,7 @@ public sealed class TagScriptExecutionService(
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         return new TagScriptGlobals(
             scriptNow,
-            new TagScriptValue(tag.Key, tag.Name, previous, ToScriptValueType(tagType), previous?.Timestamp),
+            new TagScriptValue(tag.Key, tag.Name, previous?.Value, ToScriptValueType(tagType), previous?.Timestamp),
             new TagScriptTagAccessor(
                 values,
                 (tagName, value) => SetStaticTag(emulator, tagName, value, timestamp)),
@@ -178,10 +178,26 @@ public sealed class TagScriptExecutionService(
                 previous?.Value,
                 previous?.NumericValue,
                 previous?.Timestamp,
-                new Dictionary<string, TagScriptValue>()//stateValues
+                ToScriptStateValues(stateValues)
             )
         );
     }
+
+    private static Dictionary<string, TagScriptValue> ToScriptStateValues(Dictionary<string, object?> stateValues)
+    {
+        return stateValues.ToDictionary(
+            value => value.Key,
+            value => new TagScriptValue(value.Key, value.Key, value.Value, ToScriptValueType(value.Value), null),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static TagScriptValueType ToScriptValueType(object? value) => value switch
+    {
+        bool => TagScriptValueType.Bool,
+        byte or short or int or long => TagScriptValueType.Int,
+        float or double or decimal => TagScriptValueType.Double,
+        _ => TagScriptValueType.String,
+    };
 
     private static TagScriptValueType ToScriptValueType(TagType type) => type switch
     {
