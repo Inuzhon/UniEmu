@@ -7,8 +7,8 @@ using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
 using UniEmu.Runtime;
-using UniEmu.Runtime.Models;
 using UniEmu.Runtime.Scripting;
+using UniEmu.Runtime.Scripting.UserScripts;
 
 namespace UniEmu.Features.Scripts;
 

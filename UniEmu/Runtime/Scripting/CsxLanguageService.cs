@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.CodeAnalysis.Text;
@@ -22,14 +22,15 @@ public sealed class CsxLanguageService
         .WithReferences(
             typeof(object).Assembly,
             typeof(Enumerable).Assembly,
-            typeof(DateTimeOffset).Assembly,
-            typeof(UniEmuJson).Assembly)
+            typeof(DateTimeOffset).Assembly
+        //typeof(UniEmuJson).Assembly
+        )
         .WithImports(
             "System",
             "System.Collections.Generic",
             "System.Globalization",
             "System.Linq",
-            "UniEmu.Runtime");
+            "UniEmu.Runtime.Scripting.UserScripts");
     private static readonly ConcurrentDictionary<Type, IReadOnlyList<MetadataReference>> s_metadataReferenceCache = new();
 
     internal static int MetadataReferenceCacheCount => s_metadataReferenceCache.Count;
@@ -73,9 +74,7 @@ public sealed class CsxLanguageService
 
         var service = CompletionService.GetService(document);
         if (service is null)
-        {
             return [];
-        }
 
         var completionList = service
             .GetCompletionsAsync(document, expanded.Position)
@@ -94,8 +93,7 @@ public sealed class CsxLanguageService
             .DistinctBy(item => item.Label, StringComparer.Ordinal)
             .OrderBy(item => item.SortText, StringComparer.Ordinal)
             .ThenBy(item => item.Label, StringComparer.Ordinal)
-            .ToList()
-            ?? [];
+            .ToList() ?? [];
     }
 
     public CsxHover? GetHover(
@@ -110,10 +108,9 @@ public sealed class CsxLanguageService
         var document = CreateDocument(workspace, entryPath, expanded.Content, globalsType);
         var root = document.GetSyntaxRootAsync().GetAwaiter().GetResult();
         var semanticModel = document.GetSemanticModelAsync().GetAwaiter().GetResult();
+
         if (root is null || semanticModel is null || expanded.Content.Length == 0)
-        {
             return null;
-        }
 
         var token = root.FindToken(Math.Clamp(expanded.Position, 0, Math.Max(0, expanded.Content.Length - 1)));
         var symbol = ResolveSymbol(semanticModel, token);
@@ -141,10 +138,9 @@ public sealed class CsxLanguageService
         var document = CreateDocument(workspace, entryPath, expanded.Content, globalsType);
         var root = document.GetSyntaxRootAsync().GetAwaiter().GetResult();
         var semanticModel = document.GetSemanticModelAsync().GetAwaiter().GetResult();
+
         if (root is null || semanticModel is null)
-        {
             return null;
-        }
 
         var tokenPosition = Math.Clamp(expanded.Position - 1, 0, Math.Max(0, expanded.Content.Length - 1));
         var argumentList = root
@@ -155,9 +151,7 @@ public sealed class CsxLanguageService
             .FirstOrDefault(argumentList => argumentList.Span.Start <= expanded.Position && expanded.Position <= argumentList.Span.End);
 
         if (argumentList is null)
-        {
             return null;
-        }
 
         var methods = ResolveCallableSymbols(semanticModel, argumentList)
             .Distinct(SymbolEqualityComparer.Default)
@@ -167,9 +161,7 @@ public sealed class CsxLanguageService
             .ToArray();
 
         if (methods.Length == 0)
-        {
             return null;
-        }
 
         return new CsxSignatureHelp(
             methods.Select(method => new CsxSignature(
@@ -219,9 +211,10 @@ public sealed class CsxLanguageService
     private static IReadOnlyList<MetadataReference> CreateMetadataReferences(Type globalsType)
     {
         return s_metadataReferenceCache.GetOrAdd(globalsType, static type => s_baseOptions.MetadataReferences
-            .Concat([MetadataReference.CreateFromFile(type.Assembly.Location)])
-            .Concat(type.Assembly.GetReferencedAssemblies()
-                .Select(assemblyName => MetadataReference.CreateFromFile(AssemblyPath(assemblyName))))
+            //TODO: Не надо запихивать в подсказки весь проект
+            //.Concat([MetadataReference.CreateFromFile(type.Assembly.Location)])
+            //.Concat(type.Assembly.GetReferencedAssemblies()
+            //    .Select(assemblyName => MetadataReference.CreateFromFile(AssemblyPath(assemblyName))))
             .DistinctBy(reference => reference.Display)
             .ToList());
     }
@@ -237,9 +230,7 @@ public sealed class CsxLanguageService
         {
             var loadPath = ResolveLoadPath(match.Groups["path"].Value, entryPath, visibleScripts);
             if (loadPath is null || !visibleScripts.TryGetValue(loadPath, out var loadedContent))
-            {
                 continue;
-            }
 
             prefix.Add($"#line 1 \"{loadPath}\"");
             prefix.Add(loadedContent);
@@ -247,9 +238,7 @@ public sealed class CsxLanguageService
         }
 
         if (prefix.Count == 0)
-        {
             return new ExpandedScript(content, Math.Clamp(position, 0, content.Length));
-        }
 
         var prefixText = string.Join(Environment.NewLine, prefix) + Environment.NewLine;
         return new ExpandedScript(prefixText + content, Math.Clamp(position, 0, content.Length) + prefixText.Length);
@@ -262,15 +251,11 @@ public sealed class CsxLanguageService
     {
         var normalized = TagScriptPath.Normalize(path);
         if (scripts.ContainsKey(normalized))
-        {
             return normalized;
-        }
 
         var baseDir = Path.GetDirectoryName(baseFilePath.Replace('\\', '/'))?.Replace('\\', '/');
         if (string.IsNullOrWhiteSpace(baseDir))
-        {
             return null;
-        }
 
         var relative = TagScriptPath.Normalize($"{baseDir}/{path}");
         return scripts.ContainsKey(relative) ? relative : null;
@@ -317,17 +302,13 @@ public sealed class CsxLanguageService
                          ?? semanticModel.GetDeclaredSymbol(node)
                          ?? semanticModel.GetSymbolInfo(node).CandidateSymbols.FirstOrDefault();
             if (symbol is not null)
-            {
                 return symbol;
-            }
         }
 
         return null;
     }
 
-    private static IEnumerable<ISymbol> ResolveCallableSymbols(
-        SemanticModel semanticModel,
-        BaseArgumentListSyntax argumentList)
+    private static IEnumerable<ISymbol> ResolveCallableSymbols(SemanticModel semanticModel, BaseArgumentListSyntax argumentList)
     {
         return argumentList.Parent switch
         {
@@ -337,15 +318,11 @@ public sealed class CsxLanguageService
         };
     }
 
-    private static IEnumerable<ISymbol> ResolveInvocationSymbols(
-        SemanticModel semanticModel,
-        InvocationExpressionSyntax invocation)
+    private static IEnumerable<ISymbol> ResolveInvocationSymbols(SemanticModel semanticModel, InvocationExpressionSyntax invocation)
     {
         var group = semanticModel.GetMemberGroup(invocation.Expression);
         if (group.Length > 0)
-        {
             return group;
-        }
 
         var symbolInfo = semanticModel.GetSymbolInfo(invocation);
         return symbolInfo.Symbol is not null
@@ -353,9 +330,7 @@ public sealed class CsxLanguageService
             : symbolInfo.CandidateSymbols;
     }
 
-    private static IEnumerable<ISymbol> ResolveCreationSymbols(
-        SemanticModel semanticModel,
-        ObjectCreationExpressionSyntax creation)
+    private static IEnumerable<ISymbol> ResolveCreationSymbols(SemanticModel semanticModel, ObjectCreationExpressionSyntax creation)
     {
         var symbolInfo = semanticModel.GetSymbolInfo(creation);
         return symbolInfo.Symbol is not null
@@ -366,12 +341,11 @@ public sealed class CsxLanguageService
     private static int GetActiveParameter(BaseArgumentListSyntax argumentList, int position)
     {
         var activeParameter = 0;
+
         foreach (var argument in argumentList.Arguments)
         {
             if (argument.Span.End < position)
-            {
                 activeParameter++;
-            }
         }
 
         return activeParameter;
@@ -399,9 +373,7 @@ public sealed class CsxLanguageService
     {
         var documentation = symbol.GetDocumentationCommentXml();
         if (string.IsNullOrWhiteSpace(documentation))
-        {
             return null;
-        }
 
         return Regex.Replace(documentation, "<.*?>", " ")
             .Replace("\r", " ", StringComparison.Ordinal)

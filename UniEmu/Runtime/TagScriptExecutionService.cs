@@ -9,7 +9,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Hosting;
-using UniEmu.Runtime.Models;
+using UniEmu.Runtime.Scripting.UserScripts;
 
 namespace UniEmu.Runtime;
 
@@ -33,8 +33,9 @@ public sealed class TagScriptExecutionService(
         .WithReferences(
             typeof(object).Assembly,
             typeof(Enumerable).Assembly,
-            typeof(DateTimeOffset).Assembly,
-            typeof(UniEmuJson).Assembly)
+            typeof(DateTimeOffset).Assembly
+            //typeof(UniEmuJson).Assembly
+        )
         .WithImports(
             "System",
             "System.Collections.Generic",
@@ -64,9 +65,9 @@ public sealed class TagScriptExecutionService(
         var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
         var result = scriptState.ReturnValue;
 
-        if (globals.State.IsDirty || globals.Tags.IsDirty)
+        if (globals.UniEmu.State.IsDirty || globals.UniEmu.Tags.IsDirty)
         {
-            state.ValuesJson = UniEmuJson.Serialize(globals.State.Snapshot());
+            state.ValuesJson = UniEmuJson.Serialize(globals.UniEmu.State.Snapshot());
             state.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -86,23 +87,18 @@ public sealed class TagScriptExecutionService(
         CancellationToken cancellationToken)
     {
         var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(tag.FormulaJson);
+
         if (!string.IsNullOrWhiteSpace(formula?.InlineScript))
-        {
             return new ScriptContent($"inline/{tag.Id}.csx", formula.InlineScript, $"inline:{tag.Id}");
-        }
 
         if (string.IsNullOrWhiteSpace(formula?.ScriptId))
-        {
             return new ScriptContent($"inline/{tag.Id}.csx", "return null;", $"inline:{tag.Id}");
-        }
 
         var visibleScripts = await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken);
         var script = visibleScripts.FirstOrDefault(s => s.Id == formula.ScriptId);
 
         if (script is null)
-        {
             throw new InvalidOperationException($"Script '{formula.ScriptId}' was not found for tag '{tag.Name}'.");
-        }
 
         return new ScriptContent(TagScriptPath.Normalize(script.Name), script.Content, $"script:{script.Id}");
     }
@@ -131,9 +127,7 @@ public sealed class TagScriptExecutionService(
             .FirstOrDefaultAsync(s => s.EmulatorId == emulatorId && s.ScriptKey == scriptKey, cancellationToken);
 
         if (state is not null)
-        {
             return state;
-        }
 
         state = new ScriptRuntimeStateEntity
         {
@@ -144,6 +138,7 @@ public sealed class TagScriptExecutionService(
             UpdatedAt = DateTimeOffset.UtcNow,
         };
         db.ScriptRuntimeStates.Add(state);
+
         return state;
     }
 
@@ -156,54 +151,56 @@ public sealed class TagScriptExecutionService(
         var values = emulator.Tags
             .Select(t =>
             {
+                var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
                 if (stateStore.TryGet(emulator.Id, t.Id, out var runtimeValue))
-                {
-                    return new KeyValuePair<string, object?>(t.Name, runtimeValue.Value);
-                }
+                    return new TagScriptValue(t.Key, t.Name, runtimeValue.Value, tagType, runtimeValue.Timestamp);
 
-                return new KeyValuePair<string, object?>(t.Name, ConvertPreview(t));
+                return new TagScriptValue(t.Key, t.Name, ConvertPreview(t), tagType, timestamp);
             })
             .GroupBy(value => value.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(x => x.Timestamp).First(), StringComparer.OrdinalIgnoreCase);
 
         stateStore.TryGet(emulator.Id, tag.Id, out var previous);
         var scriptNow = ApplicationGlobalization.ToApplicationTime(timestamp);
 
+        var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         return new TagScriptGlobals(
+            scriptNow,
+            new TagScriptValue(tag.Key, tag.Name, previous, tagType, previous?.Timestamp),
             new TagScriptTagAccessor(
                 values,
                 (tagName, value) => SetStaticTag(emulator, tagName, value, timestamp)),
-            scriptNow,
-            new TagScriptEmulatorContext(emulator.Id, emulator.Name, emulator.Status),
+            new TagScriptEmulatorContext(emulator.Id, emulator.Name, emulator.Status, emulator.StartedAt),
             new TagScriptStateContext(
                 emulator.Status == nameof(EmulatorStatus.Running),
                 previous?.Value,
                 previous?.NumericValue,
                 previous?.Timestamp,
-                stateValues));
+                new Dictionary<string, TagScriptValue>()//stateValues
+            )
+        );
     }
 
     private object? SetStaticTag(EmulatorEntity emulator, string tagName, object? value, DateTimeOffset timestamp)
     {
         var tag = emulator.Tags.FirstOrDefault(t =>
-            t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase)
-            || t.Key.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+            t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase) ||
+            t.Key.Equals(tagName, StringComparison.OrdinalIgnoreCase)
+        );
 
         if (tag is null)
-        {
             throw new InvalidOperationException($"Tag '{tagName}' was not found.");
-        }
 
         var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
         if (source != TagSource.Static)
-        {
             throw new InvalidOperationException($"Tag '{tagName}' is not static.");
-        }
 
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         var typedValue = TelemetryValueGenerator.ApplyTagRounding(tagType, tag, CastResult(tagType, value, tag.Preview));
+
         tag.Preview = TelemetryValueGenerator.ToPreview(typedValue);
         stateStore.Set(emulator.Id, tag.Id, tag.Name, typedValue, TelemetryValueGenerator.ToNumericValue(typedValue), timestamp);
+
         return typedValue;
     }
 
@@ -211,9 +208,7 @@ public sealed class TagScriptExecutionService(
     {
         var match = s_blockedDirective.Match(content);
         if (match.Success)
-        {
             throw new InvalidOperationException($"Unsupported script directive '{match.Value.Trim()}'. Use #load for shared scripts.");
-        }
     }
 
     private static string NormalizeEntryScriptContent(string content)
@@ -238,23 +233,17 @@ public sealed class TagScriptExecutionService(
         IReadOnlyDictionary<string, string> scripts)
     {
         if (stack.Contains(path))
-        {
             throw new InvalidOperationException($"Cyclic #load detected at '{path}'.");
-        }
 
         if (!visited.Add(path) || !scripts.TryGetValue(path, out var content))
-        {
             return;
-        }
 
         stack.Add(path);
         foreach (Match match in s_loadDirective.Matches(content))
         {
             var loadPath = ResolveLoadPath(match.Groups["path"].Value, path, scripts);
             if (loadPath is null)
-            {
                 continue;
-            }
 
             Visit(loadPath, visited, stack, scripts);
         }
@@ -266,15 +255,11 @@ public sealed class TagScriptExecutionService(
     {
         var normalized = TagScriptPath.Normalize(path);
         if (scripts.ContainsKey(normalized))
-        {
             return normalized;
-        }
 
         var baseDir = Path.GetDirectoryName(baseFilePath.Replace('\\', '/'))?.Replace('\\', '/');
         if (string.IsNullOrWhiteSpace(baseDir))
-        {
             return null;
-        }
 
         var relative = TagScriptPath.Normalize($"{baseDir}/{path}");
         return scripts.ContainsKey(relative) ? relative : null;
@@ -283,9 +268,7 @@ public sealed class TagScriptExecutionService(
     private static object? CastResult(TagType tagType, object? result, string preview)
     {
         if (result is null)
-        {
             return tagType == TagType.String ? preview : CastPreview(tagType, preview);
-        }
 
         return tagType switch
         {
@@ -297,17 +280,14 @@ public sealed class TagScriptExecutionService(
         };
     }
 
-    private static object? CastPreview(TagType tagType, string preview)
+    private static object? CastPreview(TagType tagType, string preview) => tagType switch
     {
-        return tagType switch
-        {
-            TagType.Bool => ToBool(preview, "false"),
-            TagType.Int => (int)Math.Round(ToDouble(preview, "0")),
-            TagType.Double => ToDouble(preview, "0"),
-            TagType.String => preview,
-            _ => null,
-        };
-    }
+        TagType.Bool => ToBool(preview, "false"),
+        TagType.Int => (int)Math.Round(ToDouble(preview, "0")),
+        TagType.Double => ToDouble(preview, "0"),
+        TagType.String => preview,
+        _ => null,
+    };
 
     private static object? ConvertPreview(EmulatorTagEntity tag)
     {
@@ -315,38 +295,30 @@ public sealed class TagScriptExecutionService(
         return CastPreview(tagType, tag.Preview);
     }
 
-    private static bool ToBool(object value, string preview)
+    private static bool ToBool(object value, string preview) => value switch
     {
-        return value switch
-        {
-            bool boolValue => boolValue,
-            string stringValue when bool.TryParse(stringValue, out var boolValue) => boolValue,
-            string stringValue => ToDouble(stringValue, preview) != 0,
-            _ => ToDouble(value, preview) != 0,
-        };
-    }
+        bool boolValue => boolValue,
+        string stringValue when bool.TryParse(stringValue, out var boolValue) => boolValue,
+        string stringValue => ToDouble(stringValue, preview) != 0,
+        _ => ToDouble(value, preview) != 0,
+    };
 
-    private static double ToDouble(object value, string preview)
+    private static double ToDouble(object value, string preview) => value switch
     {
-        return value switch
-        {
-            byte byteValue => byteValue,
-            short shortValue => shortValue,
-            int intValue => intValue,
-            long longValue => longValue,
-            float floatValue => floatValue,
-            double doubleValue => doubleValue,
-            decimal decimalValue => (double)decimalValue,
-            bool boolValue => boolValue ? 1 : 0,
-            string stringValue => double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var result)
-                ? result
-                : (double.TryParse(preview, NumberStyles.Float, CultureInfo.InvariantCulture, out var fallback) ? fallback : 0),
-            IConvertible convertible => Convert.ToDouble(convertible, CultureInfo.InvariantCulture),
-            _ => double.TryParse(preview, NumberStyles.Float, CultureInfo.InvariantCulture, out var fallback) ? fallback : 0,
-        };
-    }
+        byte byteValue => byteValue,
+        short shortValue => shortValue,
+        int intValue => intValue,
+        long longValue => longValue,
+        float floatValue => floatValue,
+        double doubleValue => doubleValue,
+        decimal decimalValue => (double)decimalValue,
+        bool boolValue => boolValue ? 1 : 0,
+        string stringValue => double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var result)
+            ? result
+            : (double.TryParse(preview, NumberStyles.Float, CultureInfo.InvariantCulture, out var fallback) ? fallback : 0),
+        IConvertible convertible => Convert.ToDouble(convertible, CultureInfo.InvariantCulture),
+        _ => double.TryParse(preview, NumberStyles.Float, CultureInfo.InvariantCulture, out var fallback) ? fallback : 0,
+    };
 
     private sealed record ScriptContent(string Path, string Content, string StateKey);
 }
-
-public sealed record TagScriptEmulatorContext(string Id, string Name, string Status);

@@ -22,10 +22,7 @@ using UniEmu.Runtime.Scripting;
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 Activity.DefaultIdFormat = ActivityIdFormat.W3C;
 
-var currentAssembly = Assembly.GetExecutingAssembly();
-
-Directory.SetCurrentDirectory(Path.GetDirectoryName(currentAssembly.Location)
-                              ?? throw new NullReferenceException("Current dir not found!"));
+Directory.SetCurrentDirectory(AppContext.BaseDirectory ?? throw new NullReferenceException("Current dir not found!"));
 
 var builder = WebApplication.CreateBuilder(args);
 var globalizationOptions = ApplicationGlobalizationOptions.Resolve(builder.Configuration);

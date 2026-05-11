@@ -1,13 +1,13 @@
 ﻿using System.Globalization;
 
-namespace UniEmu.Runtime.Models;
+namespace UniEmu.Runtime.Scripting.UserScripts;
 
 public sealed class TagScriptStateContext(
     bool isRunning,
     object? prevValue,
     double? prevNumericValue,
     DateTimeOffset? prevTimestamp,
-    Dictionary<string, object?> values)
+    Dictionary<string, TagScriptValue> values)
 {
     public bool IsRunning { get; } = isRunning;
     public object? PrevValue { get; } = prevValue;
@@ -19,21 +19,24 @@ public sealed class TagScriptStateContext(
 
     public TagScriptValue? Get(string key)
     {
-        return values.TryGetValue(key, out var value)
-            ? new TagScriptValue(UnwrapJsonValue(value))
-            : null;
+        return values.GetValueOrDefault(key);
     }
 
     public T? Get<T>(string key, T? fallback = default)
     {
-        return values.TryGetValue(key, out var value)
-            ? ConvertStateValue(value, fallback)
+        return values.TryGetValue(key, out var tagScriptValue)
+            ? ConvertStateValue(tagScriptValue.Value, fallback)
             : fallback;
     }
 
     public void Set(string key, object? value)
     {
-        values[key] = value;
+        if (!values.TryGetValue(key, out var tagScriptValue))
+            return;
+
+        tagScriptValue.Value = value;
+        values[key] = tagScriptValue;
+        
         IsDirty = true;
     }
 
@@ -47,31 +50,25 @@ public sealed class TagScriptStateContext(
     public void Clear()
     {
         if (values.Count == 0)
-        {
             return;
-        }
 
         values.Clear();
         IsDirty = true;
     }
 
-    public IReadOnlyDictionary<string, object?> Snapshot()
+    public IReadOnlyDictionary<string, TagScriptValue> Snapshot()
     {
-        return new Dictionary<string, object?>(values, StringComparer.OrdinalIgnoreCase);
+        return new Dictionary<string, TagScriptValue>(values, StringComparer.OrdinalIgnoreCase);
     }
 
     private static T? ConvertStateValue<T>(object? value, T? fallback)
     {
         value = UnwrapJsonValue(value);
         if (value is null)
-        {
             return fallback;
-        }
 
         if (value is T typedValue)
-        {
             return typedValue;
-        }
 
         try
         {
@@ -92,9 +89,7 @@ public sealed class TagScriptStateContext(
     private static object? UnwrapJsonValue(object? value)
     {
         if (value is not System.Text.Json.JsonElement json)
-        {
             return value;
-        }
 
         return json.ValueKind switch
         {
