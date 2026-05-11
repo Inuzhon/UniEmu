@@ -108,6 +108,22 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public void GetCompletions_DoesNotReturnAllReferencedAssemblyTypesAtTopLevel()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = service.GetCompletions(
+            "inline/tag-1.csx",
+            "A",
+            1,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.DoesNotContain(completions, item => item.Label == "AccessViolationException");
+        Assert.DoesNotContain(completions, item => item.Label == "Activator");
+    }
+
+    [Fact]
     public void GetHover_ReturnsSymbolSignature()
     {
         var service = new CsxLanguageService();
