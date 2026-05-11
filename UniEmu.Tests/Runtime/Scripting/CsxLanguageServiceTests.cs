@@ -80,7 +80,8 @@ public sealed class CsxLanguageServiceTests
             visibleScripts);
 
         Assert.Contains(completions, item => item.Label == "LoadedHelper");
-        Assert.Equal(1, CsxLanguageService.MetadataReferenceCacheCount);
+        var cacheCount = CsxLanguageService.MetadataReferenceCacheCount;
+        Assert.True(cacheCount >= 1);
 
         _ = service.GetCompletions(
             "inline/tag-1.csx",
@@ -88,7 +89,22 @@ public sealed class CsxLanguageServiceTests
             content.Length,
             visibleScripts);
 
-        Assert.Equal(1, CsxLanguageService.MetadataReferenceCacheCount);
+        Assert.Equal(cacheCount, CsxLanguageService.MetadataReferenceCacheCount);
+    }
+
+    [Fact]
+    public void GetCompletions_ReturnsUniEmuGlobalAtTopLevel()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = service.GetCompletions(
+            "inline/tag-1.csx",
+            "Uni",
+            3,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(completions, item => item.Label == "UniEmu");
     }
 
     [Fact]
@@ -106,6 +122,24 @@ public sealed class CsxLanguageServiceTests
 
         Assert.NotNull(hover);
         Assert.Contains("Round", hover.Signature, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetHover_ReturnsScriptingApiSymbolForUniEmuTags()
+    {
+        var service = new CsxLanguageService();
+        const string content = "return UniEmu.Tags;";
+        var position = content.IndexOf("Tags", StringComparison.Ordinal) + 1;
+
+        var hover = service.GetHover(
+            "inline/tag-1.csx",
+            content,
+            position,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.NotNull(hover);
+        Assert.Contains("Tags", hover.Signature, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -2,6 +2,7 @@
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
+using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime.Scripting;
@@ -37,7 +38,7 @@ public sealed class CsxIntellisenseService(
         return language.GetCompletions(
             EntryPath(context),
             sourceCode,
-            ToOffset(sourceCode, request.Position),
+            CsxPositionMapper.ToOffset(sourceCode, request.Position),
             visibleScripts,
             typeof(TagScriptGlobals));
     }
@@ -53,7 +54,7 @@ public sealed class CsxIntellisenseService(
         return language.GetHover(
             EntryPath(context),
             sourceCode,
-            ToOffset(sourceCode, request.Position),
+            CsxPositionMapper.ToOffset(sourceCode, request.Position),
             visibleScripts,
             typeof(TagScriptGlobals));
     }
@@ -69,7 +70,7 @@ public sealed class CsxIntellisenseService(
         return language.GetSignatureHelp(
             EntryPath(context),
             sourceCode,
-            ToOffset(sourceCode, request.Position),
+            CsxPositionMapper.ToOffset(sourceCode, request.Position),
             visibleScripts,
             typeof(TagScriptGlobals));
     }
@@ -110,31 +111,6 @@ public sealed class CsxIntellisenseService(
             : context.ScriptName);
     }
 
-    private static int ToOffset(string sourceCode, CsxEditorPosition? position)
-    {
-        if (position is null)
-        {
-            return sourceCode.Length;
-        }
-
-        var targetLine = Math.Max(0, position.Line - 1);
-        var targetColumn = Math.Max(0, position.Column - 1);
-        var currentLine = 0;
-        var offset = 0;
-        while (currentLine < targetLine && offset < sourceCode.Length)
-        {
-            var next = sourceCode.IndexOf('\n', offset);
-            if (next < 0)
-            {
-                return sourceCode.Length;
-            }
-
-            offset = next + 1;
-            currentLine++;
-        }
-
-        return Math.Clamp(offset + targetColumn, 0, sourceCode.Length);
-    }
 }
 
 public sealed record CsxIntellisenseRequest(

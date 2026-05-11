@@ -18,6 +18,9 @@ using UniEmu.Hosting;
 using UniEmu.Realtime;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
+using UniEmu.Runtime.Scripting.Environment;
+using UniEmu.Runtime.Scripting.Services;
+using UniEmu.Runtime.Scripting.Workspace;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 Activity.DefaultIdFormat = ActivityIdFormat.W3C;
@@ -152,6 +155,14 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<TelemetryValueGenerator>().AsSelf().SingleInstance();
     container.RegisterType<TagRuntimeStateStore>().AsSelf().SingleInstance();
     container.RegisterType<CompiledTagScriptCache>().AsSelf().SingleInstance();
+    container.RegisterType<CsxScriptEnvironment>().AsSelf().SingleInstance();
+    container.RegisterType<CsxLoadedScriptExpander>().AsSelf().SingleInstance();
+    container.RegisterType<CsxScriptDirectiveValidator>().AsSelf().SingleInstance();
+    container.RegisterType<CsxRoslynContextFactory>().AsSelf().SingleInstance();
+    container.RegisterType<CsxDiagnosticsService>().AsSelf().SingleInstance();
+    container.RegisterType<CsxCompletionService>().AsSelf().SingleInstance();
+    container.RegisterType<CsxHoverService>().AsSelf().SingleInstance();
+    container.RegisterType<CsxSignatureHelpService>().AsSelf().SingleInstance();
     container.RegisterType<CsxLanguageService>().AsSelf().SingleInstance();
     container.RegisterType<CsxIntellisenseService>().AsSelf().InstancePerLifetimeScope();
 
