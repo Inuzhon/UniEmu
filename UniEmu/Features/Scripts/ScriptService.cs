@@ -143,7 +143,7 @@ public sealed class ScriptService(
 
         visibleScripts[TagScriptPath.Normalize(nextName)] = nextContent;
 
-        var result = language.Analyze(nextName, nextContent, visibleScripts, typeof(TagScriptGlobals));
+        var result = await language.AnalyzeAsync(nextName, nextContent, visibleScripts, typeof(TagScriptGlobals), cancellationToken);
         var errors = result.Diagnostics
             .Where(diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error)
             .ToArray();

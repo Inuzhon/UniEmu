@@ -7,18 +7,19 @@ namespace UniEmu.Runtime.Scripting.Services;
 
 public sealed class CsxSignatureHelpService(CsxRoslynContextFactory contextFactory)
 {
-    public CsxSignatureHelp? GetSignatureHelp(
+    public async Task<CsxSignatureHelp?> GetSignatureHelpAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type globalsType)
+        Type globalsType,
+        CancellationToken cancellationToken = default)
     {
         using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
         var document = context.Document;
-        var sourceText = document.GetTextAsync().GetAwaiter().GetResult();
-        var root = document.GetSyntaxRootAsync().GetAwaiter().GetResult();
-        var semanticModel = document.GetSemanticModelAsync().GetAwaiter().GetResult();
+        var sourceText = await document.GetTextAsync(cancellationToken);
+        var root = await document.GetSyntaxRootAsync(cancellationToken);
+        var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
 
         if (root is null || semanticModel is null)
         {

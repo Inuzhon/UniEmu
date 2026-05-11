@@ -19,11 +19,12 @@ public sealed class CsxIntellisenseService(
         var sourceCode = request.SourceCode ?? string.Empty;
         var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
 
-        return language.Analyze(
+        return (await language.AnalyzeAsync(
                 EntryPath(context),
                 sourceCode,
                 visibleScripts,
-                typeof(TagScriptGlobals))
+                typeof(TagScriptGlobals),
+                cancellationToken))
             .Diagnostics;
     }
 
@@ -35,12 +36,13 @@ public sealed class CsxIntellisenseService(
         var sourceCode = request.SourceCode ?? string.Empty;
         var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
 
-        return language.GetCompletions(
+        return await language.GetCompletionsAsync(
             EntryPath(context),
             sourceCode,
             CsxPositionMapper.ToOffset(sourceCode, request.Position),
             visibleScripts,
-            typeof(TagScriptGlobals));
+            typeof(TagScriptGlobals),
+            cancellationToken);
     }
 
     public async Task<CsxHover?> GetHoverAsync(
@@ -51,12 +53,13 @@ public sealed class CsxIntellisenseService(
         var sourceCode = request.SourceCode ?? string.Empty;
         var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
 
-        return language.GetHover(
+        return await language.GetHoverAsync(
             EntryPath(context),
             sourceCode,
             CsxPositionMapper.ToOffset(sourceCode, request.Position),
             visibleScripts,
-            typeof(TagScriptGlobals));
+            typeof(TagScriptGlobals),
+            cancellationToken);
     }
 
     public async Task<CsxSignatureHelp?> GetSignatureHelpAsync(
@@ -67,12 +70,13 @@ public sealed class CsxIntellisenseService(
         var sourceCode = request.SourceCode ?? string.Empty;
         var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
 
-        return language.GetSignatureHelp(
+        return await language.GetSignatureHelpAsync(
             EntryPath(context),
             sourceCode,
             CsxPositionMapper.ToOffset(sourceCode, request.Position),
             visibleScripts,
-            typeof(TagScriptGlobals));
+            typeof(TagScriptGlobals),
+            cancellationToken);
     }
 
     private async Task<Dictionary<string, string>> LoadVisibleScriptsAsync(

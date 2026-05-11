@@ -17,12 +17,13 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         "TimeSpan",
     };
 
-    public IReadOnlyList<CsxCompletionItem> GetCompletions(
+    public async Task<IReadOnlyList<CsxCompletionItem>> GetCompletionsAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type globalsType)
+        Type globalsType,
+        CancellationToken cancellationToken = default)
     {
         using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
         var document = context.Document;
@@ -32,33 +33,32 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
             return [];
         }
 
-        var completionList = service
-            .GetCompletionsAsync(document, context.Position)
-            .GetAwaiter()
-            .GetResult();
+        var completionList = await service.GetCompletionsAsync(document, context.Position, cancellationToken: cancellationToken);
 
         if (completionList is null)
         {
             return [];
         }
 
-        return completionList.ItemsList
-            .Select(item =>
-            {
-                var description = service.GetDescriptionAsync(document, item).GetAwaiter().GetResult();
-                var documentation = description is null ? null : CsxDocumentationFormatter.FromTaggedParts(description.TaggedParts);
-                return new CompletionCandidate(
-                    item.Tags.Select(tag => tag.ToLowerInvariant()).ToArray(),
-                    documentation,
-                    new CsxCompletionItem(
+        var candidates = new List<CompletionCandidate>(completionList.ItemsList.Count);
+        foreach (var item in completionList.ItemsList)
+        {
+            var description = await service.GetDescriptionAsync(document, item, cancellationToken);
+            var documentation = description is null ? null : CsxDocumentationFormatter.FromTaggedParts(description.TaggedParts);
+            candidates.Add(new CompletionCandidate(
+                item.Tags.Select(tag => tag.ToLowerInvariant()).ToArray(),
+                documentation,
+                new CsxCompletionItem(
                     item.DisplayText,
                     item.SortText,
                     item.FilterText,
                     item.Properties.TryGetValue("SymbolName", out var symbolName) ? symbolName : item.DisplayText,
                     item.InlineDescription,
                     documentation,
-                    CsxRoslynSymbolHelpers.GetCompletionKind(item.Tags)));
-            })
+                    CsxRoslynSymbolHelpers.GetCompletionKind(item.Tags))));
+        }
+
+        return candidates
             .Where(IsAllowedCompletion)
             .Select(candidate => candidate.Item)
             .DistinctBy(item => item.Label, StringComparer.Ordinal)

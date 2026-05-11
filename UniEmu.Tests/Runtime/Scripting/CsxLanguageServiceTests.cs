@@ -6,11 +6,11 @@ namespace UniEmu.Tests.Runtime.Scripting;
 public sealed class CsxLanguageServiceTests
 {
     [Fact]
-    public void Analyze_ReturnsCompilerErrorDiagnostic_WhenScriptReferencesUnknownIdentifier()
+    public async Task AnalyzeAsync_ReturnsCompilerErrorDiagnostic_WhenScriptReferencesUnknownIdentifier()
     {
         var service = new CsxLanguageService();
 
-        var result = service.Analyze(
+        var result = await service.AnalyzeAsync(
             "inline/tag-1.csx",
             "return MissingValue;",
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
@@ -20,7 +20,7 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void Analyze_UsesLoadedScriptContent_WhenEntryScriptHasLoadDirective()
+    public async Task AnalyzeAsync_UsesLoadedScriptContent_WhenEntryScriptHasLoadDirective()
     {
         var service = new CsxLanguageService();
         var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -28,7 +28,7 @@ public sealed class CsxLanguageServiceTests
             ["tags/shared/math.csx"] = "int Add(int a, int b) => a + b;",
         };
 
-        var result = service.Analyze(
+        var result = await service.AnalyzeAsync(
             "tags/tag-1.csx",
             "#load \"shared/math.csx\"\nreturn Add(1, 2);",
             visibleScripts);
@@ -37,11 +37,11 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void Analyze_AcceptsScriptGlobalsFromScriptingApi()
+    public async Task AnalyzeAsync_AcceptsScriptGlobalsFromScriptingApi()
     {
         var service = new CsxLanguageService();
 
-        var result = service.Analyze(
+        var result = await service.AnalyzeAsync(
             "inline/tag-1.csx",
             "return UniEmu.Tag.Type == TagScriptValueType.Double ? Now.Offset.TotalHours : 0;",
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
@@ -63,7 +63,7 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetCompletions_ReturnsSymbolsFromLoadedScripts()
+    public async Task GetCompletionsAsync_ReturnsSymbolsFromLoadedScripts()
     {
         CsxLanguageService.ClearMetadataReferenceCacheForTests();
         var service = new CsxLanguageService();
@@ -73,7 +73,7 @@ public sealed class CsxLanguageServiceTests
         };
         const string content = "#load \"math.csx\"\nreturn Load";
 
-        var completions = service.GetCompletions(
+        var completions = await service.GetCompletionsAsync(
             "inline/tag-1.csx",
             content,
             content.Length,
@@ -83,7 +83,7 @@ public sealed class CsxLanguageServiceTests
         var cacheCount = CsxLanguageService.MetadataReferenceCacheCount;
         Assert.True(cacheCount >= 1);
 
-        _ = service.GetCompletions(
+        _ = await service.GetCompletionsAsync(
             "inline/tag-1.csx",
             content,
             content.Length,
@@ -93,11 +93,11 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetCompletions_ReturnsUniEmuGlobalAtTopLevel()
+    public async Task GetCompletionsAsync_ReturnsUniEmuGlobalAtTopLevel()
     {
         var service = new CsxLanguageService();
 
-        var completions = service.GetCompletions(
+        var completions = await service.GetCompletionsAsync(
             "inline/tag-1.csx",
             "Uni",
             3,
@@ -108,11 +108,11 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetCompletions_ReturnsMembersForUniEmuGlobal()
+    public async Task GetCompletionsAsync_ReturnsMembersForUniEmuGlobal()
     {
         var service = new CsxLanguageService();
 
-        var completions = service.GetCompletions(
+        var completions = await service.GetCompletionsAsync(
             "inline/tag-1.csx",
             "UniEmu.",
             7,
@@ -126,11 +126,11 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetCompletions_DoesNotExposeRemovedTopLevelTagAlias()
+    public async Task GetCompletionsAsync_DoesNotExposeRemovedTopLevelTagAlias()
     {
         var service = new CsxLanguageService();
 
-        var completions = service.GetCompletions(
+        var completions = await service.GetCompletionsAsync(
             "inline/tag-1.csx",
             "Tag.",
             4,
@@ -141,11 +141,11 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetCompletions_DoesNotReturnAllReferencedAssemblyTypesAtTopLevel()
+    public async Task GetCompletionsAsync_DoesNotReturnAllReferencedAssemblyTypesAtTopLevel()
     {
         var service = new CsxLanguageService();
 
-        var completions = service.GetCompletions(
+        var completions = await service.GetCompletionsAsync(
             "inline/tag-1.csx",
             "A",
             1,
@@ -157,13 +157,13 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetHover_ReturnsSymbolSignature()
+    public async Task GetHoverAsync_ReturnsSymbolSignature()
     {
         var service = new CsxLanguageService();
         const string content = "var value = Math.Round(1.2);";
         var position = content.IndexOf("Round", StringComparison.Ordinal) + 2;
 
-        var hover = service.GetHover(
+        var hover = await service.GetHoverAsync(
             "inline/tag-1.csx",
             content,
             position,
@@ -174,13 +174,13 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetHover_ReturnsScriptingApiSymbolForUniEmuTags()
+    public async Task GetHoverAsync_ReturnsScriptingApiSymbolForUniEmuTags()
     {
         var service = new CsxLanguageService();
         const string content = "return UniEmu.Tags;";
         var position = content.IndexOf("Tags", StringComparison.Ordinal) + 1;
 
-        var hover = service.GetHover(
+        var hover = await service.GetHoverAsync(
             "inline/tag-1.csx",
             content,
             position,
@@ -192,13 +192,13 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetHover_ReturnsScriptingApiSummaryDocumentation()
+    public async Task GetHoverAsync_ReturnsScriptingApiSummaryDocumentation()
     {
         var service = new CsxLanguageService();
         const string content = "return UniEmu.Tags.TryGetValue(\"pressure\", out var pressure);";
         var position = content.IndexOf("TryGetValue", StringComparison.Ordinal) + 2;
 
-        var hover = service.GetHover(
+        var hover = await service.GetHoverAsync(
             "inline/tag-1.csx",
             content,
             position,
@@ -210,12 +210,12 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public void GetSignatureHelp_ReturnsMethodParameters()
+    public async Task GetSignatureHelpAsync_ReturnsMethodParameters()
     {
         var service = new CsxLanguageService();
         const string content = "var value = Math.Round(";
 
-        var signatureHelp = service.GetSignatureHelp(
+        var signatureHelp = await service.GetSignatureHelpAsync(
             "inline/tag-1.csx",
             content,
             content.Length,

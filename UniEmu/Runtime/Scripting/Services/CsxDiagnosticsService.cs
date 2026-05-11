@@ -5,14 +5,15 @@ namespace UniEmu.Runtime.Scripting.Services;
 
 public sealed class CsxDiagnosticsService(CsxRoslynContextFactory contextFactory)
 {
-    public IReadOnlyList<CsxDiagnostic> Analyze(
+    public async Task<IReadOnlyList<CsxDiagnostic>> AnalyzeAsync(
         string entryPath,
         string content,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type globalsType)
+        Type globalsType,
+        CancellationToken cancellationToken = default)
     {
         using var context = contextFactory.CreateContext(entryPath, content, 0, visibleScripts, globalsType);
-        var compilation = context.Document.Project.GetCompilationAsync().GetAwaiter().GetResult();
+        var compilation = await context.Document.Project.GetCompilationAsync(cancellationToken);
         if (compilation is null)
         {
             return [];

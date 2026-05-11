@@ -51,64 +51,72 @@ public sealed class CsxLanguageService
         return s_defaultEnvironment.CreateMetadataReferences(globalsType);
     }
 
-    public CsxAnalysisResult Analyze(
+    public async Task<CsxAnalysisResult> AnalyzeAsync(
         string entryPath,
         string content,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
         return new CsxAnalysisResult(
             entryPath,
-            diagnostics.Analyze(
+            await diagnostics.AnalyzeAsync(
                 TagScriptPath.Normalize(entryPath),
                 content,
                 visibleScripts,
-                globalsType ?? typeof(object)));
+                globalsType ?? typeof(object),
+                cancellationToken));
     }
 
-    public IReadOnlyList<CsxCompletionItem> GetCompletions(
+    public Task<IReadOnlyList<CsxCompletionItem>> GetCompletionsAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        return completion.GetCompletions(
+        return completion.GetCompletionsAsync(
             TagScriptPath.Normalize(entryPath),
             content,
             position,
             visibleScripts,
-            globalsType ?? typeof(object));
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    public CsxHover? GetHover(
+    public Task<CsxHover?> GetHoverAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        return hover.GetHover(
+        return hover.GetHoverAsync(
             TagScriptPath.Normalize(entryPath),
             content,
             position,
             visibleScripts,
-            globalsType ?? typeof(object));
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    public CsxSignatureHelp? GetSignatureHelp(
+    public Task<CsxSignatureHelp?> GetSignatureHelpAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        return signatureHelp.GetSignatureHelp(
+        return signatureHelp.GetSignatureHelpAsync(
             TagScriptPath.Normalize(entryPath),
             content,
             position,
             visibleScripts,
-            globalsType ?? typeof(object));
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
     private static CsxRoslynContextFactory CreateDefaultContextFactory()

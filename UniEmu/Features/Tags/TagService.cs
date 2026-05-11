@@ -134,7 +134,7 @@ public sealed class TagService(
         var visibleScripts = (await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken))
             .ToDictionary(script => TagScriptPath.Normalize(script.Name), script => script.Content, StringComparer.OrdinalIgnoreCase);
 
-        var result = language.Analyze(entryPath, inlineScript, visibleScripts, typeof(TagScriptGlobals));
+        var result = await language.AnalyzeAsync(entryPath, inlineScript, visibleScripts, typeof(TagScriptGlobals), cancellationToken);
         var errors = result.Diagnostics
             .Where(diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error)
             .ToArray();
