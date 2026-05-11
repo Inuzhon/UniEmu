@@ -108,6 +108,39 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public void GetCompletions_ReturnsMembersForUniEmuGlobal()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = service.GetCompletions(
+            "inline/tag-1.csx",
+            "UniEmu.",
+            7,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(completions, item => item.Label == "Tag");
+        Assert.Contains(completions, item => item.Label == "Tags");
+        Assert.Contains(completions, item => item.Label == "State");
+        Assert.Contains(completions, item => item.Label == "Emulator");
+    }
+
+    [Fact]
+    public void GetCompletions_DoesNotExposeRemovedTopLevelTagAlias()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = service.GetCompletions(
+            "inline/tag-1.csx",
+            "Tag.",
+            4,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Empty(completions);
+    }
+
+    [Fact]
     public void GetCompletions_DoesNotReturnAllReferencedAssemblyTypesAtTopLevel()
     {
         var service = new CsxLanguageService();

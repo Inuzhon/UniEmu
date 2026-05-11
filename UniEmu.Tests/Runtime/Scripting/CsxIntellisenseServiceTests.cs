@@ -40,6 +40,24 @@ public sealed class CsxIntellisenseServiceTests
         Assert.Contains(completions, item => item.Label == "LoadedHelper");
     }
 
+    [Fact]
+    public async Task GetCompletionsAsync_ParsesEncodedInlineDocumentUriAndReturnsUniEmuMembers()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+
+        var completions = await service.GetCompletionsAsync(new CsxIntellisenseRequest(
+            "UniEmu.",
+            "uniemu://scripts/tg-f75b656d2/inline/tg-f75b656d2.csx?name%3Dinline%2Ftg-f75b656d2.csx%26scope%3Demulator%26emulatorId%3Dem-1",
+            new CsxEditorPosition(1, 8)), CancellationToken.None);
+
+        Assert.Contains(completions, item => item.Label == "Tag");
+        Assert.Contains(completions, item => item.Label == "Tags");
+        Assert.Contains(completions, item => item.Label == "State");
+        Assert.Contains(completions, item => item.Label == "Emulator");
+    }
+
     private sealed class IntellisenseDbFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
