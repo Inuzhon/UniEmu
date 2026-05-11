@@ -60,10 +60,82 @@ public sealed class EmulatorServiceTests
         Assert.Equal("0", tag.Preview);
     }
 
-    private static EmulatorService CreateService(UniEmuDbContext db, TagRuntimeStateStore? stateStore = null)
+    [Fact]
+    public async Task PatchStatusAsync_CreatesSuccessEvent_WhenEmulatorStarts()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.Emulators.Add(new EmulatorEntity
+        {
+            Id = "em-2",
+            Name = "Secondary emulator",
+            Status = nameof(EmulatorStatus.Stopped),
+            ProtocolId = 18,
+            TargetUrl = "http://localhost",
+            IntervalSec = 1,
+        });
+        await db.SaveChangesAsync();
+
+        var broadcaster = new RecordingRuntimeUpdateBroadcaster();
+        var service = CreateService(db, broadcaster: broadcaster);
+
+        await service.PatchStatusAsync(
+            "em-2",
+            new PatchEmulatorStatusRequest(EmulatorStatus.Running),
+            CancellationToken.None);
+
+        var ev = await db.SystemEvents.SingleAsync(e => e.EmulatorId == "em-2");
+        Assert.Equal("Secondary emulator", ev.EmulatorName);
+        Assert.Equal(UniEmuJson.EnumString(EventLevel.Success), ev.Level);
+        Assert.Equal("Эмулятор запущен", ev.Message);
+        Assert.Contains(broadcaster.EventUpdates, update => update.Event.Id == ev.Id);
+    }
+
+    [Fact]
+    public async Task PatchStatusAsync_CreatesInfoEvent_WhenEmulatorStops()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var broadcaster = new RecordingRuntimeUpdateBroadcaster();
+        var service = CreateService(db, broadcaster: broadcaster);
+
+        await service.PatchStatusAsync(
+            "em-1",
+            new PatchEmulatorStatusRequest(EmulatorStatus.Stopped),
+            CancellationToken.None);
+
+        var ev = await db.SystemEvents.SingleAsync(e => e.EmulatorId == "em-1" && e.Message == "Эмулятор остановлен");
+        Assert.Equal("Main emulator", ev.EmulatorName);
+        Assert.Equal(UniEmuJson.EnumString(EventLevel.Info), ev.Level);
+        Assert.Contains(broadcaster.EventUpdates, update => update.Event.Id == ev.Id);
+    }
+
+    [Fact]
+    public async Task PatchStatusAsync_DoesNotCreateEvent_WhenStatusDoesNotChange()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        await service.PatchStatusAsync(
+            "em-1",
+            new PatchEmulatorStatusRequest(EmulatorStatus.Running),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(
+            await db.SystemEvents.ToListAsync(),
+            ev => ev.Message is "Эмулятор запущен" or "Эмулятор остановлен");
+    }
+
+    private static EmulatorService CreateService(
+        UniEmuDbContext db,
+        TagRuntimeStateStore? stateStore = null,
+        IRuntimeUpdateBroadcaster? broadcaster = null)
     {
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
         stateStore ??= new TagRuntimeStateStore();
+        broadcaster ??= new NoopRuntimeUpdateBroadcaster();
+        var runtimeUpdateService = new RuntimeUpdateService(broadcaster);
         var scheduler = new Mock<IScheduler>();
         scheduler
             .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
@@ -92,13 +164,13 @@ public sealed class EmulatorServiceTests
             new ConfigurationBuilder().Build(),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
-            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+            runtimeUpdateService);
 
         return new EmulatorService(
             db,
             dataCache,
             scheduleService,
-            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+            runtimeUpdateService);
     }
 
     private sealed class EmulatorServiceDbFixture : IAsyncDisposable
@@ -147,7 +219,6 @@ public sealed class EmulatorServiceTests
                 TargetUrl = "http://localhost",
                 IntervalSec = 1,
             });
-
             db.EmulatorTags.Add(new EmulatorTagEntity
             {
                 Id = "tg-start",
@@ -229,6 +300,32 @@ public sealed class EmulatorServiceTests
 
         public Task SendEventCreatedAsync(SystemEventDto ev, IReadOnlyList<string> groups, CancellationToken cancellationToken)
         {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingRuntimeUpdateBroadcaster : IRuntimeUpdateBroadcaster
+    {
+        public List<(SystemEventDto Event, IReadOnlyList<string> Groups)> EventUpdates { get; } = [];
+
+        public Task SendTelemetryAsync(RuntimeTelemetryUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SendTagValueAsync(RuntimeTagValueUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SendEmulatorUpdatedAsync(EmulatorDto emulator, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SendEventCreatedAsync(SystemEventDto ev, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            EventUpdates.Add((ev, groups));
             return Task.CompletedTask;
         }
     }

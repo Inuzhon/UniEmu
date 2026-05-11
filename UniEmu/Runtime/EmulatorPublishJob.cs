@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Quartz;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
@@ -52,8 +52,9 @@ public sealed class EmulatorPublishJob(
         var machineIntegrationId = GetMachineIntegrationId(emulator);
         var mainProgram = await ResolveProgramAsync(emulator.Id, generatedValues, SpecialParameter.PrgName, cancellationToken);
         var subProgram = await ResolveProgramAsync(emulator.Id, generatedValues, SpecialParameter.Subprogram, cancellationToken);
+
         var level = EventLevel.Success;
-        var message = "Пакет мониторинга отправлен в Dispatcher";
+        var message = string.Empty;
 
         var telemetryPoint = new TelemetryPointEntity
         {
@@ -83,21 +84,28 @@ public sealed class EmulatorPublishJob(
         emulator.NextRun = now.AddSeconds(Math.Max(1, emulator.IntervalSec));
         emulator.StartedAt ??= now;
 
-        var systemEvent = new SystemEventEntity
+        var systemEvent = default(SystemEventEntity);
+        if (level == EventLevel.Error)
         {
-            Id = $"ev-{Guid.NewGuid():N}"[..12],
-            EmulatorId = emulator.Id,
-            EmulatorName = emulator.Name,
-            Level = UniEmuJson.EnumString(level),
-            Message = message,
-            Timestamp = now,
-        };
-        db.SystemEvents.Add(systemEvent);
+            systemEvent = new SystemEventEntity
+            {
+                Id = $"ev-{Guid.NewGuid():N}"[..12],
+                EmulatorId = emulator.Id,
+                EmulatorName = emulator.Name,
+                Level = UniEmuJson.EnumString(level),
+                Message = message,
+                Timestamp = now,
+            };
+            db.SystemEvents.Add(systemEvent);
+        }
 
         await db.SaveChangesAsync(cancellationToken);
+
         await runtimeUpdateService.PublishTelemetryAsync(emulator.Id, telemetryPoint.ToDto(), cancellationToken);
         await runtimeUpdateService.PublishEmulatorUpdatedAsync(emulator.ToDto(emulator.Tags.Count), cancellationToken);
-        await runtimeUpdateService.PublishEventCreatedAsync(systemEvent.ToDto(), cancellationToken);
+
+        if (systemEvent is not null)
+            await runtimeUpdateService.PublishEventCreatedAsync(systemEvent.ToDto(), cancellationToken);
     }
 
     private async Task<IReadOnlyList<GeneratedTagValue>> BuildValuesAsync(
@@ -390,9 +398,7 @@ public sealed class EmulatorPublishJob(
             UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Static);
 
         if (tag is null)
-        {
             return;
-        }
 
         tag.Preview = programName;
         stateStore.Set(emulator.Id, tag.Id, tag.Name, programName, numericValue: null, DateTimeOffset.UtcNow);

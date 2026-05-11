@@ -104,11 +104,11 @@ public sealed class TelemetryPacketSender
     {
         var hashUri = BuildGetFileUri(targetUrl, machineIntegrationId, fileType: 1);
         var hashAnswer = await _httpClient.GetStringAsync(hashUri, cancellationToken);
+
         EnsureNotDispatcherError(hashAnswer, "GetFileUniversal hash");
+
         if (!hashAnswer.Contains("Hash=", StringComparison.OrdinalIgnoreCase))
-        {
             throw new DispatcherProtocolException($"Unexpected Dispatcher hash answer: {NormalizeAnswerForMessage(hashAnswer)}");
-        }
 
         var hashValue = hashAnswer[(hashAnswer.IndexOf("Hash=", StringComparison.OrdinalIgnoreCase) + 5)..].Trim();
         var expectedHash = Convert.FromBase64String(hashValue);
@@ -118,11 +118,11 @@ public sealed class TelemetryPacketSender
         {
             var chunkUri = BuildGetFileUri(targetUrl, machineIntegrationId, fileType: 0);
             var chunkAnswer = await _httpClient.GetStringAsync(chunkUri, cancellationToken);
+
             EnsureNotDispatcherError(chunkAnswer, "GetFileUniversal file block");
+
             if (chunkAnswer == "EOF")
-            {
                 break;
-            }
 
             var bytes = Convert.FromBase64String(chunkAnswer.Trim());
             await content.WriteAsync(bytes, cancellationToken);
@@ -131,9 +131,7 @@ public sealed class TelemetryPacketSender
         var receivedBytes = content.ToArray();
         var actualHash = MD5.HashData(receivedBytes);
         if (!actualHash.SequenceEqual(expectedHash))
-        {
             _logger.LogWarning("Received Dispatcher program hash mismatch for machine {MachineIntegrationId}", machineIntegrationId);
-        }
 
         return new DispatcherProgram($"received_program_machine_id_{machineIntegrationId}.txt", receivedBytes);
     }

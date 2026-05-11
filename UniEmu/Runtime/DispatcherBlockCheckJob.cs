@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Quartz;
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
@@ -20,6 +20,7 @@ public sealed class DispatcherBlockCheckJob(
     {
         var cancellationToken = context.CancellationToken;
         var emulatorId = context.MergedJobDataMap.GetString(RuntimeJobKeys.EmulatorId);
+
         if (string.IsNullOrWhiteSpace(emulatorId))
         {
             logger.LogWarning("Dispatcher block check job is missing emulatorId");
@@ -27,6 +28,7 @@ public sealed class DispatcherBlockCheckJob(
         }
 
         var emulator = await db.Emulators
+            .Include(x => x.Tags)
             .FirstOrDefaultAsync(e => e.Id == emulatorId, cancellationToken);
 
         if (emulator is null || emulator.Status != nameof(EmulatorStatus.Running))
@@ -52,6 +54,7 @@ public sealed class DispatcherBlockCheckJob(
             emulator.Status = nameof(EmulatorStatus.Error);
             emulator.LastError = message;
             emulator.NextRun = null;
+
             var systemEvent = new SystemEventEntity
             {
                 Id = $"ev-{Guid.NewGuid():N}"[..12],

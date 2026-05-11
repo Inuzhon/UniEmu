@@ -1,4 +1,5 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
@@ -131,6 +132,7 @@ public sealed class EmulatorService(
         entity.Status = request.Status.ToString();
         var wasRunning = previousStatus == nameof(EmulatorStatus.Running);
         var isRunning = request.Status == EmulatorStatus.Running;
+        var systemEvent = CreateStatusTransitionEvent(entity, previousStatus, request.Status);
 
         if (isRunning)
         {
@@ -145,8 +147,14 @@ public sealed class EmulatorService(
             entity.NextRun = null;
         }
 
+        if (systemEvent is not null)
+        {
+            db.SystemEvents.Add(systemEvent);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         dataCache.InvalidateEmulator(entity.Id);
+
         if (isRunning)
         {
             if (!wasRunning)
@@ -168,6 +176,11 @@ public sealed class EmulatorService(
 
         var dto = entity.ToDto(entity.Tags.Count);
         await runtimeUpdateService.PublishEmulatorUpdatedAsync(dto, cancellationToken);
+        if (systemEvent is not null)
+        {
+            await runtimeUpdateService.PublishEventCreatedAsync(systemEvent.ToDto(), cancellationToken);
+        }
+
         return dto;
     }
 
@@ -187,5 +200,38 @@ public sealed class EmulatorService(
         dataCache.InvalidateScripts();
         dataCache.InvalidateCncPrograms();
         return true;
+    }
+
+    private static SystemEventEntity? CreateStatusTransitionEvent(
+        EmulatorEntity emulator,
+        string previousStatus,
+        EmulatorStatus nextStatus)
+    {
+        if (previousStatus == nextStatus.ToString())
+        {
+            return null;
+        }
+
+        var (level, message) = nextStatus switch
+        {
+            EmulatorStatus.Running => (EventLevel.Success, "Эмулятор запущен"),
+            EmulatorStatus.Stopped when previousStatus == nameof(EmulatorStatus.Running) => (EventLevel.Info, "Эмулятор остановлен"),
+            _ => default,
+        };
+
+        if (message is null)
+        {
+            return null;
+        }
+
+        return new SystemEventEntity
+        {
+            Id = $"ev-{Guid.NewGuid():N}"[..12],
+            EmulatorId = emulator.Id,
+            EmulatorName = emulator.Name,
+            Level = UniEmuJson.EnumString(level),
+            Message = message,
+            Timestamp = DateTimeOffset.UtcNow,
+        };
     }
 }

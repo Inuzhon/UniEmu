@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Requests;
@@ -39,9 +39,11 @@ public sealed class EventService(UniEmuDbContext db, RuntimeUpdateService runtim
         };
 
         db.SystemEvents.Add(entity);
+
         await db.SaveChangesAsync(cancellationToken);
         var dto = entity.ToDto();
         await runtimeUpdateService.PublishEventCreatedAsync(dto, cancellationToken);
+
         return dto;
     }
 }
