@@ -72,7 +72,7 @@ public sealed class CsxScriptEnvironment
     {
         if (!string.IsNullOrWhiteSpace(assembly.Location))
         {
-            references.Add(MetadataReference.CreateFromFile(assembly.Location));
+            references.Add(CreateMetadataReference(assembly.Location));
         }
     }
 
@@ -87,7 +87,7 @@ public sealed class CsxScriptEnvironment
         return value
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(IsAllowedTrustedPlatformAssembly)
-            .Select(path => MetadataReference.CreateFromFile(path))
+            .Select(CreateMetadataReference)
             .Cast<MetadataReference>()
             .ToList();
     }
@@ -96,5 +96,15 @@ public sealed class CsxScriptEnvironment
     {
         var fileName = Path.GetFileName(path);
         return !fileName.Equals("UniEmu.dll", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static PortableExecutableReference CreateMetadataReference(string assemblyPath)
+    {
+        var documentationPath = Path.ChangeExtension(assemblyPath, ".xml");
+        var documentation = File.Exists(documentationPath)
+            ? XmlDocumentationProvider.CreateFromFile(documentationPath)
+            : DocumentationProvider.Default;
+
+        return MetadataReference.CreateFromFile(assemblyPath, documentation: documentation);
     }
 }

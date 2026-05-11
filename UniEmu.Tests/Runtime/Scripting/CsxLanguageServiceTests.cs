@@ -192,6 +192,24 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public void GetHover_ReturnsScriptingApiSummaryDocumentation()
+    {
+        var service = new CsxLanguageService();
+        const string content = "return UniEmu.Tags.TryGetValue(\"pressure\", out var pressure);";
+        var position = content.IndexOf("TryGetValue", StringComparison.Ordinal) + 2;
+
+        var hover = service.GetHover(
+            "inline/tag-1.csx",
+            content,
+            position,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.NotNull(hover);
+        Assert.Contains("Attempts to get the tag value", hover.Documentation, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetSignatureHelp_ReturnsMethodParameters()
     {
         var service = new CsxLanguageService();
