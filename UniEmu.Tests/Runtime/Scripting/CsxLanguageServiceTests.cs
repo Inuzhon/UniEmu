@@ -53,4 +53,40 @@ public sealed class CsxLanguageServiceTests
 
         Assert.Contains(completions, item => item.Label == "LoadedHelper");
     }
+
+    [Fact]
+    public void GetHover_ReturnsSymbolSignature()
+    {
+        var service = new CsxLanguageService();
+        const string content = "var value = Math.Round(1.2);";
+        var position = content.IndexOf("Round", StringComparison.Ordinal) + 2;
+
+        var hover = service.GetHover(
+            "inline/tag-1.csx",
+            content,
+            position,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.NotNull(hover);
+        Assert.Contains("Round", hover.Signature, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetSignatureHelp_ReturnsMethodParameters()
+    {
+        var service = new CsxLanguageService();
+        const string content = "var value = Math.Round(";
+
+        var signatureHelp = service.GetSignatureHelp(
+            "inline/tag-1.csx",
+            content,
+            content.Length,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.NotNull(signatureHelp);
+        Assert.NotEmpty(signatureHelp.Signatures);
+        Assert.Contains(signatureHelp.Signatures, signature =>
+            signature.Label.Contains("Round", StringComparison.Ordinal)
+            && signature.Parameters.Count > 0);
+    }
 }

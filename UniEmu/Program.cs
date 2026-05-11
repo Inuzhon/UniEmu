@@ -122,8 +122,6 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
-app.MapCsxLsp();
-
 app.MapControllers();
 app.MapHub<RuntimeUpdatesHub>("/hubs/runtime-updates");
 
@@ -156,7 +154,7 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<TagRuntimeStateStore>().AsSelf().SingleInstance();
     container.RegisterType<CompiledTagScriptCache>().AsSelf().SingleInstance();
     container.RegisterType<CsxLanguageService>().AsSelf().SingleInstance();
-    container.RegisterType<CsxDocumentStore>().AsSelf().InstancePerDependency();
+    container.RegisterType<CsxIntellisenseService>().AsSelf().InstancePerLifetimeScope();
 
     container.RegisterType<TelemetryPacketSender>().AsSelf().InstancePerDependency();
 }
