@@ -40,11 +40,14 @@ public sealed class CsxLoadedScriptExpander
         var expandedContent = RemoveLoadDirectives(content);
         if (prefix.Count == 0)
         {
-            return new ExpandedCsxScript(expandedContent, Math.Clamp(position, 0, expandedContent.Length));
+            return new ExpandedCsxScript(expandedContent, Math.Clamp(position, 0, expandedContent.Length), 0);
         }
 
         var prefixText = string.Join(System.Environment.NewLine, prefix) + System.Environment.NewLine;
-        return new ExpandedCsxScript(prefixText + expandedContent, Math.Clamp(position, 0, expandedContent.Length) + prefixText.Length);
+        return new ExpandedCsxScript(
+            prefixText + expandedContent,
+            Math.Clamp(position, 0, expandedContent.Length) + prefixText.Length,
+            prefixText.Length);
     }
 
     public string? ResolveLoadPath(
@@ -126,4 +129,4 @@ public sealed class CsxLoadedScriptExpander
     }
 }
 
-public sealed record ExpandedCsxScript(string Content, int Position);
+public sealed record ExpandedCsxScript(string Content, int Position, int EntryContentStart);

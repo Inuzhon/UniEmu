@@ -79,6 +79,249 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<CsxLocation>> GetDefinitionsAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+
+        return MapLocations(
+            await language.GetDefinitionsAsync(
+                entryPath,
+                sourceCode,
+                CsxPositionMapper.ToOffset(sourceCode, request.Position),
+                visibleScripts,
+                typeof(TagScriptGlobals),
+                cancellationToken),
+            entryPath,
+            request.DocumentUri);
+    }
+
+    public async Task<IReadOnlyList<CsxLocation>> GetTypeDefinitionsAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+
+        return MapLocations(
+            await language.GetTypeDefinitionsAsync(
+                entryPath,
+                sourceCode,
+                CsxPositionMapper.ToOffset(sourceCode, request.Position),
+                visibleScripts,
+                typeof(TagScriptGlobals),
+                cancellationToken),
+            entryPath,
+            request.DocumentUri);
+    }
+
+    public async Task<IReadOnlyList<CsxLocation>> GetReferencesAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+
+        return MapLocations(
+            await language.GetReferencesAsync(
+                entryPath,
+                sourceCode,
+                CsxPositionMapper.ToOffset(sourceCode, request.Position),
+                request.IncludeDeclaration,
+                visibleScripts,
+                typeof(TagScriptGlobals),
+                cancellationToken),
+            entryPath,
+            request.DocumentUri);
+    }
+
+    public async Task<IReadOnlyList<CsxLocation>> GetImplementationsAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+
+        return MapLocations(
+            await language.GetImplementationsAsync(
+                entryPath,
+                sourceCode,
+                CsxPositionMapper.ToOffset(sourceCode, request.Position),
+                visibleScripts,
+                typeof(TagScriptGlobals),
+                cancellationToken),
+            entryPath,
+            request.DocumentUri);
+    }
+
+    public async Task<CsxWorkspaceEdit?> RenameAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.NewName))
+        {
+            return null;
+        }
+
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+        var edit = await language.RenameAsync(
+            entryPath,
+            sourceCode,
+            CsxPositionMapper.ToOffset(sourceCode, request.Position),
+            request.NewName,
+            visibleScripts,
+            typeof(TagScriptGlobals),
+            cancellationToken);
+
+        return edit is null
+            ? null
+            : new CsxWorkspaceEdit(edit.DocumentEdits
+                .Select(documentEdit => documentEdit with
+                {
+                    DocumentPath = MapDocumentPath(documentEdit.DocumentPath, entryPath, request.DocumentUri),
+                })
+                .ToArray());
+    }
+
+    public async Task<IReadOnlyList<CsxTextEdit>> FormatDocumentAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+
+        return await language.FormatDocumentAsync(
+            EntryPath(context),
+            sourceCode,
+            visibleScripts,
+            typeof(TagScriptGlobals),
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CsxTextEdit>> FormatRangeAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+
+        return await language.FormatRangeAsync(
+            EntryPath(context),
+            sourceCode,
+            request.Range ?? new CsxTextRange(0, 0, 0, 0),
+            visibleScripts,
+            typeof(TagScriptGlobals),
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CsxFoldingRange>> GetFoldingRangesAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+
+        return await language.GetFoldingRangesAsync(
+            EntryPath(context),
+            sourceCode,
+            visibleScripts,
+            typeof(TagScriptGlobals),
+            cancellationToken);
+    }
+
+    public async Task<CsxSemanticTokens> GetSemanticTokensAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+
+        return await language.GetSemanticTokensAsync(
+            EntryPath(context),
+            sourceCode,
+            visibleScripts,
+            typeof(TagScriptGlobals),
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CsxCallHierarchyItem>> PrepareCallHierarchyAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+
+        return MapCallHierarchyItems(
+            await language.PrepareCallHierarchyAsync(
+                entryPath,
+                sourceCode,
+                CsxPositionMapper.ToOffset(sourceCode, request.Position),
+                visibleScripts,
+                typeof(TagScriptGlobals),
+                cancellationToken),
+            entryPath,
+            request.DocumentUri);
+    }
+
+    public async Task<IReadOnlyList<CsxCallHierarchyIncomingCall>> GetIncomingCallsAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+
+        return (await language.GetIncomingCallsAsync(
+                entryPath,
+                sourceCode,
+                CsxPositionMapper.ToOffset(sourceCode, request.Position),
+                visibleScripts,
+                typeof(TagScriptGlobals),
+                cancellationToken))
+            .Select(call => call with { From = MapCallHierarchyItem(call.From, entryPath, request.DocumentUri) })
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<CsxCallHierarchyOutgoingCall>> GetOutgoingCallsAsync(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var context = CsxDocumentContextParser.Parse(request.DocumentUri);
+        var sourceCode = request.SourceCode ?? string.Empty;
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
+
+        return (await language.GetOutgoingCallsAsync(
+                entryPath,
+                sourceCode,
+                CsxPositionMapper.ToOffset(sourceCode, request.Position),
+                visibleScripts,
+                typeof(TagScriptGlobals),
+                cancellationToken))
+            .Select(call => call with { To = MapCallHierarchyItem(call.To, entryPath, request.DocumentUri) })
+            .ToArray();
+    }
+
     private async Task<Dictionary<string, string>> LoadVisibleScriptsAsync(
         CsxDocumentContext context,
         string sourceCode,
@@ -115,11 +358,53 @@ public sealed class CsxIntellisenseService(
             : context.ScriptName);
     }
 
+    private static IReadOnlyList<CsxLocation> MapLocations(
+        IReadOnlyList<CsxLocation> locations,
+        string entryPath,
+        string? documentUri)
+    {
+        return locations
+            .Select(location => location with
+            {
+                DocumentPath = MapDocumentPath(location.DocumentPath, entryPath, documentUri),
+            })
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CsxCallHierarchyItem> MapCallHierarchyItems(
+        IReadOnlyList<CsxCallHierarchyItem> items,
+        string entryPath,
+        string? documentUri)
+    {
+        return items.Select(item => MapCallHierarchyItem(item, entryPath, documentUri)).ToArray();
+    }
+
+    private static CsxCallHierarchyItem MapCallHierarchyItem(
+        CsxCallHierarchyItem item,
+        string entryPath,
+        string? documentUri)
+    {
+        return item with
+        {
+            DocumentPath = MapDocumentPath(item.DocumentPath, entryPath, documentUri),
+        };
+    }
+
+    private static string MapDocumentPath(string documentPath, string entryPath, string? documentUri)
+    {
+        return string.Equals(documentPath, entryPath, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(documentUri)
+            ? documentUri
+            : documentPath;
+    }
+
 }
 
 public sealed record CsxIntellisenseRequest(
     string? SourceCode,
     string? DocumentUri,
-    CsxEditorPosition? Position);
+    CsxEditorPosition? Position,
+    CsxTextRange? Range = null,
+    string? NewName = null,
+    bool IncludeDeclaration = true);
 
 public sealed record CsxEditorPosition(int Line, int Column);

@@ -12,6 +12,12 @@ public sealed class CsxLanguageService
     private readonly CsxCompletionService completion;
     private readonly CsxHoverService hover;
     private readonly CsxSignatureHelpService signatureHelp;
+    private readonly CsxNavigationService navigation;
+    private readonly CsxRenameService rename;
+    private readonly CsxFormattingService formatting;
+    private readonly CsxFoldingService folding;
+    private readonly CsxSemanticTokensService semanticTokens;
+    private readonly CsxCallHierarchyService callHierarchy;
 
     public CsxLanguageService()
         : this(CreateDefaultContextFactory())
@@ -23,7 +29,13 @@ public sealed class CsxLanguageService
             new CsxDiagnosticsService(s_defaultEnvironment),
             new CsxCompletionService(contextFactory),
             new CsxHoverService(contextFactory),
-            new CsxSignatureHelpService(contextFactory))
+            new CsxSignatureHelpService(contextFactory),
+            new CsxNavigationService(contextFactory),
+            new CsxRenameService(contextFactory),
+            new CsxFormattingService(),
+            new CsxFoldingService(contextFactory),
+            new CsxSemanticTokensService(contextFactory),
+            new CsxCallHierarchyService(contextFactory))
     {
     }
 
@@ -31,12 +43,24 @@ public sealed class CsxLanguageService
         CsxDiagnosticsService diagnostics,
         CsxCompletionService completion,
         CsxHoverService hover,
-        CsxSignatureHelpService signatureHelp)
+        CsxSignatureHelpService signatureHelp,
+        CsxNavigationService navigation,
+        CsxRenameService rename,
+        CsxFormattingService formatting,
+        CsxFoldingService folding,
+        CsxSemanticTokensService semanticTokens,
+        CsxCallHierarchyService callHierarchy)
     {
         this.diagnostics = diagnostics;
         this.completion = completion;
         this.hover = hover;
         this.signatureHelp = signatureHelp;
+        this.navigation = navigation;
+        this.rename = rename;
+        this.formatting = formatting;
+        this.folding = folding;
+        this.semanticTokens = semanticTokens;
+        this.callHierarchy = callHierarchy;
     }
 
     internal static int MetadataReferenceCacheCount => s_defaultEnvironment.MetadataReferenceCacheCount;
@@ -137,6 +161,197 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    public Task<IReadOnlyList<CsxLocation>> GetDefinitionsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return navigation.GetDefinitionsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxLocation>> GetTypeDefinitionsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return navigation.GetTypeDefinitionsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxLocation>> GetReferencesAsync(
+        string entryPath,
+        string content,
+        int position,
+        bool includeDeclaration,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return navigation.GetReferencesAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            includeDeclaration,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxLocation>> GetImplementationsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return navigation.GetImplementationsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<CsxWorkspaceEdit?> RenameAsync(
+        string entryPath,
+        string content,
+        int position,
+        string newName,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return rename.RenameAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            newName,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxTextEdit>> FormatDocumentAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return formatting.FormatDocumentAsync(content, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxTextEdit>> FormatRangeAsync(
+        string entryPath,
+        string content,
+        CsxTextRange range,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return formatting.FormatRangeAsync(content, range, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxFoldingRange>> GetFoldingRangesAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return folding.GetFoldingRangesAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<CsxSemanticTokens> GetSemanticTokensAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return semanticTokens.GetSemanticTokensAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxCallHierarchyItem>> PrepareCallHierarchyAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return callHierarchy.PrepareAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxCallHierarchyIncomingCall>> GetIncomingCallsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return callHierarchy.GetIncomingCallsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CsxCallHierarchyOutgoingCall>> GetOutgoingCallsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return callHierarchy.GetOutgoingCallsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
     private static CsxRoslynContextFactory CreateDefaultContextFactory()
     {
         return new CsxRoslynContextFactory(s_defaultEnvironment, new CsxLoadedScriptExpander());
@@ -192,3 +407,53 @@ public sealed record CsxSignature(
 public sealed record CsxSignatureParameter(
     string Label,
     string? Documentation);
+
+public sealed record CsxTextRange(
+    int StartLine,
+    int StartCharacter,
+    int EndLine,
+    int EndCharacter);
+
+public sealed record CsxLocation(
+    string DocumentPath,
+    CsxTextRange Range);
+
+public sealed record CsxTextEdit(
+    CsxTextRange Range,
+    string NewText);
+
+public sealed record CsxDocumentEdit(
+    string DocumentPath,
+    IReadOnlyList<CsxTextEdit> Edits);
+
+public sealed record CsxWorkspaceEdit(
+    IReadOnlyList<CsxDocumentEdit> DocumentEdits);
+
+public sealed record CsxFoldingRange(
+    int StartLine,
+    int EndLine,
+    string? Kind = null);
+
+public sealed record CsxSemanticTokensLegend(
+    IReadOnlyList<string> TokenTypes,
+    IReadOnlyList<string> TokenModifiers);
+
+public sealed record CsxSemanticTokens(
+    CsxSemanticTokensLegend Legend,
+    IReadOnlyList<int> Data);
+
+public sealed record CsxCallHierarchyItem(
+    string Name,
+    string Kind,
+    string? Detail,
+    string DocumentPath,
+    CsxTextRange Range,
+    CsxTextRange SelectionRange);
+
+public sealed record CsxCallHierarchyIncomingCall(
+    CsxCallHierarchyItem From,
+    IReadOnlyList<CsxTextRange> FromRanges);
+
+public sealed record CsxCallHierarchyOutgoingCall(
+    CsxCallHierarchyItem To,
+    IReadOnlyList<CsxTextRange> FromRanges);

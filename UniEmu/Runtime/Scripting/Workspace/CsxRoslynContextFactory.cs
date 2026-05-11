@@ -72,6 +72,12 @@ public sealed class CsxRoslynContextFactory
         var document = workspace.CurrentSolution.GetDocument(documentId)
             ?? throw new InvalidOperationException("CSX Roslyn document was not created.");
 
-        return new CsxRoslynContext(workspace, document, expanded.Position);
+        return new CsxRoslynContext(
+            workspace,
+            document,
+            entryPath,
+            content,
+            expanded.Position,
+            expanded.EntryContentStart);
     }
 }

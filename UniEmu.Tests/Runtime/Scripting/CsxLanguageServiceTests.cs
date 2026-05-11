@@ -51,7 +51,35 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
-    public async Task AnalyzeAsync_ReturnsCompilerErrorDiagnostic_WhenScriptReturnBranchesHaveIncompatibleTypes()
+    public async Task AnalyzeAsync_AllowsPublicTopLevelHelperMethod()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["utils.csx"] = "int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max);",
+        };
+        const string content = """
+            #load "utils.csx"
+            public int Test(int qweqe)
+            {
+                return Clamp(123, 123, qweqe);
+            }
+
+            Test(123);
+            return 0;
+            """;
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            content,
+            visibleScripts,
+            typeof(TagScriptGlobals));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsCompilerErrorDiagnostic_WhenScriptReturnBranchesDoNotMatchExpectedType()
     {
         var service = new CsxLanguageService();
         const string content = """
@@ -66,7 +94,8 @@ public sealed class CsxLanguageServiceTests
             "inline/tag-1.csx",
             content,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            typeof(TagScriptGlobals));
+            typeof(TagScriptGlobals),
+            typeof(int));
 
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
     }
@@ -316,6 +345,179 @@ public sealed class CsxLanguageServiceTests
         Assert.Contains(signatureHelp.Signatures, signature =>
             signature.Label.Contains("Round", StringComparison.Ordinal)
             && signature.Parameters.Count > 0);
+    }
+
+    [Fact]
+    public async Task GetDefinitionsAsync_ReturnsLocalMethodDeclarationLocation()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            int Add(int left, int right) => left + right;
+            return Add(1, 2);
+            """;
+        var position = content.LastIndexOf("Add", StringComparison.Ordinal) + 1;
+
+        var definitions = await service.GetDefinitionsAsync(
+            "inline/tag-1.csx",
+            content,
+            position,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        var definition = Assert.Single(definitions);
+        Assert.Equal("inline/tag-1.csx", definition.DocumentPath);
+        Assert.Equal(0, definition.Range.StartLine);
+        Assert.Equal(4, definition.Range.StartCharacter);
+        Assert.Equal(0, definition.Range.EndLine);
+        Assert.Equal(7, definition.Range.EndCharacter);
+    }
+
+    [Fact]
+    public async Task GetReferencesAsync_ReturnsDeclarationAndUsages()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            var pressure = 1;
+            var copy = pressure + pressure;
+            return copy;
+            """;
+        var position = content.IndexOf("pressure", StringComparison.Ordinal) + 1;
+
+        var references = await service.GetReferencesAsync(
+            "inline/tag-1.csx",
+            content,
+            position,
+            includeDeclaration: true,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Equal(3, references.Count(reference => reference.DocumentPath == "inline/tag-1.csx"));
+    }
+
+    [Fact]
+    public async Task RenameAsync_ReturnsOnlyCurrentDocumentEdits()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["common.csx"] = "int SharedValue() => 42;",
+        };
+        const string content = """
+            #load "common.csx"
+            int LocalValue() => SharedValue();
+            return LocalValue();
+            """;
+        var position = content.LastIndexOf("LocalValue", StringComparison.Ordinal) + 1;
+
+        var edit = await service.RenameAsync(
+            "machine.csx",
+            content,
+            position,
+            "RenamedValue",
+            visibleScripts,
+            typeof(TagScriptGlobals));
+
+        Assert.NotNull(edit);
+        var documentEdit = Assert.Single(edit.DocumentEdits);
+        Assert.Equal("machine.csx", documentEdit.DocumentPath);
+        Assert.Equal(2, documentEdit.Edits.Count);
+        Assert.All(documentEdit.Edits, textEdit => Assert.Equal("RenamedValue", textEdit.NewText));
+    }
+
+    [Fact]
+    public async Task FormatDocumentAsync_ReturnsWholeDocumentEdit()
+    {
+        var service = new CsxLanguageService();
+
+        var edits = await service.FormatDocumentAsync(
+            "inline/tag-1.csx",
+            "if(true){return 1;}",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        var edit = Assert.Single(edits);
+        Assert.Contains("return 1;", edit.NewText, StringComparison.Ordinal);
+        Assert.Contains(Environment.NewLine, edit.NewText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FormatDocumentAsync_PreservesBlankLineAfterLoadDirectives()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            #load "utils.csx"
+
+            public int Test(int qweqe){return Clamp(123,123,qweqe);}
+            """;
+
+        var edits = await service.FormatDocumentAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        var edit = Assert.Single(edits);
+        Assert.Contains($"#load \"utils.csx\"{Environment.NewLine}{Environment.NewLine}public int Test", edit.NewText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetFoldingRangesAsync_ReturnsBlockRanges()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            if (true)
+            {
+                return 1;
+            }
+            return 0;
+            """;
+
+        var ranges = await service.GetFoldingRangesAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(ranges, range => range.StartLine == 1 && range.EndLine == 3);
+    }
+
+    [Fact]
+    public async Task GetSemanticTokensAsync_ReturnsSemanticTokenData()
+    {
+        var service = new CsxLanguageService();
+
+        var tokens = await service.GetSemanticTokensAsync(
+            "inline/tag-1.csx",
+            "var pressure = UniEmu.Tag.Name;",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.NotEmpty(tokens.Data);
+        Assert.Contains("variable", tokens.Legend.TokenTypes);
+        Assert.Contains("property", tokens.Legend.TokenTypes);
+    }
+
+    [Fact]
+    public async Task PrepareCallHierarchyAsync_ReturnsCallableItem()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            int Add(int left, int right) => left + right;
+            int Twice() => Add(1, 2);
+            return Twice();
+            """;
+        var position = content.IndexOf("Twice", StringComparison.Ordinal) + 1;
+
+        var items = await service.PrepareCallHierarchyAsync(
+            "inline/tag-1.csx",
+            content,
+            position,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        var item = Assert.Single(items);
+        Assert.Equal("Twice", item.Name);
+        Assert.Equal("inline/tag-1.csx", item.DocumentPath);
     }
 
     private static void AssertPrecedes(IReadOnlyList<CsxCompletionItem> completions, string firstLabel, string secondLabel)
