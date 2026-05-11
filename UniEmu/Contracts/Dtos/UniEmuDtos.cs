@@ -64,7 +64,7 @@ public sealed record EmulatorTagDto(
 
 public sealed record TelemetryPointDto(
     DateTimeOffset Timestamp,
-    IReadOnlyDictionary<string, double> Values);
+    IReadOnlyDictionary<string, object?> Values);
 
 public sealed record SystemEventDto(
     string Id,

@@ -44,10 +44,7 @@ public sealed class EmulatorPublishJob(
         var now = DateTimeOffset.UtcNow;
         var scheduledAt = context.ScheduledFireTimeUtc ?? now;
         var generatedValues = await BuildValuesAsync(emulator, now, scheduledAt, cancellationToken);
-        var telemetryValues = generatedValues
-            .Where(value => value.NumericValue is not null)
-            .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Last().NumericValue!.Value, StringComparer.OrdinalIgnoreCase);
+        var telemetryValues = BuildTelemetryValues(generatedValues);
 
         var dispatcherValues = BuildDispatcherValues(emulator.Tags, generatedValues);
         var machineIntegrationId = GetMachineIntegrationId(emulator);
@@ -170,6 +167,14 @@ public sealed class EmulatorPublishJob(
             .Where(pair => pair.First.Enabled)
             .Select(pair => new UniversalValue(pair.Second.Key, pair.Second.Value))
             .ToList();
+    }
+
+    public static IReadOnlyDictionary<string, object?> BuildTelemetryValues(
+        IReadOnlyList<GeneratedTagValue> generatedValues)
+    {
+        return generatedValues
+            .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
     }
 
     private static GeneratedTagValue FromRuntimeValue(EmulatorTagEntity tag, TagRuntimeValue runtimeValue)

@@ -13,7 +13,7 @@ public sealed class RuntimeUpdateServiceTests
         var service = new RuntimeUpdateService(broadcaster);
         var telemetry = new TelemetryPointDto(
             DateTimeOffset.Parse("2026-05-09T10:00:00Z"),
-            new Dictionary<string, double> { ["Temperature"] = 42.5 });
+            new Dictionary<string, object?> { ["Temperature"] = 42.5 });
 
         await service.PublishTelemetryAsync("em-1", telemetry, CancellationToken.None);
 

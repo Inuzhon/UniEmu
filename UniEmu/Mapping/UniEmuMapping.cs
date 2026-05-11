@@ -78,7 +78,7 @@ public static class UniEmuMapping
     {
         return new TelemetryPointDto(
             entity.Timestamp,
-            UniEmuJson.Deserialize<Dictionary<string, double>>(entity.ValuesJson) ?? new Dictionary<string, double>());
+            UniEmuJson.Deserialize<Dictionary<string, object?>>(entity.ValuesJson) ?? new Dictionary<string, object?>());
     }
 
     public static SystemEventDto ToDto(this SystemEventEntity entity)

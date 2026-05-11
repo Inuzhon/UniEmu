@@ -8,6 +8,7 @@ using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Hosting;
 using UniEmu.Runtime.Models;
 
 namespace UniEmu.Runtime;
@@ -166,12 +167,13 @@ public sealed class TagScriptExecutionService(
             .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
 
         stateStore.TryGet(emulator.Id, tag.Id, out var previous);
+        var scriptNow = ApplicationGlobalization.ToApplicationTime(timestamp);
 
         return new TagScriptGlobals(
             new TagScriptTagAccessor(
                 values,
                 (tagName, value) => SetStaticTag(emulator, tagName, value, timestamp)),
-            timestamp,
+            scriptNow,
             new TagScriptEmulatorContext(emulator.Id, emulator.Name, emulator.Status),
             new TagScriptStateContext(
                 emulator.Status == nameof(EmulatorStatus.Running),

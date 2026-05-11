@@ -60,7 +60,7 @@ public sealed record PatchCncProgramRequest(
 public sealed record TelemetryIngestRequest(
     string EmulatorId,
     DateTimeOffset Timestamp,
-    IReadOnlyDictionary<string, double> Values);
+    IReadOnlyDictionary<string, object?> Values);
 
 public sealed record PushEventRequest(
     string EmulatorId,

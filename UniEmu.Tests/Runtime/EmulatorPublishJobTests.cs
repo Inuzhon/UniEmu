@@ -40,6 +40,21 @@ public sealed class EmulatorPublishJobTests
     }
 
     [Fact]
+    public void BuildTelemetryValues_IncludesStringAndNumericTagValues()
+    {
+        var values = new[]
+        {
+            new GeneratedTagValue("NumericTag", "NumericTag", 50, 50, null),
+            new GeneratedTagValue("ScriptByTag", "ScriptByTag", "50", null, null),
+        };
+
+        var telemetryValues = EmulatorPublishJob.BuildTelemetryValues(values);
+
+        Assert.Equal(50, telemetryValues["NumericTag"]);
+        Assert.Equal("50", telemetryValues["ScriptByTag"]);
+    }
+
+    [Fact]
     public async Task BuildValuesAsync_CalculatesFrameFromSubprogram_WhenSubprogramIsSet()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

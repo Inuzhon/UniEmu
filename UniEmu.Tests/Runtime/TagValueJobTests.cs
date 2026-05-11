@@ -10,11 +10,14 @@ using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Hosting;
 using UniEmu.Realtime;
 using UniEmu.Runtime;
+using UniEmu.Tests.Hosting;
 
 namespace UniEmu.Tests.Runtime;
 
+[Collection(ApplicationGlobalizationCollection.Name)]
 public sealed class TagValueJobTests
 {
     [Fact]
@@ -61,6 +64,27 @@ public sealed class TagValueJobTests
 
         var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-now");
         Assert.True(DateTimeOffset.TryParse(tag.Preview, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out _));
+    }
+
+    [Fact]
+    public async Task Execute_ExposesApplicationTimeZoneToScriptNow()
+    {
+        await using var fixture = await TagValueJobDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var job = new TagValueJob(
+            db,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<TagValueJob>.Instance);
+
+        await job.Execute(CreateContext("tg-now-offset"));
+
+        var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-now-offset");
+        Assert.Equal("3", tag.Preview);
     }
 
     [Fact]
@@ -149,6 +173,7 @@ public sealed class TagValueJobTests
             db.EmulatorTags.AddRange(
                 CreateTag("tg-start", "Start script", "start", TagType.Double, "return 5;"),
                 CreateTag("tg-now", "Now script", "now", TagType.String, "return Now;"),
+                CreateTag("tg-now-offset", "Now offset script", "now-offset", TagType.Double, "return Now.Offset.TotalHours;"),
                 CreateTag(
                     "tg-cron",
                     "Cron script",

@@ -28,6 +28,8 @@ Directory.SetCurrentDirectory(Path.GetDirectoryName(currentAssembly.Location)
                               ?? throw new NullReferenceException("Current dir not found!"));
 
 var builder = WebApplication.CreateBuilder(args);
+var globalizationOptions = ApplicationGlobalizationOptions.Resolve(builder.Configuration);
+ApplicationGlobalization.Apply(globalizationOptions);
 var backendPortOptions = BackendPortOptions.Resolve(builder.Configuration);
 
 builder.WebHost.UseUrls(backendPortOptions.HttpUrl);
