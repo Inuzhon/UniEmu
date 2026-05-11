@@ -20,7 +20,7 @@ public sealed class CsxLanguageService
 
     private CsxLanguageService(CsxRoslynContextFactory contextFactory)
         : this(
-            new CsxDiagnosticsService(contextFactory),
+            new CsxDiagnosticsService(s_defaultEnvironment),
             new CsxCompletionService(contextFactory),
             new CsxHoverService(contextFactory),
             new CsxSignatureHelpService(contextFactory))
@@ -58,6 +58,23 @@ public sealed class CsxLanguageService
         Type? globalsType = null,
         CancellationToken cancellationToken = default)
     {
+        return await AnalyzeAsync(
+            entryPath,
+            content,
+            visibleScripts,
+            globalsType,
+            expectedReturnType: null,
+            cancellationToken);
+    }
+
+    public async Task<CsxAnalysisResult> AnalyzeAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType,
+        Type? expectedReturnType,
+        CancellationToken cancellationToken = default)
+    {
         return new CsxAnalysisResult(
             entryPath,
             await diagnostics.AnalyzeAsync(
@@ -65,6 +82,7 @@ public sealed class CsxLanguageService
                 content,
                 visibleScripts,
                 globalsType ?? typeof(object),
+                expectedReturnType,
                 cancellationToken));
     }
 

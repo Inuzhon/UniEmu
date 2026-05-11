@@ -1,27 +1,59 @@
 using Microsoft.CodeAnalysis;
-using UniEmu.Runtime.Scripting.Workspace;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
+using UniEmu.Runtime.Scripting.Environment;
 
 namespace UniEmu.Runtime.Scripting.Services;
 
-public sealed class CsxDiagnosticsService(CsxRoslynContextFactory contextFactory)
+public sealed class CsxDiagnosticsService
 {
-    public async Task<IReadOnlyList<CsxDiagnostic>> AnalyzeAsync(
+    private readonly CsxScriptEnvironment environment;
+
+    public CsxDiagnosticsService(CsxScriptEnvironment environment)
+    {
+        this.environment = environment;
+    }
+
+    public Task<IReadOnlyList<CsxDiagnostic>> AnalyzeAsync(
         string entryPath,
         string content,
         IReadOnlyDictionary<string, string> visibleScripts,
         Type globalsType,
+        Type? expectedReturnType = null,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, 0, visibleScripts, globalsType);
-        var compilation = await context.Document.Project.GetCompilationAsync(cancellationToken);
-        if (compilation is null)
-        {
-            return [];
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
-        return compilation.GetDiagnostics()
+        var normalizedContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(content);
+        var options = environment.CreateScriptOptions(entryPath, visibleScripts);
+        var script = CreateScript(normalizedContent, options, globalsType, expectedReturnType);
+
+        IReadOnlyList<CsxDiagnostic> diagnostics = script.Compile(cancellationToken)
             .Select(ToCsxDiagnostic)
             .ToList();
+
+        return Task.FromResult(diagnostics);
+    }
+
+    private static Script CreateScript(
+        string content,
+        ScriptOptions options,
+        Type globalsType,
+        Type? expectedReturnType)
+    {
+        if (expectedReturnType == typeof(bool))
+            return CSharpScript.Create<bool>(content, options, globalsType);
+
+        if (expectedReturnType == typeof(int))
+            return CSharpScript.Create<int>(content, options, globalsType);
+
+        if (expectedReturnType == typeof(double))
+            return CSharpScript.Create<double>(content, options, globalsType);
+
+        if (expectedReturnType == typeof(string))
+            return CSharpScript.Create<string>(content, options, globalsType);
+
+        return CSharpScript.Create<object?>(content, options, globalsType);
     }
 
     private static CsxDiagnostic ToCsxDiagnostic(Diagnostic diagnostic)

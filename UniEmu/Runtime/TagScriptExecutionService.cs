@@ -1,5 +1,4 @@
 ﻿using System.Globalization;
-using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +8,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Hosting;
+using UniEmu.Runtime.Scripting;
 using UniEmu.Runtime.Scripting.Environment;
 using UniEmu.Scripting.Api;
 
@@ -22,10 +22,6 @@ public sealed class TagScriptExecutionService(
     CsxScriptEnvironment scriptEnvironment,
     CsxScriptDirectiveValidator directiveValidator)
 {
-    private static readonly Regex s_finalReturnStatement = new(
-        @"\breturn\s+(?<expression>.+?)\s*;\s*$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
-
     public TagScriptExecutionService(
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
@@ -48,7 +44,7 @@ public sealed class TagScriptExecutionService(
         CancellationToken cancellationToken)
     {
         var script = await ResolveEntryScriptAsync(emulator.Id, tag, cancellationToken);
-        var entryContent = NormalizeEntryScriptContent(script.Content);
+        var entryContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(script.Content);
         directiveValidator.ValidateSupportedDirectives(entryContent);
 
         var scripts = await LoadVisibleScriptsAsync(emulator.Id, cancellationToken);
@@ -227,14 +223,6 @@ public sealed class TagScriptExecutionService(
         stateStore.Set(emulator.Id, tag.Id, tag.Name, typedValue, TelemetryValueGenerator.ToNumericValue(typedValue), timestamp);
 
         return typedValue;
-    }
-
-    private static string NormalizeEntryScriptContent(string content)
-    {
-        var match = s_finalReturnStatement.Match(content);
-        return match.Success
-            ? content[..match.Index] + match.Groups["expression"].Value
-            : content;
     }
 
     private static object? CastResult(TagType tagType, object? result, string preview)

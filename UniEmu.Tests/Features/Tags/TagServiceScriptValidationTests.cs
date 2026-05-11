@@ -32,6 +32,21 @@ public sealed class TagServiceScriptValidationTests
         Assert.Empty(await db.EmulatorTags.ToListAsync());
     }
 
+    [Fact]
+    public async Task CreateAsync_RejectsInlineScript_WhenIntTagReturnsString()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<CsxScriptValidationException>(() =>
+            service.CreateAsync("em-1", CreateRequest("return \"not an int\";", TagType.Int), CancellationToken.None));
+
+        Assert.Contains(exception.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "CS0029");
+        Assert.Empty(await db.EmulatorTags.ToListAsync());
+    }
+
     private static TagService CreateService(UniEmuDbContext db)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
@@ -50,10 +65,10 @@ public sealed class TagServiceScriptValidationTests
         return new TagService(db, dataCache, scheduleService, new CsxLanguageService());
     }
 
-    private static CreateTagRequest CreateRequest(string inlineScript) => new(
+    private static CreateTagRequest CreateRequest(string inlineScript, TagType type = TagType.Double) => new(
         "Inline tag",
         "inline_tag",
-        TagType.Double,
+        type,
         TagSource.Formula,
         "(computed)",
         new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null),

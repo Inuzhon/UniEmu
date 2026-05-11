@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
+using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
@@ -40,7 +41,7 @@ public sealed class TagService(
             return null;
         }
 
-        await ValidateInlineScriptAsync(emulatorId, $"inline/{request.Name.Trim()}.csx", request.Formula?.InlineScript, cancellationToken);
+        await ValidateInlineScriptAsync(emulatorId, $"inline/{request.Name.Trim()}.csx", request.Formula?.InlineScript, request.Type, cancellationToken);
 
         var entity = new EmulatorTagEntity
         {
@@ -78,7 +79,7 @@ public sealed class TagService(
             return null;
         }
 
-        await ValidateInlineScriptAsync(emulatorId, $"inline/{entity.Id}.csx", request.Formula?.InlineScript, cancellationToken);
+        await ValidateInlineScriptAsync(emulatorId, $"inline/{entity.Id}.csx", request.Formula?.InlineScript, request.Type, cancellationToken);
 
         entity.Name = request.Name.Trim();
         entity.Key = request.Key.Trim();
@@ -124,6 +125,7 @@ public sealed class TagService(
         string emulatorId,
         string entryPath,
         string? inlineScript,
+        TagType tagType,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(inlineScript))
@@ -134,7 +136,13 @@ public sealed class TagService(
         var visibleScripts = (await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken))
             .ToDictionary(script => TagScriptPath.Normalize(script.Name), script => script.Content, StringComparer.OrdinalIgnoreCase);
 
-        var result = await language.AnalyzeAsync(entryPath, inlineScript, visibleScripts, typeof(TagScriptGlobals), cancellationToken);
+        var result = await language.AnalyzeAsync(
+            entryPath,
+            inlineScript,
+            visibleScripts,
+            typeof(TagScriptGlobals),
+            ExpectedScriptReturnType(tagType),
+            cancellationToken);
         var errors = result.Diagnostics
             .Where(diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error)
             .ToArray();
@@ -144,4 +152,13 @@ public sealed class TagService(
             throw new CsxScriptValidationException(errors);
         }
     }
+
+    private static Type ExpectedScriptReturnType(TagType tagType) => tagType switch
+    {
+        TagType.Bool => typeof(bool),
+        TagType.Int => typeof(int),
+        TagType.Double => typeof(double),
+        TagType.String => typeof(string),
+        _ => typeof(object),
+    };
 }

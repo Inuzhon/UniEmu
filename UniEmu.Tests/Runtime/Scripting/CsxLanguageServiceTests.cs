@@ -51,6 +51,43 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_ReturnsCompilerErrorDiagnostic_WhenScriptReturnBranchesHaveIncompatibleTypes()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            if (UniEmu.Tags.TryGetValue("NumericTag", out var numericTag)) {
+                return numericTag;
+            }
+
+            return -1;
+            """;
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsCompilerErrorDiagnostic_WhenExpectedReturnTypeDoesNotMatchScriptResult()
+    {
+        var service = new CsxLanguageService();
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "return \"not an int\";",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals),
+            typeof(int));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "CS0029");
+    }
+
+    [Fact]
     public void CreateMetadataReferences_ExposesScriptingApiWithoutBackendAssembly()
     {
         var references = CsxLanguageService.CreateMetadataReferencesForTests(typeof(TagScriptGlobals));
