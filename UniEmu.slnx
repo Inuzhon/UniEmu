@@ -8,7 +8,9 @@
     <Build />
     <Deploy />
   </Project>
-  <Project Path="UniEmu.Scripting.Api/UniEmu.Scripting.Api.csproj" />
+  <Project Path="UniEmu.Scripting.Api/UniEmu.Scripting.Api.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
   <Project Path="UniEmu.Tests/UniEmu.Tests.csproj" />
   <Project Path="UniEmu/UniEmu.csproj" />
 </Solution>

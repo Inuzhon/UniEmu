@@ -508,8 +508,7 @@ public sealed class CsxLanguageServiceTests
             typeof(TagScriptGlobals));
 
         var edit = Assert.Single(edits);
-        Assert.Contains("return 1;", edit.NewText, StringComparison.Ordinal);
-        Assert.Contains(Environment.NewLine, edit.NewText, StringComparison.Ordinal);
+        Assert.Equal("if (true) { return 1; }", edit.NewText);
     }
 
     [Fact]
@@ -530,6 +529,32 @@ public sealed class CsxLanguageServiceTests
 
         var edit = Assert.Single(edits);
         Assert.Contains($"#load \"utils.csx\"{Environment.NewLine}{Environment.NewLine}public int Test", edit.NewText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FormatDocumentAsync_PreservesMultipleBlankLinesBetweenClassMembers()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            public class Example
+            {
+            public Example()
+            {
+            }
+
+
+            private int value;
+            }
+            """;
+
+        var edits = await service.FormatDocumentAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        var edit = Assert.Single(edits);
+        Assert.Contains($"    }}{Environment.NewLine}{Environment.NewLine}{Environment.NewLine}    private int value;", edit.NewText, StringComparison.Ordinal);
     }
 
     [Fact]

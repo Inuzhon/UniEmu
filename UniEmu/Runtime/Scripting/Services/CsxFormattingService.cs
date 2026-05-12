@@ -1,7 +1,8 @@
-﻿using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Text;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Text;
 
 namespace UniEmu.Runtime.Scripting.Services;
 
@@ -15,37 +16,39 @@ public sealed class CsxFormattingService
         @"\A(?<loads>(?:\s*#\s*load\s+""[^""]+""\s*(?:\r?\n|$))+)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    public Task<IReadOnlyList<CsxTextEdit>> FormatDocumentAsync(
+    public async Task<IReadOnlyList<CsxTextEdit>> FormatDocumentAsync(
         string content,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var formatted = Format(content);
-        return Task.FromResult<IReadOnlyList<CsxTextEdit>>(
+        var formatted = await FormatAsync(content, cancellationToken);
+        return
         [
             new CsxTextEdit(WholeDocumentRange(content), formatted),
-        ]);
+        ];
     }
 
-    public Task<IReadOnlyList<CsxTextEdit>> FormatRangeAsync(
+    public async Task<IReadOnlyList<CsxTextEdit>> FormatRangeAsync(
         string content,
         CsxTextRange range,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var formatted = Format(content);
-        return Task.FromResult<IReadOnlyList<CsxTextEdit>>(
+        var formatted = await FormatAsync(content, cancellationToken);
+        return
         [
             new CsxTextEdit(WholeDocumentRange(content), formatted),
-        ]);
+        ];
     }
 
-    private static string Format(string content)
+    private static Task<string> FormatAsync(string content, CancellationToken cancellationToken)
     {
         var tree = CSharpSyntaxTree.ParseText(content, options: CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
-        var root = tree.GetRoot();
-        var formatted = root.NormalizeWhitespace().ToFullString();
-        return PreserveBlankLineAfterLeadingLoads(content, formatted);
+        var root = tree.GetRoot(cancellationToken);
+        using var workspace = new AdhocWorkspace();
+        var formattedRoot = Formatter.Format(root, workspace, cancellationToken: cancellationToken);
+        var formatted = PreserveBlankLineAfterLeadingLoads(content, formattedRoot.ToFullString());
+        return Task.FromResult(formatted);
     }
 
     private static string PreserveBlankLineAfterLeadingLoads(string original, string formatted)
