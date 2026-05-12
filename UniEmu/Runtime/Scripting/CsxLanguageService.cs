@@ -1,387 +1,361 @@
-﻿using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Completion;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Host.Mef;
-using Microsoft.CodeAnalysis.Scripting;
-using Microsoft.CodeAnalysis.Text;
-using UniEmu.Common;
+using UniEmu.Runtime.Scripting.Environment;
+using UniEmu.Runtime.Scripting.Services;
+using UniEmu.Runtime.Scripting.Workspace;
 
 namespace UniEmu.Runtime.Scripting;
 
 public sealed class CsxLanguageService
 {
-    private static readonly Regex s_loadDirective = new(
-        @"^\s*#\s*load\s+""(?<path>[^""]+)""",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+    private static readonly CsxScriptEnvironment s_defaultEnvironment = new();
 
-    private static readonly ScriptOptions s_baseOptions = ScriptOptions.Default
-        .WithReferences(
-            typeof(object).Assembly,
-            typeof(Enumerable).Assembly,
-            typeof(DateTimeOffset).Assembly
-        //typeof(UniEmuJson).Assembly
-        )
-        .WithImports(
-            "System",
-            "System.Collections.Generic",
-            "System.Globalization",
-            "System.Linq",
-            "UniEmu.Runtime.Scripting.UserScripts");
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<MetadataReference>> s_metadataReferenceCache = new();
+    private readonly CsxDiagnosticsService diagnostics;
+    private readonly CsxCompletionService completion;
+    private readonly CsxHoverService hover;
+    private readonly CsxSignatureHelpService signatureHelp;
+    private readonly CsxNavigationService navigation;
+    private readonly CsxRenameService rename;
+    private readonly CsxFormattingService formatting;
+    private readonly CsxFoldingService folding;
+    private readonly CsxSemanticTokensService semanticTokens;
+    private readonly CsxCallHierarchyService callHierarchy;
 
-    internal static int MetadataReferenceCacheCount => s_metadataReferenceCache.Count;
+    public CsxLanguageService()
+        : this(CreateDefaultContextFactory())
+    {
+    }
+
+    private CsxLanguageService(CsxRoslynContextFactory contextFactory)
+        : this(
+            new CsxDiagnosticsService(s_defaultEnvironment),
+            new CsxCompletionService(contextFactory),
+            new CsxHoverService(contextFactory),
+            new CsxSignatureHelpService(contextFactory),
+            new CsxNavigationService(contextFactory),
+            new CsxRenameService(contextFactory),
+            new CsxFormattingService(),
+            new CsxFoldingService(contextFactory),
+            new CsxSemanticTokensService(contextFactory),
+            new CsxCallHierarchyService(contextFactory))
+    {
+    }
+
+    public CsxLanguageService(
+        CsxDiagnosticsService diagnostics,
+        CsxCompletionService completion,
+        CsxHoverService hover,
+        CsxSignatureHelpService signatureHelp,
+        CsxNavigationService navigation,
+        CsxRenameService rename,
+        CsxFormattingService formatting,
+        CsxFoldingService folding,
+        CsxSemanticTokensService semanticTokens,
+        CsxCallHierarchyService callHierarchy)
+    {
+        this.diagnostics = diagnostics;
+        this.completion = completion;
+        this.hover = hover;
+        this.signatureHelp = signatureHelp;
+        this.navigation = navigation;
+        this.rename = rename;
+        this.formatting = formatting;
+        this.folding = folding;
+        this.semanticTokens = semanticTokens;
+        this.callHierarchy = callHierarchy;
+    }
+
+    internal static int MetadataReferenceCacheCount => s_defaultEnvironment.MetadataReferenceCacheCount;
 
     internal static void ClearMetadataReferenceCacheForTests()
     {
-        s_metadataReferenceCache.Clear();
+        s_defaultEnvironment.ClearMetadataReferenceCacheForTests();
     }
 
-    public CsxAnalysisResult Analyze(
+    internal static IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference> CreateMetadataReferencesForTests(Type globalsType)
+    {
+        return s_defaultEnvironment.CreateMetadataReferences(globalsType);
+    }
+
+    public async Task<CsxAnalysisResult> AnalyzeAsync(
         string entryPath,
         string content,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var options = s_baseOptions
-            .WithFilePath(TagScriptPath.Normalize(entryPath))
-            .WithSourceResolver(new DbScriptSourceResolver(visibleScripts));
-        var script = CSharpScript.Create<object?>(
+        return await AnalyzeAsync(
+            entryPath,
             content,
-            options,
-            globalsType ?? typeof(object));
-
-        var diagnostics = script.Compile()
-            .Select(ToCsxDiagnostic)
-            .ToList();
-
-        return new CsxAnalysisResult(entryPath, diagnostics);
+            visibleScripts,
+            globalsType,
+            expectedReturnType: null,
+            cancellationToken);
     }
 
-    public IReadOnlyList<CsxCompletionItem> GetCompletions(
+    public async Task<CsxAnalysisResult> AnalyzeAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType,
+        Type? expectedReturnType,
+        CancellationToken cancellationToken = default)
+    {
+        return new CsxAnalysisResult(
+            entryPath,
+            await diagnostics.AnalyzeAsync(
+                TagScriptPath.Normalize(entryPath),
+                content,
+                visibleScripts,
+                globalsType ?? typeof(object),
+                expectedReturnType,
+                cancellationToken));
+    }
+
+    public Task<IReadOnlyList<CsxCompletionItem>> GetCompletionsAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var expanded = ExpandLoadedScripts(entryPath, content, position, visibleScripts);
-        using var workspace = new AdhocWorkspace(MefHostServices.DefaultHost);
-        var document = CreateDocument(workspace, entryPath, expanded.Content, globalsType);
-
-        var service = CompletionService.GetService(document);
-        if (service is null)
-            return [];
-
-        var completionList = service
-            .GetCompletionsAsync(document, expanded.Position)
-            .GetAwaiter()
-            .GetResult();
-
-        return completionList?.ItemsList
-            .Select(item => new CsxCompletionItem(
-                item.DisplayText,
-                item.SortText,
-                item.FilterText,
-                item.Properties.TryGetValue("SymbolName", out var symbolName) ? symbolName : item.DisplayText,
-                item.InlineDescription,
-                null,
-                GetCompletionKind(item.Tags)))
-            .DistinctBy(item => item.Label, StringComparer.Ordinal)
-            .OrderBy(item => item.SortText, StringComparer.Ordinal)
-            .ThenBy(item => item.Label, StringComparer.Ordinal)
-            .ToList() ?? [];
+        return completion.GetCompletionsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    public CsxHover? GetHover(
+    public Task<CsxHover?> GetHoverAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var expanded = ExpandLoadedScripts(entryPath, content, position, visibleScripts);
-        using var workspace = new AdhocWorkspace(MefHostServices.DefaultHost);
-        var document = CreateDocument(workspace, entryPath, expanded.Content, globalsType);
-        var root = document.GetSyntaxRootAsync().GetAwaiter().GetResult();
-        var semanticModel = document.GetSemanticModelAsync().GetAwaiter().GetResult();
-
-        if (root is null || semanticModel is null || expanded.Content.Length == 0)
-            return null;
-
-        var token = root.FindToken(Math.Clamp(expanded.Position, 0, Math.Max(0, expanded.Content.Length - 1)));
-        var symbol = ResolveSymbol(semanticModel, token);
-        if (symbol is null)
-        {
-            return null;
-        }
-
-        return new CsxHover(
-            symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-            FormatDocumentation(symbol),
-            token.SpanStart,
-            token.Span.End);
+        return hover.GetHoverAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    public CsxSignatureHelp? GetSignatureHelp(
+    public Task<CsxSignatureHelp?> GetSignatureHelpAsync(
         string entryPath,
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type? globalsType = null)
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var expanded = ExpandLoadedScripts(entryPath, content, position, visibleScripts);
-        using var workspace = new AdhocWorkspace(MefHostServices.DefaultHost);
-        var document = CreateDocument(workspace, entryPath, expanded.Content, globalsType);
-        var root = document.GetSyntaxRootAsync().GetAwaiter().GetResult();
-        var semanticModel = document.GetSemanticModelAsync().GetAwaiter().GetResult();
-
-        if (root is null || semanticModel is null)
-            return null;
-
-        var tokenPosition = Math.Clamp(expanded.Position - 1, 0, Math.Max(0, expanded.Content.Length - 1));
-        var argumentList = root
-            .FindToken(tokenPosition)
-            .Parent?
-            .AncestorsAndSelf()
-            .OfType<BaseArgumentListSyntax>()
-            .FirstOrDefault(argumentList => argumentList.Span.Start <= expanded.Position && expanded.Position <= argumentList.Span.End);
-
-        if (argumentList is null)
-            return null;
-
-        var methods = ResolveCallableSymbols(semanticModel, argumentList)
-            .Distinct(SymbolEqualityComparer.Default)
-            .OfType<IMethodSymbol>()
-            .OrderBy(method => method.Parameters.Length)
-            .ThenBy(method => method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat), StringComparer.Ordinal)
-            .ToArray();
-
-        if (methods.Length == 0)
-            return null;
-
-        return new CsxSignatureHelp(
-            methods.Select(method => new CsxSignature(
-                    method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                    FormatDocumentation(method),
-                    method.Parameters
-                        .Select(parameter => new CsxSignatureParameter(
-                            parameter.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                            FormatDocumentation(parameter)))
-                        .ToArray()))
-                .ToArray(),
-            0,
-            GetActiveParameter(argumentList, expanded.Position));
+        return signatureHelp.GetSignatureHelpAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static Document CreateDocument(
-        AdhocWorkspace workspace,
-        string entryPath,
-        string content,
-        Type? globalsType)
-    {
-        var projectId = ProjectId.CreateNewId("UniEmu.Csx");
-        var documentId = DocumentId.CreateNewId(projectId, entryPath);
-        var parseOptions = CSharpParseOptions.Default
-            .WithKind(SourceCodeKind.Script)
-            .WithLanguageVersion(LanguageVersion.Preview);
-        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            .WithUsings(s_baseOptions.Imports);
-
-        var references = CreateMetadataReferences(globalsType ?? typeof(object));
-        var solution = workspace.CurrentSolution
-            .AddProject(ProjectInfo.Create(
-                projectId,
-                VersionStamp.Create(),
-                "UniEmu.Csx",
-                "UniEmu.Csx",
-                LanguageNames.CSharp,
-                parseOptions: parseOptions,
-                compilationOptions: compilationOptions,
-                metadataReferences: references))
-            .AddDocument(documentId, Path.GetFileName(entryPath), SourceText.From(content));
-
-        return solution.GetDocument(documentId)
-               ?? throw new InvalidOperationException("Unable to create CSX Roslyn document.");
-    }
-
-    private static IReadOnlyList<MetadataReference> CreateMetadataReferences(Type globalsType)
-    {
-        return s_metadataReferenceCache.GetOrAdd(globalsType, static type => s_baseOptions.MetadataReferences
-            //TODO: Не надо запихивать в подсказки весь проект
-            //.Concat([MetadataReference.CreateFromFile(type.Assembly.Location)])
-            //.Concat(type.Assembly.GetReferencedAssemblies()
-            //    .Select(assemblyName => MetadataReference.CreateFromFile(AssemblyPath(assemblyName))))
-            .DistinctBy(reference => reference.Display)
-            .ToList());
-    }
-
-    private static ExpandedScript ExpandLoadedScripts(
+    public Task<IReadOnlyList<CsxLocation>> GetDefinitionsAsync(
         string entryPath,
         string content,
         int position,
-        IReadOnlyDictionary<string, string> visibleScripts)
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var prefix = new List<string>();
-        foreach (Match match in s_loadDirective.Matches(content))
-        {
-            var loadPath = ResolveLoadPath(match.Groups["path"].Value, entryPath, visibleScripts);
-            if (loadPath is null || !visibleScripts.TryGetValue(loadPath, out var loadedContent))
-                continue;
-
-            prefix.Add($"#line 1 \"{loadPath}\"");
-            prefix.Add(loadedContent);
-            prefix.Add("#line default");
-        }
-
-        if (prefix.Count == 0)
-            return new ExpandedScript(content, Math.Clamp(position, 0, content.Length));
-
-        var prefixText = string.Join(Environment.NewLine, prefix) + Environment.NewLine;
-        return new ExpandedScript(prefixText + content, Math.Clamp(position, 0, content.Length) + prefixText.Length);
+        return navigation.GetDefinitionsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static string? ResolveLoadPath(
-        string path,
-        string baseFilePath,
-        IReadOnlyDictionary<string, string> scripts)
+    public Task<IReadOnlyList<CsxLocation>> GetTypeDefinitionsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var normalized = TagScriptPath.Normalize(path);
-        if (scripts.ContainsKey(normalized))
-            return normalized;
-
-        var baseDir = Path.GetDirectoryName(baseFilePath.Replace('\\', '/'))?.Replace('\\', '/');
-        if (string.IsNullOrWhiteSpace(baseDir))
-            return null;
-
-        var relative = TagScriptPath.Normalize($"{baseDir}/{path}");
-        return scripts.ContainsKey(relative) ? relative : null;
+        return navigation.GetTypeDefinitionsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static CsxDiagnostic ToCsxDiagnostic(Diagnostic diagnostic)
+    public Task<IReadOnlyList<CsxLocation>> GetReferencesAsync(
+        string entryPath,
+        string content,
+        int position,
+        bool includeDeclaration,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var span = diagnostic.Location.GetLineSpan();
-        var start = span.StartLinePosition;
-        var end = span.EndLinePosition;
-        return new CsxDiagnostic(
-            diagnostic.Id,
-            diagnostic.GetMessage(),
-            diagnostic.Severity switch
-            {
-                DiagnosticSeverity.Error => CsxDiagnosticSeverity.Error,
-                DiagnosticSeverity.Warning => CsxDiagnosticSeverity.Warning,
-                DiagnosticSeverity.Info => CsxDiagnosticSeverity.Information,
-                _ => CsxDiagnosticSeverity.Hint,
-            },
-            start.Line,
-            start.Character,
-            end.Line,
-            end.Character);
+        return navigation.GetReferencesAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            includeDeclaration,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static string AssemblyPath(System.Reflection.AssemblyName assemblyName)
+    public Task<IReadOnlyList<CsxLocation>> GetImplementationsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return System.Reflection.Assembly.Load(assemblyName).Location;
-        }
-        catch
-        {
-            return typeof(object).Assembly.Location;
-        }
+        return navigation.GetImplementationsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static ISymbol? ResolveSymbol(SemanticModel semanticModel, SyntaxToken token)
+    public Task<CsxWorkspaceEdit?> RenameAsync(
+        string entryPath,
+        string content,
+        int position,
+        string newName,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        foreach (var node in token.Parent?.AncestorsAndSelf() ?? [])
-        {
-            var symbol = semanticModel.GetSymbolInfo(node).Symbol
-                         ?? semanticModel.GetDeclaredSymbol(node)
-                         ?? semanticModel.GetSymbolInfo(node).CandidateSymbols.FirstOrDefault();
-            if (symbol is not null)
-                return symbol;
-        }
-
-        return null;
+        return rename.RenameAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            newName,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static IEnumerable<ISymbol> ResolveCallableSymbols(SemanticModel semanticModel, BaseArgumentListSyntax argumentList)
+    public Task<IReadOnlyList<CsxTextEdit>> FormatDocumentAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        return argumentList.Parent switch
-        {
-            InvocationExpressionSyntax invocation => ResolveInvocationSymbols(semanticModel, invocation),
-            ObjectCreationExpressionSyntax creation => ResolveCreationSymbols(semanticModel, creation),
-            _ => [],
-        };
+        return formatting.FormatDocumentAsync(content, cancellationToken);
     }
 
-    private static IEnumerable<ISymbol> ResolveInvocationSymbols(SemanticModel semanticModel, InvocationExpressionSyntax invocation)
+    public Task<IReadOnlyList<CsxTextEdit>> FormatRangeAsync(
+        string entryPath,
+        string content,
+        CsxTextRange range,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var group = semanticModel.GetMemberGroup(invocation.Expression);
-        if (group.Length > 0)
-            return group;
-
-        var symbolInfo = semanticModel.GetSymbolInfo(invocation);
-        return symbolInfo.Symbol is not null
-            ? [symbolInfo.Symbol]
-            : symbolInfo.CandidateSymbols;
+        return formatting.FormatRangeAsync(content, range, cancellationToken);
     }
 
-    private static IEnumerable<ISymbol> ResolveCreationSymbols(SemanticModel semanticModel, ObjectCreationExpressionSyntax creation)
+    public Task<IReadOnlyList<CsxFoldingRange>> GetFoldingRangesAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var symbolInfo = semanticModel.GetSymbolInfo(creation);
-        return symbolInfo.Symbol is not null
-            ? [symbolInfo.Symbol]
-            : symbolInfo.CandidateSymbols;
+        return folding.GetFoldingRangesAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static int GetActiveParameter(BaseArgumentListSyntax argumentList, int position)
+    public Task<CsxSemanticTokens> GetSemanticTokensAsync(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var activeParameter = 0;
-
-        foreach (var argument in argumentList.Arguments)
-        {
-            if (argument.Span.End < position)
-                activeParameter++;
-        }
-
-        return activeParameter;
+        return semanticTokens.GetSemanticTokensAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static string GetCompletionKind(IEnumerable<string> tags)
+    public Task<IReadOnlyList<CsxCallHierarchyItem>> PrepareCallHierarchyAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var tag = tags.FirstOrDefault()?.ToLowerInvariant();
-        return tag switch
-        {
-            "method" => "method",
-            "property" => "property",
-            "class" => "class",
-            "struct" => "struct",
-            "enum" => "enum",
-            "field" => "field",
-            "keyword" => "keyword",
-            "local" => "variable",
-            "parameter" => "variable",
-            _ => "text",
-        };
+        return callHierarchy.PrepareAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private static string? FormatDocumentation(ISymbol symbol)
+    public Task<IReadOnlyList<CsxCallHierarchyIncomingCall>> GetIncomingCallsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
     {
-        var documentation = symbol.GetDocumentationCommentXml();
-        if (string.IsNullOrWhiteSpace(documentation))
-            return null;
-
-        return Regex.Replace(documentation, "<.*?>", " ")
-            .Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal)
-            .Trim();
+        return callHierarchy.GetIncomingCallsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
     }
 
-    private sealed record ExpandedScript(string Content, int Position);
+    public Task<IReadOnlyList<CsxCallHierarchyOutgoingCall>> GetOutgoingCallsAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return callHierarchy.GetOutgoingCallsAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    private static CsxRoslynContextFactory CreateDefaultContextFactory()
+    {
+        return new CsxRoslynContextFactory(s_defaultEnvironment, new CsxLoadedScriptExpander());
+    }
 }
 
 public sealed record CsxAnalysisResult(
@@ -433,3 +407,53 @@ public sealed record CsxSignature(
 public sealed record CsxSignatureParameter(
     string Label,
     string? Documentation);
+
+public sealed record CsxTextRange(
+    int StartLine,
+    int StartCharacter,
+    int EndLine,
+    int EndCharacter);
+
+public sealed record CsxLocation(
+    string DocumentPath,
+    CsxTextRange Range);
+
+public sealed record CsxTextEdit(
+    CsxTextRange Range,
+    string NewText);
+
+public sealed record CsxDocumentEdit(
+    string DocumentPath,
+    IReadOnlyList<CsxTextEdit> Edits);
+
+public sealed record CsxWorkspaceEdit(
+    IReadOnlyList<CsxDocumentEdit> DocumentEdits);
+
+public sealed record CsxFoldingRange(
+    int StartLine,
+    int EndLine,
+    string? Kind = null);
+
+public sealed record CsxSemanticTokensLegend(
+    IReadOnlyList<string> TokenTypes,
+    IReadOnlyList<string> TokenModifiers);
+
+public sealed record CsxSemanticTokens(
+    CsxSemanticTokensLegend Legend,
+    IReadOnlyList<int> Data);
+
+public sealed record CsxCallHierarchyItem(
+    string Name,
+    string Kind,
+    string? Detail,
+    string DocumentPath,
+    CsxTextRange Range,
+    CsxTextRange SelectionRange);
+
+public sealed record CsxCallHierarchyIncomingCall(
+    CsxCallHierarchyItem From,
+    IReadOnlyList<CsxTextRange> FromRanges);
+
+public sealed record CsxCallHierarchyOutgoingCall(
+    CsxCallHierarchyItem To,
+    IReadOnlyList<CsxTextRange> FromRanges);

@@ -1,11 +1,13 @@
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Quartz;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
@@ -18,6 +20,57 @@ namespace UniEmu.Tests.Runtime;
 
 public sealed class EmulatorPublishJobTests
 {
+    [Fact]
+    public async Task Execute_CalculatesDisabledTagsButDoesNotSendThemToDispatcher()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.Emulators.Add(new EmulatorEntity
+        {
+            Id = "emu-1",
+            Name = "Main emulator",
+            Status = nameof(EmulatorStatus.Running),
+            ProtocolId = 18,
+            TargetUrl = "http://dispatcher.test",
+            IntervalSec = 1,
+            StartedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z"),
+            Tags =
+            [
+                CreateTag("Temperature", "Temp", enabled: true),
+                CreateGeneratorTag("tg-internal-load", "InternalLoad", "InternalLoad", enabled: false),
+            ],
+        });
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var handler = new CaptureMonitoringHandler();
+        var job = CreateJob(db, dataCache, stateStore, CreateSender(handler));
+
+        await job.Execute(CreateContext("emu-1"));
+
+        Assert.NotNull(handler.MonitoringJson);
+        using var document = JsonDocument.Parse(handler.MonitoringJson);
+        var listValues = document.RootElement.GetProperty("ListValues").EnumerateArray().ToList();
+        Assert.Contains(listValues, value => value.GetProperty("Key").GetString() == "Temp");
+        Assert.DoesNotContain(listValues, value => value.GetProperty("Key").GetString() == "InternalLoad");
+
+        var disabledTag = await db.EmulatorTags.SingleAsync(tag => tag.Id == "tg-internal-load");
+        Assert.Equal("99", disabledTag.Preview);
+        Assert.True(stateStore.TryGet("emu-1", "tg-internal-load", out var runtimeValue));
+        Assert.Equal(99d, runtimeValue.Value);
+
+        var telemetryPoint = await db.TelemetryPoints.SingleAsync();
+        using var telemetry = JsonDocument.Parse(telemetryPoint.ValuesJson);
+        Assert.Equal(99d, telemetry.RootElement.GetProperty("InternalLoad").GetDouble());
+    }
+
     [Fact]
     public void BuildDispatcherValues_ExcludesDisabledTags()
     {
@@ -339,6 +392,31 @@ public sealed class EmulatorPublishJobTests
         };
     }
 
+    private static EmulatorTagEntity CreateGeneratorTag(string id, string name, string key, bool enabled)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = id,
+            EmulatorId = "emu-1",
+            Name = name,
+            Key = key,
+            Type = UniEmuJson.EnumString(TagType.Double),
+            Source = UniEmuJson.EnumString(TagSource.Generator),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 2, TagIntervalUnit.Sec)),
+            CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(
+                CalcType.Sequence,
+                Start: "[99]",
+                Finish: null,
+                Duration: 1,
+                Amplitude: null,
+                Period: null,
+                Curvature: null,
+                Distortion: null)),
+            Enabled = enabled,
+        };
+    }
+
     private static CncProgramEntity CreateProgram(
         string id,
         string name,
@@ -468,6 +546,35 @@ public sealed class EmulatorPublishJobTests
             .Returns(new HttpClient(handler ?? new HttpClientHandler()));
 
         return new TelemetryPacketSender(factory.Object, NullLogger<TelemetryPacketSender>.Instance);
+    }
+
+    private static IJobExecutionContext CreateContext(string emulatorId)
+    {
+        var context = new Mock<IJobExecutionContext>();
+        context.SetupGet(c => c.CancellationToken).Returns(CancellationToken.None);
+        context.SetupGet(c => c.MergedJobDataMap).Returns(new JobDataMap
+        {
+            [RuntimeJobKeys.EmulatorId] = emulatorId,
+        });
+
+        return context.Object;
+    }
+
+    private sealed class CaptureMonitoringHandler : HttpMessageHandler
+    {
+        public string? MonitoringJson { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            MonitoringJson = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("FileType=0;GetFile=0"),
+            };
+        }
     }
 
     private sealed class DispatcherReceiveHandler(byte[] programBytes, object machineIntegrationId) : HttpMessageHandler

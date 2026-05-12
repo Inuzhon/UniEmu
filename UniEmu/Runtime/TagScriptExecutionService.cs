@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
-using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
@@ -9,7 +9,9 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Hosting;
-using UniEmu.Runtime.Scripting.UserScripts;
+using UniEmu.Runtime.Scripting;
+using UniEmu.Runtime.Scripting.Environment;
+using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime;
 
@@ -17,31 +19,26 @@ public sealed class TagScriptExecutionService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
     TagRuntimeStateStore stateStore,
-    CompiledTagScriptCache scriptCache)
+    CompiledTagScriptCache scriptCache,
+    CsxScriptEnvironment scriptEnvironment,
+    CsxScriptDirectiveValidator directiveValidator,
+    CsxScriptSecurityValidator securityValidator)
 {
-    private static readonly Regex s_blockedDirective = new(
-        @"^\s*#\s*(r|using)\b",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-    private static readonly Regex s_loadDirective = new(
-        @"^\s*#\s*load\s+""(?<path>[^""]+)""",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-    private static readonly Regex s_finalReturnStatement = new(
-        @"\breturn\s+(?<expression>.+?)\s*;\s*$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
-
-    private static readonly ScriptOptions s_baseOptions = ScriptOptions.Default
-        .WithReferences(
-            typeof(object).Assembly,
-            typeof(Enumerable).Assembly,
-            typeof(DateTimeOffset).Assembly
-            //typeof(UniEmuJson).Assembly
-        )
-        .WithImports(
-            "System",
-            "System.Collections.Generic",
-            "System.Globalization",
-            "System.Linq",
-            "UniEmu.Runtime");
+    public TagScriptExecutionService(
+        UniEmuDbContext db,
+        CachedUniEmuDataService dataCache,
+        TagRuntimeStateStore stateStore,
+        CompiledTagScriptCache scriptCache)
+        : this(
+            db,
+            dataCache,
+            stateStore,
+            scriptCache,
+            new CsxScriptEnvironment(),
+            new CsxScriptDirectiveValidator(),
+            new CsxScriptSecurityValidator())
+    {
+    }
 
     public async Task<GeneratedTagValue> GenerateScriptTagAsync(
         EmulatorEntity emulator,
@@ -50,18 +47,20 @@ public sealed class TagScriptExecutionService(
         CancellationToken cancellationToken)
     {
         var script = await ResolveEntryScriptAsync(emulator.Id, tag, cancellationToken);
-        var entryContent = NormalizeEntryScriptContent(script.Content);
-        ValidateDirectives(entryContent);
+        var entryContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(script.Content);
+        directiveValidator.ValidateSupportedDirectives(entryContent);
 
         var scripts = await LoadVisibleScriptsAsync(emulator.Id, cancellationToken);
         scripts[script.Path] = entryContent;
-        DetectLoadCycles(script.Path, scripts);
+        directiveValidator.DetectLoadCycles(script.Path, scripts);
 
         var state = await GetOrCreateStateAsync(emulator.Id, script.StateKey, cancellationToken);
         var stateValues = UniEmuJson.Deserialize<Dictionary<string, object?>>(state.ValuesJson)
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var globals = BuildGlobals(emulator, tag, timestamp, stateValues);
-        var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, s_baseOptions, typeof(TagScriptGlobals));
+        var scriptOptions = scriptEnvironment.CreateScriptOptions(script.Path, scripts);
+        ValidateSecurity(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals), cancellationToken);
+        var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals));
         var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
         var result = scriptState.ReturnValue;
 
@@ -111,11 +110,37 @@ public sealed class TagScriptExecutionService(
         foreach (var script in scripts)
         {
             var path = TagScriptPath.Normalize(script.Name);
-            ValidateDirectives(script.Content);
+            directiveValidator.ValidateSupportedDirectives(script.Content);
             result[path] = script.Content;
         }
 
         return result;
+    }
+
+    private void ValidateSecurity(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        ScriptOptions options,
+        Type globalsType,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var script = CSharpScript.Create<object?>(
+            content,
+            options
+                .WithFilePath(TagScriptPath.Normalize(entryPath))
+                .WithSourceResolver(new DbScriptSourceResolver(visibleScripts)),
+            globalsType);
+
+        _ = script.Compile(cancellationToken);
+
+        var diagnostics = securityValidator.Validate(script.GetCompilation());
+        if (diagnostics.Count > 0)
+        {
+            throw new CsxScriptValidationException(diagnostics);
+        }
     }
 
     private async Task<ScriptRuntimeStateEntity> GetOrCreateStateAsync(
@@ -151,11 +176,12 @@ public sealed class TagScriptExecutionService(
         var values = emulator.Tags
             .Select(t =>
             {
-                var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
+                var tagType = UniEmuJson.EnumValue<TagType>(t.Type);
+                var scriptTagType = ToScriptValueType(tagType);
                 if (stateStore.TryGet(emulator.Id, t.Id, out var runtimeValue))
-                    return new TagScriptValue(t.Key, t.Name, runtimeValue.Value, tagType, runtimeValue.Timestamp);
+                    return new TagScriptValue(t.Key, t.Name, runtimeValue.Value, scriptTagType, runtimeValue.Timestamp);
 
-                return new TagScriptValue(t.Key, t.Name, ConvertPreview(t), tagType, timestamp);
+                return new TagScriptValue(t.Key, t.Name, ConvertPreview(t), scriptTagType, timestamp);
             })
             .GroupBy(value => value.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.OrderByDescending(x => x.Timestamp).First(), StringComparer.OrdinalIgnoreCase);
@@ -166,7 +192,7 @@ public sealed class TagScriptExecutionService(
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         return new TagScriptGlobals(
             scriptNow,
-            new TagScriptValue(tag.Key, tag.Name, previous, tagType, previous?.Timestamp),
+            new TagScriptValue(tag.Key, tag.Name, previous?.Value, ToScriptValueType(tagType), previous?.Timestamp),
             new TagScriptTagAccessor(
                 values,
                 (tagName, value) => SetStaticTag(emulator, tagName, value, timestamp)),
@@ -176,10 +202,35 @@ public sealed class TagScriptExecutionService(
                 previous?.Value,
                 previous?.NumericValue,
                 previous?.Timestamp,
-                new Dictionary<string, TagScriptValue>()//stateValues
+                ToScriptStateValues(stateValues)
             )
         );
     }
+
+    private static Dictionary<string, TagScriptValue> ToScriptStateValues(Dictionary<string, object?> stateValues)
+    {
+        return stateValues.ToDictionary(
+            value => value.Key,
+            value => new TagScriptValue(value.Key, value.Key, value.Value, ToScriptValueType(value.Value), null),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static TagScriptValueType ToScriptValueType(object? value) => value switch
+    {
+        bool => TagScriptValueType.Bool,
+        byte or short or int or long => TagScriptValueType.Int,
+        float or double or decimal => TagScriptValueType.Double,
+        _ => TagScriptValueType.String,
+    };
+
+    private static TagScriptValueType ToScriptValueType(TagType type) => type switch
+    {
+        TagType.Bool => TagScriptValueType.Bool,
+        TagType.Int => TagScriptValueType.Int,
+        TagType.Double => TagScriptValueType.Double,
+        TagType.String => TagScriptValueType.String,
+        _ => TagScriptValueType.String,
+    };
 
     private object? SetStaticTag(EmulatorEntity emulator, string tagName, object? value, DateTimeOffset timestamp)
     {
@@ -202,67 +253,6 @@ public sealed class TagScriptExecutionService(
         stateStore.Set(emulator.Id, tag.Id, tag.Name, typedValue, TelemetryValueGenerator.ToNumericValue(typedValue), timestamp);
 
         return typedValue;
-    }
-
-    private static void ValidateDirectives(string content)
-    {
-        var match = s_blockedDirective.Match(content);
-        if (match.Success)
-            throw new InvalidOperationException($"Unsupported script directive '{match.Value.Trim()}'. Use #load for shared scripts.");
-    }
-
-    private static string NormalizeEntryScriptContent(string content)
-    {
-        var match = s_finalReturnStatement.Match(content);
-        return match.Success
-            ? content[..match.Index] + match.Groups["expression"].Value
-            : content;
-    }
-
-    private static void DetectLoadCycles(string entryPath, IReadOnlyDictionary<string, string> scripts)
-    {
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var stack = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        Visit(TagScriptPath.Normalize(entryPath), visited, stack, scripts);
-    }
-
-    private static void Visit(
-        string path,
-        HashSet<string> visited,
-        HashSet<string> stack,
-        IReadOnlyDictionary<string, string> scripts)
-    {
-        if (stack.Contains(path))
-            throw new InvalidOperationException($"Cyclic #load detected at '{path}'.");
-
-        if (!visited.Add(path) || !scripts.TryGetValue(path, out var content))
-            return;
-
-        stack.Add(path);
-        foreach (Match match in s_loadDirective.Matches(content))
-        {
-            var loadPath = ResolveLoadPath(match.Groups["path"].Value, path, scripts);
-            if (loadPath is null)
-                continue;
-
-            Visit(loadPath, visited, stack, scripts);
-        }
-
-        stack.Remove(path);
-    }
-
-    private static string? ResolveLoadPath(string path, string baseFilePath, IReadOnlyDictionary<string, string> scripts)
-    {
-        var normalized = TagScriptPath.Normalize(path);
-        if (scripts.ContainsKey(normalized))
-            return normalized;
-
-        var baseDir = Path.GetDirectoryName(baseFilePath.Replace('\\', '/'))?.Replace('\\', '/');
-        if (string.IsNullOrWhiteSpace(baseDir))
-            return null;
-
-        var relative = TagScriptPath.Normalize($"{baseDir}/{path}");
-        return scripts.ContainsKey(relative) ? relative : null;
     }
 
     private static object? CastResult(TagType tagType, object? result, string preview)

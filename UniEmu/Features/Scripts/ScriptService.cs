@@ -8,7 +8,7 @@ using UniEmu.Domain.Entities;
 using UniEmu.Mapping;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
-using UniEmu.Runtime.Scripting.UserScripts;
+using UniEmu.Scripting.Api;
 
 namespace UniEmu.Features.Scripts;
 
@@ -143,7 +143,7 @@ public sealed class ScriptService(
 
         visibleScripts[TagScriptPath.Normalize(nextName)] = nextContent;
 
-        var result = language.Analyze(nextName, nextContent, visibleScripts, typeof(TagScriptGlobals));
+        var result = await language.AnalyzeAsync(nextName, nextContent, visibleScripts, typeof(TagScriptGlobals), cancellationToken);
         var errors = result.Diagnostics
             .Where(diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error)
             .ToArray();

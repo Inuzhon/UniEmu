@@ -61,6 +61,114 @@ public sealed class IntellisenseController(CsxIntellisenseService service) : Con
         return Ok(await service.GetSignatureHelpAsync(ClampPosition(request), cancellationToken));
     }
 
+    [HttpPost("definition")]
+    public async Task<ActionResult<IReadOnlyList<CsxLocation>>> Definition(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetDefinitionsAsync(ClampPosition(request), cancellationToken));
+    }
+
+    [HttpPost("type-definition")]
+    public async Task<ActionResult<IReadOnlyList<CsxLocation>>> TypeDefinition(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetTypeDefinitionsAsync(ClampPosition(request), cancellationToken));
+    }
+
+    [HttpPost("references")]
+    public async Task<ActionResult<IReadOnlyList<CsxLocation>>> References(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetReferencesAsync(ClampPosition(request), cancellationToken));
+    }
+
+    [HttpPost("implementation")]
+    public async Task<ActionResult<IReadOnlyList<CsxLocation>>> Implementation(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetImplementationsAsync(ClampPosition(request), cancellationToken));
+    }
+
+    [HttpPost("rename")]
+    public async Task<ActionResult<CsxWorkspaceEdit?>> Rename(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.RenameAsync(ClampPosition(request), cancellationToken));
+    }
+
+    [HttpPost("format")]
+    public async Task<ActionResult<IReadOnlyList<CsxTextEdit>>> Format(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.FormatDocumentAsync(request, cancellationToken));
+    }
+
+    [HttpPost("format-range")]
+    public async Task<ActionResult<IReadOnlyList<CsxTextEdit>>> FormatRange(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.FormatRangeAsync(request, cancellationToken));
+    }
+
+    [HttpPost("folding-ranges")]
+    public async Task<ActionResult<IReadOnlyList<CsxFoldingRange>>> FoldingRanges(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetFoldingRangesAsync(request, cancellationToken));
+    }
+
+    [HttpPost("semantic-tokens")]
+    public async Task<ActionResult<CsxSemanticTokens>> SemanticTokens(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetSemanticTokensAsync(request, cancellationToken));
+    }
+
+    [HttpPost("call-hierarchy/prepare")]
+    public async Task<ActionResult<IReadOnlyList<CsxCallHierarchyItem>>> PrepareCallHierarchy(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.PrepareCallHierarchyAsync(ClampPosition(request), cancellationToken));
+    }
+
+    [HttpPost("call-hierarchy/incoming")]
+    public async Task<ActionResult<IReadOnlyList<CsxCallHierarchyIncomingCall>>> IncomingCalls(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetIncomingCallsAsync(ClampPosition(request), cancellationToken));
+    }
+
+    [HttpPost("call-hierarchy/outgoing")]
+    public async Task<ActionResult<IReadOnlyList<CsxCallHierarchyOutgoingCall>>> OutgoingCalls(
+        CsxIntellisenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (IsSourceTooLarge(request)) return BadRequest("Source code is too large.");
+        return Ok(await service.GetOutgoingCallsAsync(ClampPosition(request), cancellationToken));
+    }
+
     private static bool IsSourceTooLarge(CsxIntellisenseRequest request)
     {
         return request.SourceCode?.Length > MaxSourceCodeLength;

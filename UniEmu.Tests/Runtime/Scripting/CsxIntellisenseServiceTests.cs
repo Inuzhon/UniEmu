@@ -40,6 +40,61 @@ public sealed class CsxIntellisenseServiceTests
         Assert.Contains(completions, item => item.Label == "LoadedHelper");
     }
 
+    [Fact]
+    public async Task GetCompletionsAsync_ParsesEncodedInlineDocumentUriAndReturnsUniEmuMembers()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+
+        var completions = await service.GetCompletionsAsync(new CsxIntellisenseRequest(
+            "UniEmu.",
+            "uniemu://scripts/tg-f75b656d2/inline/tg-f75b656d2.csx?name%3Dinline%2Ftg-f75b656d2.csx%26scope%3Demulator%26emulatorId%3Dem-1",
+            new CsxEditorPosition(1, 8)), CancellationToken.None);
+
+        Assert.Contains(completions, item => item.Label == "Tag");
+        Assert.Contains(completions, item => item.Label == "Tags");
+        Assert.Contains(completions, item => item.Label == "State");
+        Assert.Contains(completions, item => item.Label == "Emulator");
+    }
+
+    [Fact]
+    public async Task GetReferencesAsync_UsesVisibleLoadedScripts()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+        const string source = "#load \"common.csx\"\nreturn LoadedHelper(2);";
+
+        var references = await service.GetReferencesAsync(new CsxIntellisenseRequest(
+            source,
+            "uniemu://scripts/scr-machine/machine.csx?name=machine.csx&scope=emulator&emulatorId=em-1",
+            new CsxEditorPosition(2, 13)), CancellationToken.None);
+
+        Assert.Contains(references, reference => reference.DocumentPath == "common.csx");
+        Assert.Contains(references, reference => reference.DocumentPath.StartsWith("uniemu://scripts/scr-machine", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RenameAsync_ReturnsOnlyRequestDocumentEdits()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+        const string source = "int LocalValue() => 1;\nreturn LocalValue();";
+
+        var edit = await service.RenameAsync(new CsxIntellisenseRequest(
+            source,
+            "uniemu://scripts/scr-machine/machine.csx?name=machine.csx&scope=emulator&emulatorId=em-1",
+            new CsxEditorPosition(2, 10),
+            NewName: "RenamedValue"), CancellationToken.None);
+
+        Assert.NotNull(edit);
+        var documentEdit = Assert.Single(edit.DocumentEdits);
+        Assert.Equal("uniemu://scripts/scr-machine/machine.csx?name=machine.csx&scope=emulator&emulatorId=em-1", documentEdit.DocumentPath);
+        Assert.Equal(2, documentEdit.Edits.Count);
+    }
+
     private sealed class IntellisenseDbFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
