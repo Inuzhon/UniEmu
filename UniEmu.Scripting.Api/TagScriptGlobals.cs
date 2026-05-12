@@ -26,8 +26,17 @@ public sealed class TagScriptGlobals
     /// <param name="tags">Доступ к значениям других тегов.</param>
     /// <param name="emulator">Контекст эмулятора, в котором выполняется скрипт.</param>
     /// <param name="state">Состояние скрипта между вычислениями.</param>
-    /// <param name="rest">Configured REST operations available to user scripts.</param>
     public TagScriptGlobals(
+        DateTimeOffset now,
+        TagScriptValue tag,
+        TagScriptTagAccessor tags,
+        TagScriptEmulatorContext emulator,
+        TagScriptStateContext state)
+        : this(now, tag, tags, emulator, state, null)
+    {
+    }
+
+    internal TagScriptGlobals(
         DateTimeOffset now,
         TagScriptValue tag,
         TagScriptTagAccessor tags,
@@ -83,8 +92,16 @@ public sealed class UniEmuScriptContext
     /// <param name="state">Состояние скрипта между вычислениями.</param>
     /// <param name="tag">Текущий вычисляемый тег.</param>
     /// <param name="tags">Доступ к значениям тегов.</param>
-    /// <param name="rest">Configured REST operations available to user scripts.</param>
     public UniEmuScriptContext(
+        TagScriptEmulatorContext emulator,
+        TagScriptStateContext state,
+        TagScriptValue tag,
+        TagScriptTagAccessor tags)
+        : this(emulator, state, tag, tags, null)
+    {
+    }
+
+    internal UniEmuScriptContext(
         TagScriptEmulatorContext emulator,
         TagScriptStateContext state,
         TagScriptValue tag,

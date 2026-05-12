@@ -8,4 +8,9 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="UniEmu" />
+    <InternalsVisibleTo Include="UniEmu.Tests" />
+  </ItemGroup>
+
 </Project>

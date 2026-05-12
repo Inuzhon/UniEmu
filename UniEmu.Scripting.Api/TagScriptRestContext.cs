@@ -9,15 +9,15 @@ public sealed class TagScriptRestContext
     private readonly ITagScriptRestOperations operations;
     private readonly CancellationToken cancellationToken;
 
-    public TagScriptRestContext(ITagScriptRestOperations operations, CancellationToken cancellationToken = default)
+    internal TagScriptRestContext(ITagScriptRestOperations operations, CancellationToken cancellationToken = default)
     {
         this.operations = operations;
         this.cancellationToken = cancellationToken;
     }
 
-    public static TagScriptRestContext Disabled { get; } = CreateDisabled();
+    internal static TagScriptRestContext Disabled { get; } = CreateDisabled();
 
-    public static TagScriptRestContext CreateDisabled(CancellationToken cancellationToken = default)
+    internal static TagScriptRestContext CreateDisabled(CancellationToken cancellationToken = default)
     {
         return new TagScriptRestContext(new DisabledRestOperations(), cancellationToken);
     }

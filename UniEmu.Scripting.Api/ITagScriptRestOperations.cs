@@ -1,6 +1,6 @@
 namespace UniEmu.Scripting.Api;
 
-public interface ITagScriptRestOperations
+internal interface ITagScriptRestOperations
 {
     Task<Worker?> GetWorkerByIdAsync(int workerId, CancellationToken cancellationToken);
 

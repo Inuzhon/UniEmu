@@ -295,6 +295,37 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_RejectsRestContextConstructionFromScript()
+    {
+        var service = new CsxLanguageService();
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "return new TagScriptRestContext(null!);",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_RejectsRestOperationsPortFromScript()
+    {
+        var service = new CsxLanguageService();
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "ITagScriptRestOperations rest = null!; return 0;",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals),
+            typeof(int));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public async Task GetCompletionsAsync_ReturnsMarkedScriptingApiMembers()
     {
         var service = new CsxLanguageService();
