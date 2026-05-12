@@ -392,5 +392,4 @@ IndustryTestProject/ConnectTest.cs
 **/dockerfiles/result/
 
 # UniEmu local SQLite database
-UniEmu/uniemu.db*
-/docs
+uniemu.db*
