@@ -241,6 +241,60 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task GetCompletionsAsync_ReturnsRestForUniEmuGlobal()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "UniEmu.",
+            7,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(completions, item => item.Label == "Rest");
+    }
+
+    [Fact]
+    public async Task GetCompletionsAsync_ReturnsRestOperationMembers()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "UniEmu.Rest.",
+            12,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(completions, item => item.Label == "GetWorkerByIdAsync");
+        Assert.Contains(completions, item => item.Label == "GetActiveWorkerAsync");
+        Assert.Contains(completions, item => item.Label == "RegisterWorkerAsync");
+        Assert.Contains(completions, item => item.Label == "TryRegisterWorkerAsync");
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_AcceptsAwaitedRestOperationAndWorkerMembers()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            var worker = await UniEmu.Rest.GetWorkerByIdAsync(123);
+            return worker is not null && worker.IsActive
+                ? worker.Id
+                : -1;
+            """;
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals),
+            typeof(int));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public async Task GetCompletionsAsync_ReturnsMarkedScriptingApiMembers()
     {
         var service = new CsxLanguageService();

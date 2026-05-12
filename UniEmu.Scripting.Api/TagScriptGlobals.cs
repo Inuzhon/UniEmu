@@ -26,15 +26,17 @@ public sealed class TagScriptGlobals
     /// <param name="tags">Доступ к значениям других тегов.</param>
     /// <param name="emulator">Контекст эмулятора, в котором выполняется скрипт.</param>
     /// <param name="state">Состояние скрипта между вычислениями.</param>
+    /// <param name="rest">Configured REST operations available to user scripts.</param>
     public TagScriptGlobals(
         DateTimeOffset now,
         TagScriptValue tag,
         TagScriptTagAccessor tags,
         TagScriptEmulatorContext emulator,
-        TagScriptStateContext state)
+        TagScriptStateContext state,
+        TagScriptRestContext? rest = null)
     {
         Now = now;
-        UniEmu = new UniEmuScriptContext(emulator, state, tag, tags);
+        UniEmu = new UniEmuScriptContext(emulator, state, tag, tags, rest);
     }
 }
 
@@ -69,21 +71,30 @@ public sealed class UniEmuScriptContext
     public TagScriptTagAccessor Tags { get; }
 
     /// <summary>
+    /// Configured REST operations available to user scripts.
+    /// </summary>
+    [ScriptingApi]
+    public TagScriptRestContext Rest { get; }
+
+    /// <summary>
     /// Создает контекст UniEmu для выполнения скрипта тега.
     /// </summary>
     /// <param name="emulator">Эмулятор, для которого выполняется скрипт.</param>
     /// <param name="state">Состояние скрипта между вычислениями.</param>
     /// <param name="tag">Текущий вычисляемый тег.</param>
     /// <param name="tags">Доступ к значениям тегов.</param>
+    /// <param name="rest">Configured REST operations available to user scripts.</param>
     public UniEmuScriptContext(
         TagScriptEmulatorContext emulator,
         TagScriptStateContext state,
         TagScriptValue tag,
-        TagScriptTagAccessor tags)
+        TagScriptTagAccessor tags,
+        TagScriptRestContext? rest = null)
     {
         Emulator = emulator;
         State = state;
         Tag = tag;
         Tags = tags;
+        Rest = rest ?? TagScriptRestContext.Disabled;
     }
 }
