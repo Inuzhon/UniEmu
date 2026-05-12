@@ -7,6 +7,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Runtime;
+using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Tests.Runtime;
 
@@ -77,6 +78,21 @@ public sealed class TagScriptExecutionServiceTests
 
         var state = await db.ScriptRuntimeStates.SingleAsync(s => s.EmulatorId == "em-1" && s.ScriptKey == "inline:tg-stateful");
         Assert.Contains("\"count\":2", state.ValuesJson);
+    }
+
+    [Fact]
+    public async Task GenerateScriptTagAsync_BlocksForbiddenRuntimeApi()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db, new TagRuntimeStateStore());
+        var (emulator, tag) = await LoadAsync(db, "tg-forbidden-api");
+
+        var exception = await Assert.ThrowsAsync<CsxScriptValidationException>(() =>
+            service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None));
+
+        Assert.Contains(exception.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "SEC003");
     }
 
     private static TagScriptExecutionService CreateService(UniEmuDbContext db, TagRuntimeStateStore stateStore)
@@ -181,6 +197,12 @@ public sealed class TagScriptExecutionServiceTests
                     UniEmu.State.Set("count", count);
                     return count;
                     """),
+                CreateScriptTag(
+                    "tg-forbidden-api",
+                    "Forbidden API",
+                    "forbidden-api",
+                    TagType.String,
+                    "return System.Environment.GetEnvironmentVariable(\"UNIEMU_SECRET\");"),
                 CreateTag("tg-pressure", "Pressure", "pressure", TagType.Double, TagSource.Static, "12.5"),
                 CreateTag("tg-enabled", "Enabled", "enabled", TagType.Bool, TagSource.Static, "true"),
                 CreateTag("tg-label", "Label", "label", TagType.String, TagSource.Static, "abc"),

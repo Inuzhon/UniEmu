@@ -51,6 +51,55 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_ReturnsSecurityDiagnostic_WhenScriptCallsForbiddenApi()
+    {
+        var service = new CsxLanguageService();
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "return System.IO.File.ReadAllText(\"secret.txt\");",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "SEC003");
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsSecurityDiagnostic_WhenLoadedScriptUsesForbiddenType()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["shared/unsafe.csx"] = "var client = new System.Net.Http.HttpClient();",
+        };
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "#load \"shared/unsafe.csx\"\nreturn 0;",
+            visibleScripts,
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "SEC002");
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsSecurityDiagnostic_WhenScriptUsesUnsafeCode()
+    {
+        var service = new CsxLanguageService();
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "unsafe { int value = 1; int* pointer = &value; return *pointer; }",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "SEC001");
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_AllowsPublicTopLevelHelperMethod()
     {
         var service = new CsxLanguageService();

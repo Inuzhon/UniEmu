@@ -158,6 +158,7 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<CsxScriptEnvironment>().AsSelf().SingleInstance();
     container.RegisterType<CsxLoadedScriptExpander>().AsSelf().SingleInstance();
     container.RegisterType<CsxScriptDirectiveValidator>().AsSelf().SingleInstance();
+    container.RegisterType<CsxScriptSecurityValidator>().AsSelf().SingleInstance();
     container.RegisterType<CsxRoslynContextFactory>().AsSelf().SingleInstance();
     container.RegisterType<CsxDiagnosticsService>().AsSelf().SingleInstance();
     container.RegisterType<CsxCompletionService>().AsSelf().SingleInstance();

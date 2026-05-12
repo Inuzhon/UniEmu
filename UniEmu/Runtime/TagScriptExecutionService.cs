@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
@@ -20,7 +21,8 @@ public sealed class TagScriptExecutionService(
     TagRuntimeStateStore stateStore,
     CompiledTagScriptCache scriptCache,
     CsxScriptEnvironment scriptEnvironment,
-    CsxScriptDirectiveValidator directiveValidator)
+    CsxScriptDirectiveValidator directiveValidator,
+    CsxScriptSecurityValidator securityValidator)
 {
     public TagScriptExecutionService(
         UniEmuDbContext db,
@@ -33,7 +35,8 @@ public sealed class TagScriptExecutionService(
             stateStore,
             scriptCache,
             new CsxScriptEnvironment(),
-            new CsxScriptDirectiveValidator())
+            new CsxScriptDirectiveValidator(),
+            new CsxScriptSecurityValidator())
     {
     }
 
@@ -56,6 +59,7 @@ public sealed class TagScriptExecutionService(
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var globals = BuildGlobals(emulator, tag, timestamp, stateValues);
         var scriptOptions = scriptEnvironment.CreateScriptOptions(script.Path, scripts);
+        ValidateSecurity(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals), cancellationToken);
         var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals));
         var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
         var result = scriptState.ReturnValue;
@@ -111,6 +115,32 @@ public sealed class TagScriptExecutionService(
         }
 
         return result;
+    }
+
+    private void ValidateSecurity(
+        string entryPath,
+        string content,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        ScriptOptions options,
+        Type globalsType,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var script = CSharpScript.Create<object?>(
+            content,
+            options
+                .WithFilePath(TagScriptPath.Normalize(entryPath))
+                .WithSourceResolver(new DbScriptSourceResolver(visibleScripts)),
+            globalsType);
+
+        _ = script.Compile(cancellationToken);
+
+        var diagnostics = securityValidator.Validate(script.GetCompilation());
+        if (diagnostics.Count > 0)
+        {
+            throw new CsxScriptValidationException(diagnostics);
+        }
     }
 
     private async Task<ScriptRuntimeStateEntity> GetOrCreateStateAsync(

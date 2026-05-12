@@ -8,10 +8,17 @@ namespace UniEmu.Runtime.Scripting.Services;
 public sealed class CsxDiagnosticsService
 {
     private readonly CsxScriptEnvironment environment;
+    private readonly CsxScriptSecurityValidator securityValidator;
 
     public CsxDiagnosticsService(CsxScriptEnvironment environment)
+        : this(environment, new CsxScriptSecurityValidator())
+    {
+    }
+
+    public CsxDiagnosticsService(CsxScriptEnvironment environment, CsxScriptSecurityValidator securityValidator)
     {
         this.environment = environment;
+        this.securityValidator = securityValidator;
     }
 
     public Task<IReadOnlyList<CsxDiagnostic>> AnalyzeAsync(
@@ -28,8 +35,13 @@ public sealed class CsxDiagnosticsService
         var options = environment.CreateScriptOptions(entryPath, visibleScripts);
         var script = CreateScript(normalizedContent, options, globalsType, expectedReturnType);
 
-        IReadOnlyList<CsxDiagnostic> diagnostics = script.Compile(cancellationToken)
+        var compilerDiagnostics = script.Compile(cancellationToken)
             .Select(ToCsxDiagnostic)
+            .ToList();
+        var securityDiagnostics = securityValidator.Validate(script.GetCompilation());
+
+        IReadOnlyList<CsxDiagnostic> diagnostics = compilerDiagnostics
+            .Concat(securityDiagnostics)
             .ToList();
 
         return Task.FromResult(diagnostics);
