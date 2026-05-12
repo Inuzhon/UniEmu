@@ -1,0 +1,109 @@
+stages:
+  - test
+  - package
+  - publish
+
+variables:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  DOTNET_NOLOGO: "1"
+  NUGET_PACKAGES: "$CI_PROJECT_DIR/.nuget/packages"
+  BUILD_CONFIGURATION: "Release"
+  DOCKER_TLS_CERTDIR: "/certs"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .nuget/packages/
+    - UniEmu.Client/node_modules/
+    - UniEmu.Client/.yarn-cache/
+
+.dotnet_node:
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends curl ca-certificates gnupg zip
+    - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    - apt-get install -y --no-install-recommends nodejs
+    - npm install -g yarn@1.22.22
+    - rm -rf /var/lib/apt/lists/*
+    - dotnet --info
+    - node --version
+    - yarn --version
+
+build_and_test:
+  extends: .dotnet_node
+  stage: test
+  script:
+    - dotnet restore UniEmu.Tests/UniEmu.Tests.csproj
+    - dotnet build UniEmu.Tests/UniEmu.Tests.csproj --no-restore -c "$BUILD_CONFIGURATION" -nr:false -p:UseSharedCompilation=false -p:SkipYarnBuild=True /v:minimal
+    - dotnet test UniEmu.Tests/UniEmu.Tests.csproj --no-build -c "$BUILD_CONFIGURATION" -nr:false -p:UseSharedCompilation=false -p:SkipYarnBuild=True --logger "trx;LogFileName=uniemu-tests.trx" --results-directory TestResults
+    - cd UniEmu.Client
+    - yarn install --frozen-lockfile --cache-folder .yarn-cache
+    - yarn build
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - TestResults/
+
+windows_archive:
+  extends: .dotnet_node
+  stage: package
+  needs:
+    - build_and_test
+  script:
+    - cd UniEmu.Client
+    - yarn install --frozen-lockfile --cache-folder .yarn-cache
+    - yarn build
+    - cd "$CI_PROJECT_DIR"
+    - rm -rf UniEmu/wwwroot artifacts
+    - mkdir -p UniEmu/wwwroot artifacts/windows/UniEmu
+    - cp -R UniEmu.Client/dist/. UniEmu/wwwroot/
+    - dotnet restore UniEmu/UniEmu.csproj -r win-x64
+    - dotnet publish UniEmu/UniEmu.csproj -c "$BUILD_CONFIGURATION" -r win-x64 --self-contained false --no-restore -o artifacts/windows/UniEmu -p:SkipYarnBuild=True
+    - cd artifacts/windows
+    - zip -r "../UniEmu-win-x64-${CI_COMMIT_SHORT_SHA}.zip" UniEmu
+  artifacts:
+    name: "UniEmu-win-x64-${CI_COMMIT_SHORT_SHA}"
+    expire_in: 30 days
+    paths:
+      - artifacts/UniEmu-win-x64-*.zip
+
+docker_image:
+  image: docker:27
+  stage: publish
+  services:
+    - name: docker:27-dind
+      alias: docker
+  needs:
+    - build_and_test
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  before_script:
+    - docker version
+  script:
+    - IMAGE_REPOSITORY="${LOCAL_DOCKER_REGISTRY_IMAGE:-$CI_REGISTRY_IMAGE}"
+    - IMAGE_TAG="${IMAGE_REPOSITORY}:${CI_COMMIT_SHORT_SHA}"
+    - BRANCH_TAG="${IMAGE_REPOSITORY}:${CI_COMMIT_REF_SLUG}"
+    - |
+      if [ -n "${LOCAL_DOCKER_REGISTRY:-$CI_REGISTRY}" ]; then
+        REGISTRY_HOST="${LOCAL_DOCKER_REGISTRY:-$CI_REGISTRY}"
+        REGISTRY_USER="${LOCAL_DOCKER_REGISTRY_USER:-$CI_REGISTRY_USER}"
+        REGISTRY_PASSWORD="${LOCAL_DOCKER_REGISTRY_PASSWORD:-$CI_REGISTRY_PASSWORD}"
+        if [ -n "$REGISTRY_USER" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+          echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_HOST" -u "$REGISTRY_USER" --password-stdin
+        fi
+      fi
+    - docker build --pull --build-arg BUILD_CONFIGURATION="$BUILD_CONFIGURATION" -f UniEmu/Dockerfile -t "$IMAGE_TAG" -t "$BRANCH_TAG" .
+    - docker push "$IMAGE_TAG"
+    - docker push "$BRANCH_TAG"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        docker tag "$IMAGE_TAG" "${IMAGE_REPOSITORY}:latest"
+        docker push "${IMAGE_REPOSITORY}:latest"
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH

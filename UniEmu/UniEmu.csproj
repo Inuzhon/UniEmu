@@ -40,7 +40,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UniEmu.Scripting.Api\UniEmu.Scripting.Api.csproj" />
-    <ProjectReference Include="..\UniEmu.Client\UniEmu.Client.esproj">
+    <ProjectReference Include="..\UniEmu.Client\UniEmu.Client.esproj" Condition="'$(SkipYarnBuild)'!='True'">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>

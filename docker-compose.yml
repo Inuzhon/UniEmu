@@ -1,0 +1,24 @@
+services:
+  uniemu:
+    image: ${UNIEMU_IMAGE:-uniemu:local}
+    build:
+      context: .
+      dockerfile: UniEmu/Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIGURATION:-Release}
+    container_name: ${UNIEMU_CONTAINER_NAME:-uniemu}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      UniEmu__Port: "5083"
+      UniEmu__TimeZone: ${UNIEMU_TIME_ZONE:-Europe/Moscow}
+      ConnectionStrings__UniEmuDb: ${UNIEMU_DB_CONNECTION:-Data Source=/app/data/uniemu.db}
+    ports:
+      - "${UNIEMU_PORT:-5083}:5083"
+    volumes:
+      - uniemu-data:/app/data
+      - uniemu-logs:/app/Logs
+
+volumes:
+  uniemu-data:
+  uniemu-logs:
