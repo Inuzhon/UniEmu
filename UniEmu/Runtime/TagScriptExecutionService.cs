@@ -15,14 +15,7 @@ using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime;
 
-public sealed class TagScriptExecutionService(
-    UniEmuDbContext db,
-    CachedUniEmuDataService dataCache,
-    TagRuntimeStateStore stateStore,
-    CompiledTagScriptCache scriptCache,
-    CsxScriptEnvironment scriptEnvironment,
-    CsxScriptDirectiveValidator directiveValidator,
-    CsxScriptSecurityValidator securityValidator)
+public sealed class TagScriptExecutionService
 {
     public TagScriptExecutionService(
         UniEmuDbContext db,
@@ -39,6 +32,65 @@ public sealed class TagScriptExecutionService(
             new CsxScriptSecurityValidator())
     {
     }
+
+    public TagScriptExecutionService(
+        UniEmuDbContext db,
+        CachedUniEmuDataService dataCache,
+        TagRuntimeStateStore stateStore,
+        CompiledTagScriptCache scriptCache,
+        CsxScriptEnvironment scriptEnvironment,
+        CsxScriptDirectiveValidator directiveValidator,
+        CsxScriptSecurityValidator securityValidator)
+        : this(db, dataCache, stateStore, scriptCache, scriptEnvironment, directiveValidator, securityValidator, null)
+    {
+    }
+
+    internal TagScriptExecutionService(
+        UniEmuDbContext db,
+        CachedUniEmuDataService dataCache,
+        TagRuntimeStateStore stateStore,
+        CompiledTagScriptCache scriptCache,
+        ITagScriptRestOperations? restOperations)
+        : this(
+            db,
+            dataCache,
+            stateStore,
+            scriptCache,
+            new CsxScriptEnvironment(),
+            new CsxScriptDirectiveValidator(),
+            new CsxScriptSecurityValidator(),
+            restOperations)
+    {
+    }
+
+    internal TagScriptExecutionService(
+        UniEmuDbContext db,
+        CachedUniEmuDataService dataCache,
+        TagRuntimeStateStore stateStore,
+        CompiledTagScriptCache scriptCache,
+        CsxScriptEnvironment scriptEnvironment,
+        CsxScriptDirectiveValidator directiveValidator,
+        CsxScriptSecurityValidator securityValidator,
+        ITagScriptRestOperations? restOperations)
+    {
+        this.db = db;
+        this.dataCache = dataCache;
+        this.stateStore = stateStore;
+        this.scriptCache = scriptCache;
+        this.scriptEnvironment = scriptEnvironment;
+        this.directiveValidator = directiveValidator;
+        this.securityValidator = securityValidator;
+        this.restOperations = restOperations;
+    }
+
+    private readonly UniEmuDbContext db;
+    private readonly CachedUniEmuDataService dataCache;
+    private readonly TagRuntimeStateStore stateStore;
+    private readonly CompiledTagScriptCache scriptCache;
+    private readonly CsxScriptEnvironment scriptEnvironment;
+    private readonly CsxScriptDirectiveValidator directiveValidator;
+    private readonly CsxScriptSecurityValidator securityValidator;
+    private readonly ITagScriptRestOperations? restOperations;
 
     public async Task<GeneratedTagValue> GenerateScriptTagAsync(
         EmulatorEntity emulator,
@@ -57,7 +109,7 @@ public sealed class TagScriptExecutionService(
         var state = await GetOrCreateStateAsync(emulator.Id, script.StateKey, cancellationToken);
         var stateValues = UniEmuJson.Deserialize<Dictionary<string, object?>>(state.ValuesJson)
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        var globals = BuildGlobals(emulator, tag, timestamp, stateValues);
+        var globals = BuildGlobals(emulator, tag, timestamp, stateValues, cancellationToken);
         var scriptOptions = scriptEnvironment.CreateScriptOptions(script.Path, scripts);
         ValidateSecurity(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals), cancellationToken);
         var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals));
@@ -171,7 +223,8 @@ public sealed class TagScriptExecutionService(
         EmulatorEntity emulator,
         EmulatorTagEntity tag,
         DateTimeOffset timestamp,
-        Dictionary<string, object?> stateValues)
+        Dictionary<string, object?> stateValues,
+        CancellationToken cancellationToken)
     {
         var values = emulator.Tags
             .Select(t =>
@@ -203,7 +256,10 @@ public sealed class TagScriptExecutionService(
                 previous?.NumericValue,
                 previous?.Timestamp,
                 ToScriptStateValues(stateValues)
-            )
+            ),
+            restOperations is null
+                ? TagScriptRestContext.CreateDisabled(cancellationToken)
+                : new TagScriptRestContext(restOperations, cancellationToken)
         );
     }
 

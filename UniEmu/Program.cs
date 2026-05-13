@@ -19,8 +19,10 @@ using UniEmu.Realtime;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
 using UniEmu.Runtime.Scripting.Environment;
+using UniEmu.Runtime.Scripting.Rest;
 using UniEmu.Runtime.Scripting.Services;
 using UniEmu.Runtime.Scripting.Workspace;
+using UniEmu.Scripting.Api;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 Activity.DefaultIdFormat = ActivityIdFormat.W3C;
@@ -67,6 +69,7 @@ builder.Services.AddHttpClient(nameof(TelemetryPacketSender), configure =>
 {
     ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
+builder.Services.AddHttpClient(nameof(TagScriptRestClient));
 
 if (!builder.Configuration.GetValue<bool>("UniEmu:DisableRuntime"))
 {
@@ -149,7 +152,17 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<RuntimeUpdateService>().AsSelf().InstancePerLifetimeScope();
     container.RegisterType<SignalRRuntimeUpdateBroadcaster>().As<IRuntimeUpdateBroadcaster>().InstancePerLifetimeScope();
     container.RegisterType<EmulatorScheduleService>().AsSelf().InstancePerLifetimeScope();
-    container.RegisterType<TagScriptExecutionService>().AsSelf().InstancePerLifetimeScope();
+    container.Register(context => new TagScriptExecutionService(
+            context.Resolve<UniEmuDbContext>(),
+            context.Resolve<CachedUniEmuDataService>(),
+            context.Resolve<TagRuntimeStateStore>(),
+            context.Resolve<CompiledTagScriptCache>(),
+            context.Resolve<CsxScriptEnvironment>(),
+            context.Resolve<CsxScriptDirectiveValidator>(),
+            context.Resolve<CsxScriptSecurityValidator>(),
+            context.ResolveOptional<ITagScriptRestOperations>()))
+        .AsSelf()
+        .InstancePerLifetimeScope();
     container.RegisterType<TagRuntimeStatePersistenceService>().AsSelf().InstancePerLifetimeScope();
 
     container.RegisterType<TelemetryValueGenerator>().AsSelf().SingleInstance();
@@ -168,4 +181,6 @@ static void RegisterUniEmuServices(ContainerBuilder container)
     container.RegisterType<CsxIntellisenseService>().AsSelf().InstancePerLifetimeScope();
 
     container.RegisterType<TelemetryPacketSender>().AsSelf().InstancePerDependency();
+    container.RegisterType<AppSettingsRestCatalogProvider>().As<IRestCatalogProvider>().SingleInstance();
+    container.RegisterType<TagScriptRestClient>().As<ITagScriptRestOperations>().InstancePerLifetimeScope();
 }

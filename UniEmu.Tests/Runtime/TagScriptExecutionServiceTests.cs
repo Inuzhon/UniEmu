@@ -8,6 +8,7 @@ using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
+using UniEmu.Scripting.Api;
 
 namespace UniEmu.Tests.Runtime;
 
@@ -95,13 +96,38 @@ public sealed class TagScriptExecutionServiceTests
             diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "SEC003");
     }
 
-    private static TagScriptExecutionService CreateService(UniEmuDbContext db, TagRuntimeStateStore stateStore)
+    [Fact]
+    public async Task GenerateScriptTagAsync_CanAwaitRestWorkerOperation()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(
+            db,
+            new TagRuntimeStateStore(),
+            new FakeRestOperations(new Worker { Id = 321, Name = "Active", Status = "Ready", IsActive = true }));
+        var (emulator, tag) = await LoadAsync(db, "tg-rest-worker");
+
+        var value = await service.GenerateScriptTagAsync(
+            emulator,
+            tag,
+            DateTimeOffset.Parse("2026-05-11T10:00:00Z"),
+            CancellationToken.None);
+
+        Assert.Equal(321, value.Value);
+        Assert.Equal(321d, value.NumericValue);
+    }
+
+    private static TagScriptExecutionService CreateService(
+        UniEmuDbContext db,
+        TagRuntimeStateStore stateStore,
+        ITagScriptRestOperations? restOperations = null)
     {
         return new TagScriptExecutionService(
             db,
             new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions())),
             stateStore,
-            new CompiledTagScriptCache());
+            new CompiledTagScriptCache(),
+            restOperations);
     }
 
     private static async Task<(EmulatorEntity Emulator, EmulatorTagEntity Tag)> LoadAsync(UniEmuDbContext db, string tagId)
@@ -203,6 +229,15 @@ public sealed class TagScriptExecutionServiceTests
                     "forbidden-api",
                     TagType.String,
                     "return System.Environment.GetEnvironmentVariable(\"UNIEMU_SECRET\");"),
+                CreateScriptTag(
+                    "tg-rest-worker",
+                    "Rest worker",
+                    "rest-worker",
+                    TagType.Int,
+                    """
+                    var worker = await UniEmu.Rest.GetActiveWorkerAsync();
+                    return worker?.Id ?? -1;
+                    """),
                 CreateTag("tg-pressure", "Pressure", "pressure", TagType.Double, TagSource.Static, "12.5"),
                 CreateTag("tg-enabled", "Enabled", "enabled", TagType.Bool, TagSource.Static, "true"),
                 CreateTag("tg-label", "Label", "label", TagType.String, TagSource.Static, "abc"),
@@ -239,6 +274,29 @@ public sealed class TagScriptExecutionServiceTests
                 TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
                 FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, script)),
             };
+        }
+    }
+
+    private sealed class FakeRestOperations(Worker activeWorker) : ITagScriptRestOperations
+    {
+        public Task<Worker?> GetWorkerByIdAsync(int workerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Worker?>(activeWorker.Id == workerId ? activeWorker : null);
+        }
+
+        public Task<Worker?> GetActiveWorkerAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Worker?>(activeWorker);
+        }
+
+        public Task RegisterWorkerAsync(int workerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<RestCallResult> TryRegisterWorkerAsync(int workerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(RestCallResult.Ok());
         }
     }
 }
