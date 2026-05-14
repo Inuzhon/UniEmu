@@ -1,8 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
 using Quartz.Impl.Matchers;
@@ -13,6 +13,7 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Features.Emulators;
+using UniEmu.Hosting;
 using UniEmu.Realtime;
 using UniEmu.Runtime;
 
@@ -161,7 +162,7 @@ public sealed class EmulatorServiceTests
             schedulerFactory.Object,
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             runtimeUpdateService);

@@ -5,6 +5,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Features.Common;
 using UniEmu.Mapping;
 
 namespace UniEmu.Features.CncPrograms;
@@ -14,7 +15,8 @@ namespace UniEmu.Features.CncPrograms;
 /// </summary>
 public sealed class CncProgramService(
     UniEmuDbContext db,
-    CachedUniEmuDataService dataCache)
+    CachedUniEmuDataService dataCache,
+    ScopedResourceValidator scopedResourceValidator)
 {
     /// <summary>
     /// Возвращает CNC-программы с учетом области видимости и эмулятора.
@@ -62,7 +64,7 @@ public sealed class CncProgramService(
     /// <returns>Созданная программа или <see langword="null"/>, если область видимости некорректна.</returns>
     public async Task<CncProgramDto?> CreateAsync(CreateCncProgramRequest request, CancellationToken cancellationToken)
     {
-        if (!await IsScopeValidAsync(request.Scope, request.EmulatorId, cancellationToken))
+        if (!await scopedResourceValidator.IsValidCncScopeAsync(request.Scope, request.EmulatorId, cancellationToken))
         {
             return null;
         }
@@ -142,14 +144,4 @@ public sealed class CncProgramService(
         return deleted > 0;
     }
 
-    private async Task<bool> IsScopeValidAsync(CncScope scope, string? emulatorId, CancellationToken cancellationToken)
-    {
-        return scope switch
-        {
-            CncScope.Shared => string.IsNullOrWhiteSpace(emulatorId),
-            CncScope.Emulator => !string.IsNullOrWhiteSpace(emulatorId)
-                && await db.Emulators.AnyAsync(e => e.Id == emulatorId, cancellationToken),
-            _ => false,
-        };
-    }
 }

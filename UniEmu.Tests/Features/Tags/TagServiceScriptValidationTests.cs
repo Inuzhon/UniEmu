@@ -1,8 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
 using UniEmu.Contracts.Dtos;
@@ -11,6 +11,7 @@ using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Features.Tags;
+using UniEmu.Hosting;
 using UniEmu.Realtime;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
@@ -57,7 +58,7 @@ public sealed class TagServiceScriptValidationTests
             Mock.Of<ISchedulerFactory>(),
             new TagRuntimeStateStore(),
             NullLogger<EmulatorScheduleService>.Instance,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, new TagRuntimeStateStore(), new CompiledTagScriptCache()),
             new RuntimeUpdateService(Mock.Of<IRuntimeUpdateBroadcaster>()));

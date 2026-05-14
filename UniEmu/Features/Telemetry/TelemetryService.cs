@@ -30,13 +30,17 @@ public sealed class TelemetryService(UniEmuDbContext db, RuntimeUpdateService ru
 
         var take = Math.Clamp(points <= 0 ? 60 : points, 1, 1000);
         var telemetry = await db.TelemetryPoints
+            .FromSqlInterpolated($"""
+                SELECT "Id", "EmulatorId", "Timestamp", "ValuesJson"
+                FROM "TelemetryPoints"
+                WHERE "EmulatorId" = {emulatorId}
+                ORDER BY "Timestamp" DESC
+                LIMIT {take}
+                """)
             .AsNoTracking()
-            .Where(t => t.EmulatorId == emulatorId)
             .ToListAsync(cancellationToken);
 
         return telemetry
-            .OrderByDescending(t => t.Timestamp)
-            .Take(take)
             .OrderBy(t => t.Timestamp)
             .Select(t => t.ToDto())
             .ToList();

@@ -24,14 +24,29 @@ public sealed class EventService(UniEmuDbContext db, RuntimeUpdateService runtim
     public async Task<IReadOnlyList<SystemEventDto>> ListAsync(DateTimeOffset? cursor, int limit, CancellationToken cancellationToken)
     {
         var take = Math.Clamp(limit <= 0 ? 50 : limit, 1, 200);
-        var events = await db.SystemEvents
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+        var events = cursor is null
+            ? await db.SystemEvents
+                .FromSqlInterpolated($"""
+                    SELECT "Id", "EmulatorId", "EmulatorName", "Level", "Message", "Timestamp"
+                    FROM "SystemEvents"
+                    ORDER BY "Timestamp" DESC
+                    LIMIT {take}
+                    """)
+                .AsNoTracking()
+                .ToListAsync(cancellationToken)
+            : await db.SystemEvents
+                .FromSqlInterpolated($"""
+                    SELECT "Id", "EmulatorId", "EmulatorName", "Level", "Message", "Timestamp"
+                    FROM "SystemEvents"
+                    WHERE "Timestamp" < {cursor.Value}
+                    ORDER BY "Timestamp" DESC
+                    LIMIT {take}
+                    """)
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
 
         return events
-            .Where(e => cursor is null || e.Timestamp < cursor)
             .OrderByDescending(e => e.Timestamp)
-            .Take(take)
             .Select(e => e.ToDto())
             .ToList();
     }

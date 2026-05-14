@@ -1,8 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
 using Quartz.Impl.Matchers;
@@ -11,6 +11,7 @@ using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Hosting;
 using UniEmu.Realtime;
 using UniEmu.Runtime;
 
@@ -44,7 +45,7 @@ public sealed class EmulatorScheduleServiceTests
             schedulerFactory.Object,
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
@@ -103,7 +104,7 @@ public sealed class EmulatorScheduleServiceTests
             schedulerFactory.Object,
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
@@ -138,7 +139,7 @@ public sealed class EmulatorScheduleServiceTests
             Mock.Of<ISchedulerFactory>(),
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
@@ -166,7 +167,7 @@ public sealed class EmulatorScheduleServiceTests
             Mock.Of<ISchedulerFactory>(),
             stateStore,
             NullLogger<EmulatorScheduleService>.Instance,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));

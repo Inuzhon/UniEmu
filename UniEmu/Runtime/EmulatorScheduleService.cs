@@ -1,11 +1,13 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Quartz;
+using Microsoft.Extensions.Options;
 using Quartz.Impl.Matchers;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Hosting;
 using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
@@ -16,7 +18,7 @@ public sealed class EmulatorScheduleService(
     ISchedulerFactory schedulerFactory,
     TagRuntimeStateStore stateStore,
     ILogger<EmulatorScheduleService> logger,
-    IConfiguration configuration,
+    IOptions<UniEmuOptions> options,
     TelemetryValueGenerator valueGenerator,
     TagScriptExecutionService scriptExecutionService,
     RuntimeUpdateService runtimeUpdateService)
@@ -74,7 +76,7 @@ public sealed class EmulatorScheduleService(
         }
 
         await SchedulePublishJobAsync(scheduler, emulator, cancellationToken);
-        await ScheduleDispatcherBlockCheckJobAsync(scheduler, emulator, GetDispatcherBlockCheckInterval(configuration), cancellationToken);
+        await ScheduleDispatcherBlockCheckJobAsync(scheduler, emulator, GetDispatcherBlockCheckInterval(options.Value), cancellationToken);
     }
 
     public async Task UnscheduleEmulatorAsync(string emulatorId, CancellationToken cancellationToken = default)
@@ -311,9 +313,8 @@ public sealed class EmulatorScheduleService(
         return parts.Length is 6 or 7 ? string.Join(' ', parts) : null;
     }
 
-    private static TimeSpan GetDispatcherBlockCheckInterval(IConfiguration configuration)
+    private static TimeSpan GetDispatcherBlockCheckInterval(UniEmuOptions options)
     {
-        var seconds = configuration.GetValue("UniEmu:DispatcherBlockCheckIntervalSeconds", 5);
-        return TimeSpan.FromSeconds(Math.Clamp(seconds, 5, 10));
+        return TimeSpan.FromSeconds(Math.Clamp(options.DispatcherBlockCheckIntervalSeconds, 5, 10));
     }
 }

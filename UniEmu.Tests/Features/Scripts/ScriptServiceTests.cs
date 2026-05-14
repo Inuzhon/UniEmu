@@ -5,6 +5,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Features.Common;
 using UniEmu.Features.Scripts;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
@@ -75,7 +76,12 @@ public sealed class ScriptServiceTests
     private static ScriptService CreateService(UniEmuDbContext db, CompiledTagScriptCache? compiledCache = null)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
-        return new ScriptService(db, new CachedUniEmuDataService(db, cache), new CsxLanguageService(), compiledCache ?? new CompiledTagScriptCache());
+        return new ScriptService(
+            db,
+            new CachedUniEmuDataService(db, cache),
+            new ScopedResourceValidator(db),
+            new CsxLanguageService(),
+            compiledCache ?? new CompiledTagScriptCache());
     }
 
     private sealed class ScriptDbFixture : IAsyncDisposable

@@ -5,6 +5,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Features.Common;
 using UniEmu.Mapping;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
@@ -18,6 +19,7 @@ namespace UniEmu.Features.Scripts;
 public sealed class ScriptService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
+    ScopedResourceValidator scopedResourceValidator,
     CsxLanguageService language,
     CompiledTagScriptCache compiledScripts)
 {
@@ -55,7 +57,7 @@ public sealed class ScriptService(
     /// <returns>Созданный скрипт или <see langword="null"/>, если область видимости некорректна.</returns>
     public async Task<ScriptFileDto?> CreateAsync(CreateScriptRequest request, CancellationToken cancellationToken)
     {
-        if (!await IsScopeValidAsync(request.Scope, request.EmulatorId, cancellationToken))
+        if (!await scopedResourceValidator.IsValidScriptScopeAsync(request.Scope, request.EmulatorId, cancellationToken))
         {
             return null;
         }
@@ -145,17 +147,6 @@ public sealed class ScriptService(
         }
 
         return deleted > 0;
-    }
-
-    private async Task<bool> IsScopeValidAsync(ScriptScope scope, string? emulatorId, CancellationToken cancellationToken)
-    {
-        return scope switch
-        {
-            ScriptScope.Shared => string.IsNullOrWhiteSpace(emulatorId),
-            ScriptScope.Emulator => !string.IsNullOrWhiteSpace(emulatorId)
-                && await db.Emulators.AnyAsync(e => e.Id == emulatorId, cancellationToken),
-            _ => false,
-        };
     }
 
     private async Task ValidateContentAsync(
