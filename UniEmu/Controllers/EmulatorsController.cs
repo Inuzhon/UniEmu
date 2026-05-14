@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Requests;
@@ -9,7 +10,9 @@ namespace UniEmu.Features.Emulators;
 /// </summary>
 [ApiController]
 [Route("api/emulators")]
-public sealed class EmulatorsController(EmulatorService service) : ControllerBase
+public sealed class EmulatorsController(
+    EmulatorService service,
+    DispatcherTemplateService dispatcherTemplateService) : ControllerBase
 {
     /// <summary>
     /// Возвращает список всех эмуляторов.
@@ -33,6 +36,27 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
     {
         var emulator = await service.GetAsync(emulatorId, cancellationToken);
         return emulator is null ? NotFound() : Ok(emulator);
+    }
+
+    /// <summary>
+    /// Returns a Universal dispatcher protocol XML template for an emulator.
+    /// </summary>
+    /// <param name="emulatorId">Emulator identifier.</param>
+    /// <param name="cancellationToken">Request cancellation token.</param>
+    /// <returns>XML template file or 404 when emulator is not found.</returns>
+    [HttpGet("{emulatorId}/dispatcher-template")]
+    public async Task<IActionResult> GetDispatcherTemplate(string emulatorId, CancellationToken cancellationToken)
+    {
+        var template = await dispatcherTemplateService.CreateAsync(emulatorId, cancellationToken);
+        if (template is null)
+        {
+            return NotFound();
+        }
+
+        return File(
+            Encoding.UTF8.GetBytes(template.Content),
+            "application/xml; charset=utf-8",
+            template.FileName);
     }
 
     /// <summary>

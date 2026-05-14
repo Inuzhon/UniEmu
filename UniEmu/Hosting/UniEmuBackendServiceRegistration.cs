@@ -26,6 +26,7 @@ public static class UniEmuBackendServiceRegistration
     public static void RegisterServices(ContainerBuilder container)
     {
         container.RegisterType<EmulatorService>().AsSelf().InstancePerLifetimeScope();
+        container.RegisterType<DispatcherTemplateService>().AsSelf().InstancePerLifetimeScope();
         container.RegisterType<TagService>().AsSelf().InstancePerLifetimeScope();
         container.RegisterType<ScriptService>().AsSelf().InstancePerLifetimeScope();
         container.RegisterType<CncProgramService>().AsSelf().InstancePerLifetimeScope();
