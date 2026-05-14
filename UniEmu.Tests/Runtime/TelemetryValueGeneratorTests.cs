@@ -49,17 +49,74 @@ public sealed class TelemetryValueGeneratorTests
             { CalcType.None, null, null, null, null, null, null, null, 5, 42 },
             { CalcType.Text, "not-a-number", null, null, null, null, null, null, 5, 42 },
             { CalcType.Line, "10", "20", 10, null, null, null, null, 5, 15 },
-            { CalcType.Line, "10", "20", 10, null, null, null, null, 15, 20 },
+            { CalcType.Line, "10", "20", 10, null, null, null, null, 10, 20 },
+            { CalcType.Line, "10", "20", 10, null, null, null, null, 15, 15 },
             { CalcType.Curve, "10", "26", 8, null, null, 2, null, 4, 14 },
+            { CalcType.Curve, "10", "26", 8, null, null, 2, null, 12, 14 },
             { CalcType.Sequence, "[10,20,30]", null, 9, null, null, null, null, 4, 20 },
             { CalcType.Sequence, "[10,20,30]", null, 9, null, null, null, null, 9, 30 },
+            { CalcType.Sequence, "[10,20,30]", null, 9, null, null, null, null, 10, 10 },
             { CalcType.Sinusoid, "100", null, null, 5, 20, null, null, 5, 105 },
             { CalcType.Square, "100", null, null, 5, 10, null, null, 2.5, 105 },
             { CalcType.Square, "100", null, null, 5, 10, null, null, 7.5, 95 },
             { CalcType.Sawtooth, "100", null, null, 5, 10, null, null, 2.5, 97.5 },
             { CalcType.SquircleEarly, "10", "20", 10, null, null, null, null, 5, 17.5 },
+            { CalcType.SquircleEarly, "10", "20", 10, null, null, null, null, 15, 17.5 },
             { CalcType.SquircleLate, "10", "20", 10, null, null, null, null, 5, 12.5 },
+            { CalcType.SquircleLate, "10", "20", 10, null, null, null, null, 15, 12.5 },
         };
+    }
+
+    [Fact]
+    public void GenerateTag_RepeatsLineGeneratorAfterInclusiveDurationBoundary()
+    {
+        var generator = new TelemetryValueGenerator();
+        var startedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z");
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = startedAt };
+        var tag = CreateTag("Generated", "Generated", TagType.Double, TagSource.Generator, preview: "0");
+        tag.CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(
+            CalcType.Line,
+            Start: "0",
+            Finish: "100",
+            Duration: 60,
+            Amplitude: null,
+            Period: null,
+            Curvature: null,
+            Distortion: null));
+
+        var beforeBoundary = generator.GenerateTag(emulator, tag, startedAt.AddSeconds(59));
+        var atBoundary = generator.GenerateTag(emulator, tag, startedAt.AddSeconds(60));
+        var afterBoundary = generator.GenerateTag(emulator, tag, startedAt.AddSeconds(61));
+
+        Assert.Equal(98.33333333333333, Assert.IsType<double>(beforeBoundary.Value), precision: 12);
+        Assert.Equal(100d, atBoundary.Value);
+        Assert.Equal(1.6666666666666667, Assert.IsType<double>(afterBoundary.Value), precision: 12);
+    }
+
+    [Fact]
+    public void GenerateTag_KeepsLineGeneratorFlat_WhenStartAndFinishAreEqual()
+    {
+        var generator = new TelemetryValueGenerator();
+        var startedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z");
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = startedAt };
+        var tag = CreateTag("Generated", "Generated", TagType.Double, TagSource.Generator, preview: "0");
+        tag.CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(
+            CalcType.Line,
+            Start: "50",
+            Finish: "50",
+            Duration: 60,
+            Amplitude: null,
+            Period: null,
+            Curvature: null,
+            Distortion: null));
+
+        foreach (var elapsedSec in new[] { 0, 30, 60, 61, 120 })
+        {
+            var value = generator.GenerateTag(emulator, tag, startedAt.AddSeconds(elapsedSec));
+
+            Assert.Equal(50d, value.Value);
+            Assert.Equal(50d, value.NumericValue);
+        }
     }
 
     [Fact]

@@ -147,11 +147,12 @@ public sealed class TelemetryValueGenerator
         var finish = ParsePreview(calc.Finish ?? preview);
         var duration = Math.Max(1, calc.Duration ?? 60);
         var period = Math.Max(1, calc.Period ?? duration);
-        var progress = Math.Clamp(elapsedSec / duration, 0, 1);
+        var boundedElapsedSec = GetCyclicElapsed(elapsedSec, duration);
+        var progress = Math.Clamp(boundedElapsedSec / duration, 0, 1);
         var phase = (elapsedSec % period) / period;
         var amplitude = calc.Amplitude ?? Math.Abs(finish - start);
 
-        return calc.Type switch
+        var value = calc.Type switch
         {
             CalcType.Line => start + (finish - start) * progress,
             CalcType.Curve => start + (finish - start) * Math.Pow(progress, calc.Curvature ?? 2),
@@ -164,6 +165,32 @@ public sealed class TelemetryValueGenerator
             CalcType.SquircleLate => start + (finish - start) * Math.Pow(progress, 2),
             _ => ParsePreview(preview),
         };
+
+        return ApplyDistortion(value, calc.Distortion, boundedElapsedSec, progress);
+    }
+
+    private static double GetCyclicElapsed(double elapsedSec, double duration)
+    {
+        if (elapsedSec <= duration)
+        {
+            return Math.Max(0, elapsedSec);
+        }
+
+        var remainder = elapsedSec % duration;
+        return remainder == 0 ? duration : remainder;
+    }
+
+    private static double ApplyDistortion(double value, double? distortion, double elapsedSec, double progress)
+    {
+        if (distortion is null or <= 0)
+        {
+            return value;
+        }
+
+        var distortionRatio = distortion.Value / 100;
+        var noise = Math.Sin(elapsedSec * 53.13 + progress * 17.7) * 0.5 * distortionRatio;
+        var scale = Math.Max(1, Math.Abs(value));
+        return value + noise * scale;
     }
 
     private static double GenerateRandom(double start, double finish)
