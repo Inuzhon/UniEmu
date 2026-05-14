@@ -358,10 +358,25 @@ public sealed class CsxLanguageService
     }
 }
 
+/// <summary>
+/// Результат анализа CSX-документа.
+/// </summary>
+/// <param name="EntryPath">Нормализованный путь входного CSX-документа.</param>
+/// <param name="Diagnostics">Диагностические сообщения анализа.</param>
 public sealed record CsxAnalysisResult(
     string EntryPath,
     IReadOnlyList<CsxDiagnostic> Diagnostics);
 
+/// <summary>
+/// Диагностическое сообщение CSX-языкового сервиса.
+/// </summary>
+/// <param name="Code">Код диагностики.</param>
+/// <param name="Message">Текст диагностики.</param>
+/// <param name="Severity">Важность диагностики.</param>
+/// <param name="StartLine">Начальная строка диапазона.</param>
+/// <param name="StartCharacter">Начальная колонка диапазона.</param>
+/// <param name="EndLine">Конечная строка диапазона.</param>
+/// <param name="EndCharacter">Конечная колонка диапазона.</param>
 public sealed record CsxDiagnostic(
     string Code,
     string Message,
@@ -371,14 +386,34 @@ public sealed record CsxDiagnostic(
     int EndLine,
     int EndCharacter);
 
+/// <summary>
+/// Важность диагностического сообщения CSX-языкового сервиса.
+/// </summary>
 public enum CsxDiagnosticSeverity
 {
+    /// <summary>Ошибка, блокирующая корректное выполнение кода.</summary>
     Error = 1,
+
+    /// <summary>Предупреждение о потенциальной проблеме.</summary>
     Warning = 2,
+
+    /// <summary>Информационное сообщение.</summary>
     Information = 3,
+
+    /// <summary>Подсказка редактора.</summary>
     Hint = 4,
 }
 
+/// <summary>
+/// Элемент автодополнения CSX-редактора.
+/// </summary>
+/// <param name="Label">Отображаемая подпись элемента.</param>
+/// <param name="SortText">Текст сортировки.</param>
+/// <param name="FilterText">Текст фильтрации.</param>
+/// <param name="InsertText">Текст, вставляемый в документ.</param>
+/// <param name="Detail">Краткие дополнительные сведения.</param>
+/// <param name="Documentation">Документация элемента.</param>
+/// <param name="Kind">Тип элемента автодополнения.</param>
 public sealed record CsxCompletionItem(
     string Label,
     string SortText,
@@ -388,60 +423,135 @@ public sealed record CsxCompletionItem(
     string? Documentation = null,
     string Kind = "text");
 
+/// <summary>
+/// Hover-информация для символа CSX-документа.
+/// </summary>
+/// <param name="Signature">Сигнатура или краткое описание символа.</param>
+/// <param name="Documentation">Документация символа.</param>
+/// <param name="StartOffset">Начальный offset диапазона символа.</param>
+/// <param name="EndOffset">Конечный offset диапазона символа.</param>
 public sealed record CsxHover(
     string Signature,
     string? Documentation,
     int StartOffset,
     int EndOffset);
 
+/// <summary>
+/// Подсказка сигнатур для вызова метода или конструктора.
+/// </summary>
+/// <param name="Signatures">Доступные сигнатуры.</param>
+/// <param name="ActiveSignature">Индекс активной сигнатуры.</param>
+/// <param name="ActiveParameter">Индекс активного параметра.</param>
 public sealed record CsxSignatureHelp(
     IReadOnlyList<CsxSignature> Signatures,
     int ActiveSignature,
     int ActiveParameter);
 
+/// <summary>
+/// Описание одной сигнатуры вызываемого символа.
+/// </summary>
+/// <param name="Label">Текст сигнатуры.</param>
+/// <param name="Documentation">Документация сигнатуры.</param>
+/// <param name="Parameters">Параметры сигнатуры.</param>
 public sealed record CsxSignature(
     string Label,
     string? Documentation,
     IReadOnlyList<CsxSignatureParameter> Parameters);
 
+/// <summary>
+/// Описание параметра сигнатуры.
+/// </summary>
+/// <param name="Label">Текст параметра.</param>
+/// <param name="Documentation">Документация параметра.</param>
 public sealed record CsxSignatureParameter(
     string Label,
     string? Documentation);
 
+/// <summary>
+/// Диапазон текста в документе редактора.
+/// </summary>
+/// <param name="StartLine">Начальная строка диапазона.</param>
+/// <param name="StartCharacter">Начальная колонка диапазона.</param>
+/// <param name="EndLine">Конечная строка диапазона.</param>
+/// <param name="EndCharacter">Конечная колонка диапазона.</param>
 public sealed record CsxTextRange(
     int StartLine,
     int StartCharacter,
     int EndLine,
     int EndCharacter);
 
+/// <summary>
+/// Местоположение диапазона в CSX-документе.
+/// </summary>
+/// <param name="DocumentPath">Путь или URI документа.</param>
+/// <param name="Range">Диапазон внутри документа.</param>
 public sealed record CsxLocation(
     string DocumentPath,
     CsxTextRange Range);
 
+/// <summary>
+/// Текстовая правка документа.
+/// </summary>
+/// <param name="Range">Диапазон заменяемого текста.</param>
+/// <param name="NewText">Новый текст диапазона.</param>
 public sealed record CsxTextEdit(
     CsxTextRange Range,
     string NewText);
 
+/// <summary>
+/// Набор правок одного документа.
+/// </summary>
+/// <param name="DocumentPath">Путь или URI документа.</param>
+/// <param name="Edits">Правки документа.</param>
 public sealed record CsxDocumentEdit(
     string DocumentPath,
     IReadOnlyList<CsxTextEdit> Edits);
 
+/// <summary>
+/// Набор правок для нескольких документов рабочего пространства.
+/// </summary>
+/// <param name="DocumentEdits">Правки документов.</param>
 public sealed record CsxWorkspaceEdit(
     IReadOnlyList<CsxDocumentEdit> DocumentEdits);
 
+/// <summary>
+/// Диапазон сворачивания в CSX-документе.
+/// </summary>
+/// <param name="StartLine">Начальная строка диапазона.</param>
+/// <param name="EndLine">Конечная строка диапазона.</param>
+/// <param name="Kind">Тип сворачиваемого диапазона.</param>
 public sealed record CsxFoldingRange(
     int StartLine,
     int EndLine,
     string? Kind = null);
 
+/// <summary>
+/// Легенда semantic tokens для редактора.
+/// </summary>
+/// <param name="TokenTypes">Типы токенов.</param>
+/// <param name="TokenModifiers">Модификаторы токенов.</param>
 public sealed record CsxSemanticTokensLegend(
     IReadOnlyList<string> TokenTypes,
     IReadOnlyList<string> TokenModifiers);
 
+/// <summary>
+/// Semantic tokens CSX-документа.
+/// </summary>
+/// <param name="Legend">Легенда токенов.</param>
+/// <param name="Data">Закодированный поток токенов.</param>
 public sealed record CsxSemanticTokens(
     CsxSemanticTokensLegend Legend,
     IReadOnlyList<int> Data);
 
+/// <summary>
+/// Элемент call hierarchy.
+/// </summary>
+/// <param name="Name">Имя символа.</param>
+/// <param name="Kind">Тип символа.</param>
+/// <param name="Detail">Дополнительные сведения о символе.</param>
+/// <param name="DocumentPath">Путь или URI документа.</param>
+/// <param name="Range">Полный диапазон символа.</param>
+/// <param name="SelectionRange">Диапазон имени символа.</param>
 public sealed record CsxCallHierarchyItem(
     string Name,
     string Kind,
@@ -450,10 +560,20 @@ public sealed record CsxCallHierarchyItem(
     CsxTextRange Range,
     CsxTextRange SelectionRange);
 
+/// <summary>
+/// Входящий вызов call hierarchy.
+/// </summary>
+/// <param name="From">Символ, из которого выполняется вызов.</param>
+/// <param name="FromRanges">Диапазоны вызова в исходном символе.</param>
 public sealed record CsxCallHierarchyIncomingCall(
     CsxCallHierarchyItem From,
     IReadOnlyList<CsxTextRange> FromRanges);
 
+/// <summary>
+/// Исходящий вызов call hierarchy.
+/// </summary>
+/// <param name="To">Символ, в который выполняется вызов.</param>
+/// <param name="FromRanges">Диапазоны вызова в текущем символе.</param>
 public sealed record CsxCallHierarchyOutgoingCall(
     CsxCallHierarchyItem To,
     IReadOnlyList<CsxTextRange> FromRanges);

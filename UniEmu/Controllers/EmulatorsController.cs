@@ -4,16 +4,30 @@ using UniEmu.Contracts.Requests;
 
 namespace UniEmu.Features.Emulators;
 
+/// <summary>
+/// HTTP API для управления эмуляторами и их состоянием выполнения.
+/// </summary>
 [ApiController]
 [Route("api/emulators")]
 public sealed class EmulatorsController(EmulatorService service) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список всех эмуляторов.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Список эмуляторов с краткой статистикой.</returns>
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<EmulatorDto>>> List(CancellationToken cancellationToken)
     {
         return Ok(await service.ListAsync(cancellationToken));
     }
 
+    /// <summary>
+    /// Возвращает эмулятор по идентификатору.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Эмулятор или ответ 404, если он не найден.</returns>
     [HttpGet("{emulatorId}")]
     public async Task<ActionResult<EmulatorDto>> Get(string emulatorId, CancellationToken cancellationToken)
     {
@@ -21,6 +35,12 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
         return emulator is null ? NotFound() : Ok(emulator);
     }
 
+    /// <summary>
+    /// Создает новый эмулятор.
+    /// </summary>
+    /// <param name="request">Параметры создаваемого эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Созданный эмулятор.</returns>
     [HttpPost]
     public async Task<ActionResult<EmulatorDto>> Create(CreateEmulatorRequest request, CancellationToken cancellationToken)
     {
@@ -38,6 +58,13 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
         return CreatedAtAction(nameof(Get), new { emulatorId = emulator.Id }, emulator);
     }
 
+    /// <summary>
+    /// Частично обновляет настройки эмулятора.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="request">Новые значения изменяемых полей.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Обновленный эмулятор или ответ 404, если он не найден.</returns>
     [HttpPatch("{emulatorId}")]
     public async Task<ActionResult<EmulatorDto>> Patch(string emulatorId, PatchEmulatorRequest request, CancellationToken cancellationToken)
     {
@@ -50,6 +77,13 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
         return emulator is null ? NotFound() : Ok(emulator);
     }
 
+    /// <summary>
+    /// Изменяет рабочий статус эмулятора.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="request">Новый статус эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Обновленный эмулятор или ответ 404, если он не найден.</returns>
     [HttpPatch("{emulatorId}/status")]
     public async Task<ActionResult<EmulatorDto>> PatchStatus(string emulatorId, PatchEmulatorStatusRequest request, CancellationToken cancellationToken)
     {
@@ -57,6 +91,12 @@ public sealed class EmulatorsController(EmulatorService service) : ControllerBas
         return emulator is null ? NotFound() : Ok(emulator);
     }
 
+    /// <summary>
+    /// Удаляет эмулятор.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Ответ 204 при удалении или 404, если эмулятор не найден.</returns>
     [HttpDelete("{emulatorId}")]
     public async Task<IActionResult> Delete(string emulatorId, CancellationToken cancellationToken)
     {

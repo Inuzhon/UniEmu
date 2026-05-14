@@ -1,7 +1,7 @@
 namespace UniEmu.Scripting.Api;
 
 /// <summary>
-/// Configured REST operations available to user scripts.
+/// Настроенные REST-операции, доступные пользовательским скриптам.
 /// </summary>
 [ScriptingApi]
 public sealed class TagScriptRestContext
@@ -22,24 +22,43 @@ public sealed class TagScriptRestContext
         return new TagScriptRestContext(new DisabledRestOperations(), cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает работника по идентификатору.
+    /// </summary>
+    /// <param name="workerId">Идентификатор работника.</param>
+    /// <returns>Данные работника или <see langword="null"/>, если работник не найден.</returns>
     [ScriptingApi]
     public Task<Worker?> GetWorkerByIdAsync(int workerId)
     {
         return operations.GetWorkerByIdAsync(workerId, cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает текущего активного работника.
+    /// </summary>
+    /// <returns>Данные активного работника или <see langword="null"/>, если он не найден.</returns>
     [ScriptingApi]
     public Task<Worker?> GetActiveWorkerAsync()
     {
         return operations.GetActiveWorkerAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Регистрирует работника через настроенную REST-операцию.
+    /// </summary>
+    /// <param name="workerId">Идентификатор работника.</param>
+    /// <returns>Задача выполнения операции.</returns>
     [ScriptingApi]
     public Task RegisterWorkerAsync(int workerId)
     {
         return operations.RegisterWorkerAsync(workerId, cancellationToken);
     }
 
+    /// <summary>
+    /// Пытается зарегистрировать работника без выброса исключения при ошибке REST-операции.
+    /// </summary>
+    /// <param name="workerId">Идентификатор работника.</param>
+    /// <returns>Результат REST-операции.</returns>
     [ScriptingApi]
     public Task<RestCallResult> TryRegisterWorkerAsync(int workerId)
     {

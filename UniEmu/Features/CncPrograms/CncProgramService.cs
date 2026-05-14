@@ -9,10 +9,20 @@ using UniEmu.Mapping;
 
 namespace UniEmu.Features.CncPrograms;
 
+/// <summary>
+/// Выполняет прикладные операции с CNC-программами.
+/// </summary>
 public sealed class CncProgramService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache)
 {
+    /// <summary>
+    /// Возвращает CNC-программы с учетом области видимости и эмулятора.
+    /// </summary>
+    /// <param name="scope">Область видимости для фильтрации.</param>
+    /// <param name="emulatorId">Идентификатор эмулятора для фильтрации.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список CNC-программ.</returns>
     public async Task<IReadOnlyList<CncProgramDto>> ListAsync(CncScope? scope, string? emulatorId, CancellationToken cancellationToken)
     {
         var query = db.CncPrograms.AsNoTracking();
@@ -32,11 +42,24 @@ public sealed class CncProgramService(
         return programs.Select(p => p.ToDto()).ToList();
     }
 
+    /// <summary>
+    /// Создает CNC-программу в области видимости конкретного эмулятора.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="request">Параметры создаваемой программы.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданная программа или <see langword="null"/>, если эмулятор не найден.</returns>
     public Task<CncProgramDto?> CreateForEmulatorAsync(string emulatorId, CreateCncProgramRequest request, CancellationToken cancellationToken)
     {
         return CreateAsync(request with { Scope = CncScope.Emulator, EmulatorId = emulatorId }, cancellationToken);
     }
 
+    /// <summary>
+    /// Создает CNC-программу.
+    /// </summary>
+    /// <param name="request">Параметры создаваемой программы.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданная программа или <see langword="null"/>, если область видимости некорректна.</returns>
     public async Task<CncProgramDto?> CreateAsync(CreateCncProgramRequest request, CancellationToken cancellationToken)
     {
         if (!await IsScopeValidAsync(request.Scope, request.EmulatorId, cancellationToken))
@@ -65,6 +88,13 @@ public sealed class CncProgramService(
         return entity.ToDto();
     }
 
+    /// <summary>
+    /// Обновляет метаданные и/или содержимое CNC-программы.
+    /// </summary>
+    /// <param name="programId">Идентификатор программы.</param>
+    /// <param name="request">Новые значения программы.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Обновленная программа или <see langword="null"/>, если она не найдена.</returns>
     public async Task<CncProgramDto?> PatchAsync(string programId, PatchCncProgramRequest request, CancellationToken cancellationToken)
     {
         var entity = await db.CncPrograms.FirstOrDefaultAsync(p => p.Id == programId, cancellationToken);
@@ -95,6 +125,12 @@ public sealed class CncProgramService(
         return entity.ToDto();
     }
 
+    /// <summary>
+    /// Удаляет CNC-программу.
+    /// </summary>
+    /// <param name="programId">Идентификатор программы.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns><see langword="true"/>, если программа была удалена.</returns>
     public async Task<bool> DeleteAsync(string programId, CancellationToken cancellationToken)
     {
         var deleted = await db.CncPrograms.Where(p => p.Id == programId).ExecuteDeleteAsync(cancellationToken);

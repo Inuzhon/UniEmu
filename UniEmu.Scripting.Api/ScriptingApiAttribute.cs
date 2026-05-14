@@ -1,7 +1,7 @@
 namespace UniEmu.Scripting.Api;
 
 /// <summary>
-/// Marks a type or member as visible to user scripts in the UniEmu scripting API.
+/// Помечает тип или член как доступный пользовательским скриптам UniEmu.
 /// </summary>
 [AttributeUsage(
     AttributeTargets.Class

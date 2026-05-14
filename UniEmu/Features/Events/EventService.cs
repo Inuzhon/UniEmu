@@ -9,8 +9,18 @@ using UniEmu.Realtime;
 
 namespace UniEmu.Features.Events;
 
+/// <summary>
+/// Выполняет прикладные операции с системными событиями.
+/// </summary>
 public sealed class EventService(UniEmuDbContext db, RuntimeUpdateService runtimeUpdateService)
 {
+    /// <summary>
+    /// Возвращает страницу системных событий.
+    /// </summary>
+    /// <param name="cursor">Временная метка, старше которой нужно вернуть события.</param>
+    /// <param name="limit">Максимальное количество событий.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список событий, отсортированный от новых к старым.</returns>
     public async Task<IReadOnlyList<SystemEventDto>> ListAsync(DateTimeOffset? cursor, int limit, CancellationToken cancellationToken)
     {
         var take = Math.Clamp(limit <= 0 ? 50 : limit, 1, 200);
@@ -26,6 +36,12 @@ public sealed class EventService(UniEmuDbContext db, RuntimeUpdateService runtim
             .ToList();
     }
 
+    /// <summary>
+    /// Создает системное событие и публикует realtime-уведомление.
+    /// </summary>
+    /// <param name="request">Данные создаваемого события.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданное событие.</returns>
     public async Task<SystemEventDto> CreateAsync(PushEventRequest request, CancellationToken cancellationToken)
     {
         var entity = new SystemEventEntity

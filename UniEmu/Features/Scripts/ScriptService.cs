@@ -12,12 +12,22 @@ using UniEmu.Scripting.Api;
 
 namespace UniEmu.Features.Scripts;
 
+/// <summary>
+/// Выполняет прикладные операции с CSX-скриптами тегов.
+/// </summary>
 public sealed class ScriptService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
     CsxLanguageService language,
     CompiledTagScriptCache compiledScripts)
 {
+    /// <summary>
+    /// Возвращает скрипты с учетом области видимости и эмулятора.
+    /// </summary>
+    /// <param name="scope">Область видимости для фильтрации.</param>
+    /// <param name="emulatorId">Идентификатор эмулятора для фильтрации.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список скриптов.</returns>
     public async Task<IReadOnlyList<ScriptFileDto>> ListAsync(ScriptScope? scope, string? emulatorId, CancellationToken cancellationToken)
     {
         var query = db.ScriptFiles.AsNoTracking();
@@ -37,6 +47,12 @@ public sealed class ScriptService(
         return scripts.Select(s => s.ToDto()).ToList();
     }
 
+    /// <summary>
+    /// Создает новый CSX-скрипт с шаблонным содержимым.
+    /// </summary>
+    /// <param name="request">Параметры создаваемого скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданный скрипт или <see langword="null"/>, если область видимости некорректна.</returns>
     public async Task<ScriptFileDto?> CreateAsync(CreateScriptRequest request, CancellationToken cancellationToken)
     {
         if (!await IsScopeValidAsync(request.Scope, request.EmulatorId, cancellationToken))
@@ -67,6 +83,13 @@ public sealed class ScriptService(
         return entity.ToDto();
     }
 
+    /// <summary>
+    /// Обновляет имя и/или содержимое скрипта с проверкой CSX-кода.
+    /// </summary>
+    /// <param name="scriptId">Идентификатор скрипта.</param>
+    /// <param name="request">Новые значения скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Обновленный скрипт или <see langword="null"/>, если он не найден.</returns>
     public async Task<ScriptFileDto?> PatchAsync(string scriptId, PatchScriptRequest request, CancellationToken cancellationToken)
     {
         var entity = await db.ScriptFiles.FirstOrDefaultAsync(s => s.Id == scriptId, cancellationToken);
@@ -106,6 +129,12 @@ public sealed class ScriptService(
         return entity.ToDto();
     }
 
+    /// <summary>
+    /// Удаляет CSX-скрипт и очищает кэш скомпилированных скриптов.
+    /// </summary>
+    /// <param name="scriptId">Идентификатор скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns><see langword="true"/>, если скрипт был удален.</returns>
     public async Task<bool> DeleteAsync(string scriptId, CancellationToken cancellationToken)
     {
         var deleted = await db.ScriptFiles.Where(s => s.Id == scriptId).ExecuteDeleteAsync(cancellationToken);

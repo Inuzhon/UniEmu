@@ -10,6 +10,8 @@
     <SpaRoot>..\UniEmu.Client\</SpaRoot>
     <SpaProxyLaunchCommand>yarn run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>http://localhost:8070</SpaProxyServerUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>

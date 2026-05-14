@@ -9,8 +9,18 @@ using UniEmu.Realtime;
 
 namespace UniEmu.Features.Telemetry;
 
+/// <summary>
+/// Выполняет прикладные операции с телеметрией эмуляторов.
+/// </summary>
 public sealed class TelemetryService(UniEmuDbContext db, RuntimeUpdateService runtimeUpdateService)
 {
+    /// <summary>
+    /// Возвращает последние точки телеметрии эмулятора.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="points">Запрошенное количество точек.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список точек телеметрии или <see langword="null"/>, если эмулятор не найден.</returns>
     public async Task<IReadOnlyList<TelemetryPointDto>?> GetAsync(string emulatorId, int points, CancellationToken cancellationToken)
     {
         if (!await db.Emulators.AnyAsync(e => e.Id == emulatorId, cancellationToken))
@@ -32,6 +42,12 @@ public sealed class TelemetryService(UniEmuDbContext db, RuntimeUpdateService ru
             .ToList();
     }
 
+    /// <summary>
+    /// Записывает точку телеметрии и публикует realtime-уведомление.
+    /// </summary>
+    /// <param name="request">Данные точки телеметрии.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданная точка телеметрии или <see langword="null"/>, если эмулятор не найден.</returns>
     public async Task<TelemetryPointDto?> IngestAsync(TelemetryIngestRequest request, CancellationToken cancellationToken)
     {
         if (!await db.Emulators.AnyAsync(e => e.Id == request.EmulatorId, cancellationToken))

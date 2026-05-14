@@ -7,10 +7,19 @@ using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime.Scripting;
 
+/// <summary>
+/// Подготавливает языковые возможности CSX-редактора с учетом сохраненных скриптов UniEmu.
+/// </summary>
 public sealed class CsxIntellisenseService(
     UniEmuDbContext db,
     CsxLanguageService language)
 {
+    /// <summary>
+    /// Возвращает диагностические сообщения для CSX-документа.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и контекстом документа.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список диагностик.</returns>
     public async Task<IReadOnlyList<CsxDiagnostic>> GetDiagnosticsAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -28,6 +37,12 @@ public sealed class CsxIntellisenseService(
             .Diagnostics;
     }
 
+    /// <summary>
+    /// Возвращает варианты автодополнения для позиции в CSX-документе.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список элементов автодополнения.</returns>
     public async Task<IReadOnlyList<CsxCompletionItem>> GetCompletionsAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -45,6 +60,12 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает hover-информацию для символа под курсором.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Hover-информация или <see langword="null"/>, если символ не найден.</returns>
     public async Task<CsxHover?> GetHoverAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -62,6 +83,12 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает подсказку сигнатуры для текущего вызова.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Подсказка сигнатуры или <see langword="null"/>, если она недоступна.</returns>
     public async Task<CsxSignatureHelp?> GetSignatureHelpAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -79,6 +106,12 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает определения символа под курсором.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список мест определения.</returns>
     public async Task<IReadOnlyList<CsxLocation>> GetDefinitionsAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -100,6 +133,12 @@ public sealed class CsxIntellisenseService(
             request.DocumentUri);
     }
 
+    /// <summary>
+    /// Возвращает определения типа символа под курсором.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список мест определения типа.</returns>
     public async Task<IReadOnlyList<CsxLocation>> GetTypeDefinitionsAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -121,6 +160,12 @@ public sealed class CsxIntellisenseService(
             request.DocumentUri);
     }
 
+    /// <summary>
+    /// Возвращает ссылки на символ под курсором.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список мест использования символа.</returns>
     public async Task<IReadOnlyList<CsxLocation>> GetReferencesAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -143,6 +188,12 @@ public sealed class CsxIntellisenseService(
             request.DocumentUri);
     }
 
+    /// <summary>
+    /// Возвращает реализации символа под курсором.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список мест реализации.</returns>
     public async Task<IReadOnlyList<CsxLocation>> GetImplementationsAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -164,6 +215,12 @@ public sealed class CsxIntellisenseService(
             request.DocumentUri);
     }
 
+    /// <summary>
+    /// Подготавливает набор правок для переименования символа.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом, позицией и новым именем.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Набор правок или <see langword="null"/>, если переименование недоступно.</returns>
     public async Task<CsxWorkspaceEdit?> RenameAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -196,6 +253,12 @@ public sealed class CsxIntellisenseService(
                 .ToArray());
     }
 
+    /// <summary>
+    /// Форматирует весь CSX-документ.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список текстовых правок форматирования.</returns>
     public async Task<IReadOnlyList<CsxTextEdit>> FormatDocumentAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -212,6 +275,12 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Форматирует диапазон CSX-документа.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и диапазоном.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список текстовых правок форматирования.</returns>
     public async Task<IReadOnlyList<CsxTextEdit>> FormatRangeAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -229,6 +298,12 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает диапазоны сворачивания CSX-документа.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список диапазонов сворачивания.</returns>
     public async Task<IReadOnlyList<CsxFoldingRange>> GetFoldingRangesAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -245,6 +320,12 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает semantic tokens для подсветки CSX-документа.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Semantic tokens и легенда токенов.</returns>
     public async Task<CsxSemanticTokens> GetSemanticTokensAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -261,6 +342,12 @@ public sealed class CsxIntellisenseService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Подготавливает элементы call hierarchy для символа под курсором.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией курсора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список элементов call hierarchy.</returns>
     public async Task<IReadOnlyList<CsxCallHierarchyItem>> PrepareCallHierarchyAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -282,6 +369,12 @@ public sealed class CsxIntellisenseService(
             request.DocumentUri);
     }
 
+    /// <summary>
+    /// Возвращает входящие вызовы для элемента call hierarchy.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией элемента.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список входящих вызовов.</returns>
     public async Task<IReadOnlyList<CsxCallHierarchyIncomingCall>> GetIncomingCallsAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -302,6 +395,12 @@ public sealed class CsxIntellisenseService(
             .ToArray();
     }
 
+    /// <summary>
+    /// Возвращает исходящие вызовы для элемента call hierarchy.
+    /// </summary>
+    /// <param name="request">Запрос редактора с исходным кодом и позицией элемента.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список исходящих вызовов.</returns>
     public async Task<IReadOnlyList<CsxCallHierarchyOutgoingCall>> GetOutgoingCallsAsync(
         CsxIntellisenseRequest request,
         CancellationToken cancellationToken)
@@ -399,6 +498,15 @@ public sealed class CsxIntellisenseService(
 
 }
 
+/// <summary>
+/// Запрос CSX-редактора к backend-сервисам IntelliSense.
+/// </summary>
+/// <param name="SourceCode">Текущий исходный код документа.</param>
+/// <param name="DocumentUri">URI или путь документа в редакторе.</param>
+/// <param name="Position">Позиция курсора в документе.</param>
+/// <param name="Range">Диапазон документа для операций форматирования.</param>
+/// <param name="NewName">Новое имя для операции переименования.</param>
+/// <param name="IncludeDeclaration">Признак включения объявления в список ссылок.</param>
 public sealed record CsxIntellisenseRequest(
     string? SourceCode,
     string? DocumentUri,
@@ -407,4 +515,9 @@ public sealed record CsxIntellisenseRequest(
     string? NewName = null,
     bool IncludeDeclaration = true);
 
+/// <summary>
+/// Позиция в текстовом документе редактора.
+/// </summary>
+/// <param name="Line">Номер строки, начиная с 1.</param>
+/// <param name="Column">Номер колонки, начиная с 1.</param>
 public sealed record CsxEditorPosition(int Line, int Column);

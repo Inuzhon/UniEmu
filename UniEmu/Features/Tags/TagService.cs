@@ -12,12 +12,21 @@ using UniEmu.Scripting.Api;
 
 namespace UniEmu.Features.Tags;
 
+/// <summary>
+/// Выполняет прикладные операции с тегами эмуляторов.
+/// </summary>
 public sealed class TagService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
     EmulatorScheduleService scheduleService,
     CsxLanguageService language)
 {
+    /// <summary>
+    /// Возвращает теги выбранного эмулятора.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список тегов или <see langword="null"/>, если эмулятор не найден.</returns>
     public async Task<IReadOnlyList<EmulatorTagDto>?> ListAsync(string emulatorId, CancellationToken cancellationToken)
     {
         if (!await db.Emulators.AnyAsync(e => e.Id == emulatorId, cancellationToken))
@@ -34,6 +43,13 @@ public sealed class TagService(
         return tags.Select(t => t.ToDto()).ToList();
     }
 
+    /// <summary>
+    /// Создает тег эмулятора и пересобирает расписание, если эмулятор запущен.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="request">Параметры создаваемого тега.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданный тег или <see langword="null"/>, если эмулятор не найден.</returns>
     public async Task<EmulatorTagDto?> CreateAsync(string emulatorId, CreateTagRequest request, CancellationToken cancellationToken)
     {
         if (!await db.Emulators.AnyAsync(e => e.Id == emulatorId, cancellationToken))
@@ -69,6 +85,14 @@ public sealed class TagService(
         return entity.ToDto();
     }
 
+    /// <summary>
+    /// Полностью заменяет конфигурацию тега и пересобирает расписание, если эмулятор запущен.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="tagId">Идентификатор тега.</param>
+    /// <param name="request">Новая конфигурация тега.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Обновленный тег или <see langword="null"/>, если тег не найден.</returns>
     public async Task<EmulatorTagDto?> ReplaceAsync(string emulatorId, string tagId, ReplaceTagRequest request, CancellationToken cancellationToken)
     {
         var entity = await db.EmulatorTags
@@ -101,6 +125,13 @@ public sealed class TagService(
         return entity.ToDto();
     }
 
+    /// <summary>
+    /// Удаляет тег эмулятора и пересобирает расписание при успешном удалении.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="tagId">Идентификатор тега.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns><see langword="true"/>, если тег был удален.</returns>
     public async Task<bool> DeleteAsync(string emulatorId, string tagId, CancellationToken cancellationToken)
     {
         var deleted = await db.EmulatorTags

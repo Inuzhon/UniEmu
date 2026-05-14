@@ -11,12 +11,20 @@ using UniEmu.Runtime;
 
 namespace UniEmu.Features.Emulators;
 
+/// <summary>
+/// Выполняет прикладные операции с эмуляторами и их расписанием.
+/// </summary>
 public sealed class EmulatorService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
     EmulatorScheduleService scheduleService,
     RuntimeUpdateService runtimeUpdateService)
 {
+    /// <summary>
+    /// Возвращает все эмуляторы с краткой статистикой.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список эмуляторов.</returns>
     public async Task<IReadOnlyList<EmulatorDto>> ListAsync(CancellationToken cancellationToken)
     {
         var emulators = await db.Emulators
@@ -32,6 +40,12 @@ public sealed class EmulatorService(
         return emulators.Select(e => e.Entity.ToDto(e.TagsCount)).ToList();
     }
 
+    /// <summary>
+    /// Возвращает эмулятор по идентификатору.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Эмулятор или <see langword="null"/>, если он не найден.</returns>
     public async Task<EmulatorDto?> GetAsync(string emulatorId, CancellationToken cancellationToken)
     {
         var emulator = await db.Emulators
@@ -47,6 +61,12 @@ public sealed class EmulatorService(
         return emulator?.Entity.ToDto(emulator.TagsCount);
     }
 
+    /// <summary>
+    /// Создает новый эмулятор и публикует runtime-обновление.
+    /// </summary>
+    /// <param name="request">Параметры создаваемого эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданный эмулятор.</returns>
     public async Task<EmulatorDto> CreateAsync(CreateEmulatorRequest request, CancellationToken cancellationToken)
     {
         var entity = new EmulatorEntity
@@ -68,6 +88,13 @@ public sealed class EmulatorService(
         return dto;
     }
 
+    /// <summary>
+    /// Частично обновляет настройки эмулятора и пересобирает расписание при необходимости.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="request">Новые значения изменяемых полей.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Обновленный эмулятор или <see langword="null"/>, если он не найден.</returns>
     public async Task<EmulatorDto?> PatchAsync(string emulatorId, PatchEmulatorRequest request, CancellationToken cancellationToken)
     {
         var entity = await db.Emulators
@@ -117,6 +144,13 @@ public sealed class EmulatorService(
         return dto;
     }
 
+    /// <summary>
+    /// Изменяет статус эмулятора, управляет расписанием и публикует событие перехода.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="request">Новый статус эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Обновленный эмулятор или <see langword="null"/>, если он не найден.</returns>
     public async Task<EmulatorDto?> PatchStatusAsync(string emulatorId, PatchEmulatorStatusRequest request, CancellationToken cancellationToken)
     {
         var entity = await db.Emulators
@@ -184,6 +218,12 @@ public sealed class EmulatorService(
         return dto;
     }
 
+    /// <summary>
+    /// Удаляет эмулятор и связанные runtime-расписания.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns><see langword="true"/>, если эмулятор был удален.</returns>
     public async Task<bool> DeleteAsync(string emulatorId, CancellationToken cancellationToken)
     {
         var deleted = await db.Emulators

@@ -80,7 +80,7 @@ public sealed class UniEmuScriptContext
     public TagScriptTagAccessor Tags { get; }
 
     /// <summary>
-    /// Configured REST operations available to user scripts.
+    /// Настроенные REST-операции, доступные пользовательскому скрипту.
     /// </summary>
     [ScriptingApi]
     public TagScriptRestContext Rest { get; }
