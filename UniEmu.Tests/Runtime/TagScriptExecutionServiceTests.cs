@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
@@ -64,6 +65,24 @@ public sealed class TagScriptExecutionServiceTests
     }
 
     [Fact]
+    public async Task GenerateScriptTagAsync_MarksStaticTagSideEffectForDeferredFlush()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var service = CreateService(db, stateStore, previewFlushService: flushService);
+        var (emulator, tag) = await LoadNoTrackingAsync(db, "tg-update-static");
+
+        await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None);
+        await flushService.FlushAsync(CancellationToken.None);
+
+        db.ChangeTracker.Clear();
+        var setpoint = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-setpoint");
+        Assert.Equal("42.57", setpoint.Preview);
+    }
+
+    [Fact]
     public async Task GenerateScriptTagAsync_PersistsScriptStateBetweenRuns()
     {
         await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
@@ -120,19 +139,32 @@ public sealed class TagScriptExecutionServiceTests
     private static TagScriptExecutionService CreateService(
         UniEmuDbContext db,
         TagRuntimeStateStore stateStore,
-        ITagScriptRestOperations? restOperations = null)
+        ITagScriptRestOperations? restOperations = null,
+        TagPreviewFlushService? previewFlushService = null)
     {
         return new TagScriptExecutionService(
             db,
             new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions())),
             stateStore,
             new CompiledTagScriptCache(),
-            restOperations);
+            restOperations,
+            previewFlushService);
     }
 
     private static async Task<(EmulatorEntity Emulator, EmulatorTagEntity Tag)> LoadAsync(UniEmuDbContext db, string tagId)
     {
         var emulator = await db.Emulators
+            .Include(e => e.Tags)
+            .SingleAsync(e => e.Id == "em-1");
+        var tag = emulator.Tags.Single(t => t.Id == tagId);
+
+        return (emulator, tag);
+    }
+
+    private static async Task<(EmulatorEntity Emulator, EmulatorTagEntity Tag)> LoadNoTrackingAsync(UniEmuDbContext db, string tagId)
+    {
+        var emulator = await db.Emulators
+            .AsNoTracking()
             .Include(e => e.Tags)
             .SingleAsync(e => e.Id == "em-1");
         var tag = emulator.Tags.Single(t => t.Id == tagId);

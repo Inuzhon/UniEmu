@@ -21,7 +21,8 @@ public sealed class TagScriptExecutionService
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
         TagRuntimeStateStore stateStore,
-        CompiledTagScriptCache scriptCache)
+        CompiledTagScriptCache scriptCache,
+        TagPreviewFlushService? previewFlushService = null)
         : this(
             db,
             dataCache,
@@ -29,7 +30,8 @@ public sealed class TagScriptExecutionService
             scriptCache,
             new CsxScriptEnvironment(),
             new CsxScriptDirectiveValidator(),
-            new CsxScriptSecurityValidator())
+            new CsxScriptSecurityValidator(),
+            previewFlushService)
     {
     }
 
@@ -40,8 +42,9 @@ public sealed class TagScriptExecutionService
         CompiledTagScriptCache scriptCache,
         CsxScriptEnvironment scriptEnvironment,
         CsxScriptDirectiveValidator directiveValidator,
-        CsxScriptSecurityValidator securityValidator)
-        : this(db, dataCache, stateStore, scriptCache, scriptEnvironment, directiveValidator, securityValidator, null)
+        CsxScriptSecurityValidator securityValidator,
+        TagPreviewFlushService? previewFlushService = null)
+        : this(db, dataCache, stateStore, scriptCache, scriptEnvironment, directiveValidator, securityValidator, null, previewFlushService)
     {
     }
 
@@ -50,7 +53,8 @@ public sealed class TagScriptExecutionService
         CachedUniEmuDataService dataCache,
         TagRuntimeStateStore stateStore,
         CompiledTagScriptCache scriptCache,
-        ITagScriptRestOperations? restOperations)
+        ITagScriptRestOperations? restOperations,
+        TagPreviewFlushService? previewFlushService = null)
         : this(
             db,
             dataCache,
@@ -59,7 +63,8 @@ public sealed class TagScriptExecutionService
             new CsxScriptEnvironment(),
             new CsxScriptDirectiveValidator(),
             new CsxScriptSecurityValidator(),
-            restOperations)
+            restOperations,
+            previewFlushService)
     {
     }
 
@@ -71,7 +76,8 @@ public sealed class TagScriptExecutionService
         CsxScriptEnvironment scriptEnvironment,
         CsxScriptDirectiveValidator directiveValidator,
         CsxScriptSecurityValidator securityValidator,
-        ITagScriptRestOperations? restOperations)
+        ITagScriptRestOperations? restOperations,
+        TagPreviewFlushService? previewFlushService = null)
     {
         this.db = db;
         this.dataCache = dataCache;
@@ -81,6 +87,7 @@ public sealed class TagScriptExecutionService
         this.directiveValidator = directiveValidator;
         this.securityValidator = securityValidator;
         this.restOperations = restOperations;
+        this.previewFlushService = previewFlushService;
     }
 
     private readonly UniEmuDbContext db;
@@ -91,6 +98,7 @@ public sealed class TagScriptExecutionService
     private readonly CsxScriptDirectiveValidator directiveValidator;
     private readonly CsxScriptSecurityValidator securityValidator;
     private readonly ITagScriptRestOperations? restOperations;
+    private readonly TagPreviewFlushService? previewFlushService;
 
     public async Task<GeneratedTagValue> GenerateScriptTagAsync(
         EmulatorEntity emulator,
@@ -307,6 +315,7 @@ public sealed class TagScriptExecutionService
 
         tag.Preview = TelemetryValueGenerator.ToPreview(typedValue);
         stateStore.Set(emulator.Id, tag.Id, tag.Name, typedValue, TelemetryValueGenerator.ToNumericValue(typedValue), timestamp);
+        previewFlushService?.MarkDirty(emulator.Id, tag.Id, tag.Preview);
 
         return typedValue;
     }

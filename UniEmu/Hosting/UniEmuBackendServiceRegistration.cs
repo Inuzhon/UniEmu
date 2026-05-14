@@ -51,7 +51,8 @@ public static class UniEmuBackendServiceRegistration
                 context.Resolve<CsxScriptEnvironment>(),
                 context.Resolve<CsxScriptDirectiveValidator>(),
                 context.Resolve<CsxScriptSecurityValidator>(),
-                context.ResolveOptional<ITagScriptRestOperations>()))
+                context.ResolveOptional<ITagScriptRestOperations>(),
+                context.Resolve<TagPreviewFlushService>()))
             .AsSelf()
             .InstancePerLifetimeScope();
         container.RegisterType<TagRuntimeStatePersistenceService>().AsSelf().InstancePerLifetimeScope();
