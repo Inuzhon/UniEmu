@@ -27,16 +27,20 @@ public sealed class TagValueJobTests
         await using var db = fixture.CreateDbContext();
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var job = new TagValueJob(
             db,
+            dataCache,
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             stateStore,
+            flushService,
             new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
             NullLogger<TagValueJob>.Instance);
         var context = CreateContext("tg-start");
 
         await job.Execute(context);
+        await flushService.FlushAsync();
 
         var events = await db.SystemEvents.Select(e => e.Message).ToListAsync();
         Assert.True(stateStore.TryGet("em-1", "tg-start", out var value), string.Join(Environment.NewLine, events));
@@ -52,15 +56,19 @@ public sealed class TagValueJobTests
         await using var db = fixture.CreateDbContext();
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var job = new TagValueJob(
             db,
+            dataCache,
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             stateStore,
+            flushService,
             new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
             NullLogger<TagValueJob>.Instance);
 
         await job.Execute(CreateContext("tg-now"));
+        await flushService.FlushAsync();
 
         var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-now");
         Assert.True(DateTimeOffset.TryParse(tag.Preview, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out _));
@@ -73,15 +81,19 @@ public sealed class TagValueJobTests
         await using var db = fixture.CreateDbContext();
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var job = new TagValueJob(
             db,
+            dataCache,
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             stateStore,
+            flushService,
             new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
             NullLogger<TagValueJob>.Instance);
 
         await job.Execute(CreateContext("tg-now-offset"));
+        await flushService.FlushAsync();
 
         var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-now-offset");
         Assert.Equal("3", tag.Preview);
@@ -94,21 +106,52 @@ public sealed class TagValueJobTests
         await using var db = fixture.CreateDbContext();
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var job = new TagValueJob(
             db,
+            dataCache,
             new TelemetryValueGenerator(),
             new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
             stateStore,
+            flushService,
             new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
             NullLogger<TagValueJob>.Instance);
 
         await job.Execute(CreateContext("tg-cron"));
+        await flushService.FlushAsync();
 
         var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-cron");
         Assert.Equal("17", tag.Preview);
         Assert.True(stateStore.TryGet("em-1", "tg-cron", out var value));
         Assert.Equal(17d, value.Value);
         Assert.Equal(17d, value.NumericValue);
+    }
+
+    [Fact]
+    public async Task Execute_DoesNotPersistPreviewBeforeFlush()
+    {
+        await using var fixture = await TagValueJobDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var job = new TagValueJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            flushService,
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<TagValueJob>.Instance);
+
+        await job.Execute(CreateContext("tg-cron"));
+
+        db.ChangeTracker.Clear();
+        var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-cron");
+        Assert.Equal("(computed)", tag.Preview);
+        Assert.True(stateStore.TryGet("em-1", "tg-cron", out var value));
+        Assert.Equal(17d, value.Value);
     }
 
     private static IJobExecutionContext CreateContext(string tagId)

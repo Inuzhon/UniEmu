@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Quartz;
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
@@ -11,9 +10,11 @@ namespace UniEmu.Runtime;
 [DisallowConcurrentExecution]
 public sealed class TagValueJob(
     UniEmuDbContext db,
+    CachedUniEmuDataService dataCache,
     TelemetryValueGenerator valueGenerator,
     TagScriptExecutionService scriptExecutionService,
     TagRuntimeStateStore stateStore,
+    TagPreviewFlushService previewFlushService,
     RuntimeUpdateService runtimeUpdateService,
     ILogger<TagValueJob> logger) : IJob
 {
@@ -29,12 +30,10 @@ public sealed class TagValueJob(
             return;
         }
 
-        var tag = await db.EmulatorTags
-            .Include(t => t.Emulator)
-            .ThenInclude(e => e!.Tags)
-            .FirstOrDefaultAsync(t => t.EmulatorId == emulatorId && t.Id == tagId, cancellationToken);
+        var emulator = await dataCache.GetEmulatorWithTagsAsync(emulatorId, cancellationToken);
+        var tag = emulator?.Tags.FirstOrDefault(t => t.Id == tagId);
 
-        if (tag?.Emulator is null || tag.Emulator.Status != nameof(EmulatorStatus.Running))
+        if (emulator is null || tag is null || emulator.Status != nameof(EmulatorStatus.Running))
         {
             stateStore.Remove(emulatorId, tagId);
             return;
@@ -45,12 +44,13 @@ public sealed class TagValueJob(
         {
             var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
             var value = source is TagSource.Script or TagSource.Formula
-                ? await scriptExecutionService.GenerateScriptTagAsync(tag.Emulator, tag, now, cancellationToken)
-                : valueGenerator.GenerateTag(tag.Emulator, tag, now);
+                ? await scriptExecutionService.GenerateScriptTagAsync(emulator, tag, now, cancellationToken)
+                : valueGenerator.GenerateTag(emulator, tag, now);
 
-            tag.Preview = TelemetryValueGenerator.ToPreview(value.Value);
+            var preview = TelemetryValueGenerator.ToPreview(value.Value);
+            tag.Preview = preview;
             stateStore.Set(emulatorId, tagId, tag.Name, value.Value, value.NumericValue, now);
-            await db.SaveChangesAsync(cancellationToken);
+            previewFlushService.MarkDirty(emulatorId, tagId, preview);
             await runtimeUpdateService.PublishTagValueAsync(
                 new RuntimeTagValueUpdateDto(emulatorId, tagId, tag.Name, value.Value, value.NumericValue, now),
                 cancellationToken);
@@ -61,8 +61,8 @@ public sealed class TagValueJob(
             db.SystemEvents.Add(new SystemEventEntity
             {
                 Id = $"ev-{Guid.NewGuid():N}"[..12],
-                EmulatorId = tag.Emulator.Id,
-                EmulatorName = tag.Emulator.Name,
+                EmulatorId = emulator.Id,
+                EmulatorName = emulator.Name,
                 Level = UniEmuJson.EnumString(EventLevel.Error),
                 Message = $"Ошибка вычисления тега {tag.Name}: {ex.Message}",
                 Timestamp = now,
