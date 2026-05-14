@@ -52,11 +52,13 @@ public sealed class TagServiceScriptValidationTests
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
         var dataCache = new CachedUniEmuDataService(db, cache);
+        var flushService = new TagPreviewFlushService(() => db, NullLogger<TagPreviewFlushService>.Instance);
         var scheduleService = new EmulatorScheduleService(
             db,
             dataCache,
             Mock.Of<ISchedulerFactory>(),
             new TagRuntimeStateStore(),
+            flushService,
             NullLogger<EmulatorScheduleService>.Instance,
             Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),

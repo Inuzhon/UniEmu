@@ -39,11 +39,13 @@ public sealed class EmulatorScheduleServiceTests
 
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var service = new EmulatorScheduleService(
             db,
             dataCache,
             schedulerFactory.Object,
             stateStore,
+            flushService,
             NullLogger<EmulatorScheduleService>.Instance,
             Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
@@ -98,11 +100,13 @@ public sealed class EmulatorScheduleServiceTests
 
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var service = new EmulatorScheduleService(
             db,
             dataCache,
             schedulerFactory.Object,
             stateStore,
+            flushService,
             NullLogger<EmulatorScheduleService>.Instance,
             Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
@@ -133,11 +137,13 @@ public sealed class EmulatorScheduleServiceTests
         await using var db = fixture.CreateDbContext();
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var service = new EmulatorScheduleService(
             db,
             dataCache,
             Mock.Of<ISchedulerFactory>(),
             stateStore,
+            flushService,
             NullLogger<EmulatorScheduleService>.Instance,
             Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
@@ -161,11 +167,13 @@ public sealed class EmulatorScheduleServiceTests
         await using var db = fixture.CreateDbContext();
         var stateStore = new TagRuntimeStateStore();
         var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
         var service = new EmulatorScheduleService(
             db,
             dataCache,
             Mock.Of<ISchedulerFactory>(),
             stateStore,
+            flushService,
             NullLogger<EmulatorScheduleService>.Instance,
             Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),
@@ -180,6 +188,47 @@ public sealed class EmulatorScheduleServiceTests
 
         var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-start");
         Assert.Equal("1", tag.Preview);
+    }
+
+    [Fact]
+    public async Task UnscheduleEmulatorAsync_FlushesDirtyTagPreviews()
+    {
+        await using var fixture = await ScheduleDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var scheduler = new Mock<IScheduler>();
+        scheduler
+            .Setup(s => s.GetJobKeys(It.IsAny<GroupMatcher<JobKey>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<JobKey>());
+
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduler.Object);
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var service = new EmulatorScheduleService(
+            db,
+            dataCache,
+            schedulerFactory.Object,
+            stateStore,
+            flushService,
+            NullLogger<EmulatorScheduleService>.Instance,
+            Options.Create(new UniEmuOptions()),
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
+        flushService.MarkDirty("em-1", "tg-interval", "123");
+
+        await service.UnscheduleEmulatorAsync("em-1", CancellationToken.None);
+
+        db.ChangeTracker.Clear();
+        var preview = await db.EmulatorTags
+            .Where(t => t.Id == "tg-interval")
+            .Select(t => t.Preview)
+            .SingleAsync();
+        Assert.Equal("123", preview);
     }
 
     private sealed class ScheduleDbFixture : IAsyncDisposable

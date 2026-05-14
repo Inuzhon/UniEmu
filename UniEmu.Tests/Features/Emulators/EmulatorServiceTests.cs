@@ -137,6 +137,7 @@ public sealed class EmulatorServiceTests
         stateStore ??= new TagRuntimeStateStore();
         broadcaster ??= new NoopRuntimeUpdateBroadcaster();
         var runtimeUpdateService = new RuntimeUpdateService(broadcaster);
+        var flushService = new TagPreviewFlushService(() => db, NullLogger<TagPreviewFlushService>.Instance);
         var scheduler = new Mock<IScheduler>();
         scheduler
             .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
@@ -161,6 +162,7 @@ public sealed class EmulatorServiceTests
             dataCache,
             schedulerFactory.Object,
             stateStore,
+            flushService,
             NullLogger<EmulatorScheduleService>.Instance,
             Options.Create(new UniEmuOptions()),
             new TelemetryValueGenerator(),

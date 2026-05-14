@@ -1,4 +1,5 @@
 using Autofac;
+using Microsoft.Extensions.DependencyInjection;
 using UniEmu.Data;
 using UniEmu.Features.CncPrograms;
 using UniEmu.Features.Common;
@@ -36,6 +37,11 @@ public static class UniEmuBackendServiceRegistration
         container.RegisterType<ScopedResourceValidator>().AsSelf().InstancePerLifetimeScope();
         container.RegisterType<RuntimeUpdateService>().AsSelf().InstancePerLifetimeScope();
         container.RegisterType<SignalRRuntimeUpdateBroadcaster>().As<IRuntimeUpdateBroadcaster>().InstancePerLifetimeScope();
+        container.Register(context => new TagPreviewFlushService(
+                context.Resolve<IServiceScopeFactory>(),
+                context.Resolve<ILogger<TagPreviewFlushService>>()))
+            .AsSelf()
+            .SingleInstance();
         container.RegisterType<EmulatorScheduleService>().AsSelf().InstancePerLifetimeScope();
         container.Register(context => new TagScriptExecutionService(
                 context.Resolve<UniEmuDbContext>(),

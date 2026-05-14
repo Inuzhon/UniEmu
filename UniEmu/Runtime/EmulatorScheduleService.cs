@@ -17,6 +17,7 @@ public sealed class EmulatorScheduleService(
     CachedUniEmuDataService dataCache,
     ISchedulerFactory schedulerFactory,
     TagRuntimeStateStore stateStore,
+    TagPreviewFlushService previewFlushService,
     ILogger<EmulatorScheduleService> logger,
     IOptions<UniEmuOptions> options,
     TelemetryValueGenerator valueGenerator,
@@ -84,6 +85,7 @@ public sealed class EmulatorScheduleService(
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
         await DeleteEmulatorJobsAsync(scheduler, emulatorId, cancellationToken);
         stateStore.ClearEmulator(emulatorId);
+        await previewFlushService.FlushAsync(cancellationToken);
     }
 
     public async Task ExecuteEventTagsAsync(

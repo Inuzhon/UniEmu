@@ -1,14 +1,44 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using UniEmu.Data;
 
 namespace UniEmu.Runtime;
 
-public sealed class TagPreviewFlushService(
-    Func<UniEmuDbContext> dbContextFactory,
-    ILogger<TagPreviewFlushService> logger)
+public sealed class TagPreviewFlushService
 {
     private readonly ConcurrentDictionary<TagPreviewKey, string> dirtyPreviews = new();
+    private readonly Func<DbContextLease> dbContextFactory;
+    private readonly ILogger<TagPreviewFlushService> logger;
+
+    public TagPreviewFlushService(
+        IServiceScopeFactory scopeFactory,
+        ILogger<TagPreviewFlushService> logger)
+        : this(
+            () =>
+            {
+                var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<UniEmuDbContext>();
+                return new DbContextLease(db, scope, disposeDbContext: true);
+            },
+            logger)
+    {
+    }
+
+    public TagPreviewFlushService(
+        Func<UniEmuDbContext> dbContextFactory,
+        ILogger<TagPreviewFlushService> logger)
+        : this(() => new DbContextLease(dbContextFactory(), null, disposeDbContext: false), logger)
+    {
+    }
+
+    private TagPreviewFlushService(
+        Func<DbContextLease> dbContextFactory,
+        ILogger<TagPreviewFlushService> logger)
+    {
+        this.dbContextFactory = dbContextFactory;
+        this.logger = logger;
+    }
 
     public void MarkDirty(string emulatorId, string tagId, string preview)
     {
@@ -30,7 +60,8 @@ public sealed class TagPreviewFlushService(
 
         try
         {
-            await using var db = dbContextFactory();
+            await using var lease = dbContextFactory();
+            var db = lease.DbContext;
             foreach (var item in batch)
             {
                 await db.EmulatorTags
@@ -52,4 +83,19 @@ public sealed class TagPreviewFlushService(
     }
 
     private sealed record TagPreviewKey(string EmulatorId, string TagId);
+
+    private sealed class DbContextLease(UniEmuDbContext dbContext, IServiceScope? scope, bool disposeDbContext) : IAsyncDisposable
+    {
+        public UniEmuDbContext DbContext { get; } = dbContext;
+
+        public async ValueTask DisposeAsync()
+        {
+            if (disposeDbContext)
+            {
+                await DbContext.DisposeAsync();
+            }
+
+            scope?.Dispose();
+        }
+    }
 }
