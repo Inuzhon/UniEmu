@@ -182,6 +182,30 @@ public sealed class TagValueJobTests
         Assert.Equal(17d, value.Value);
     }
 
+    [Fact]
+    public async Task Execute_StoresTagCalculationErrorOnEmulator()
+    {
+        await using var fixture = await TagValueJobDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var job = new TagValueJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            flushService,
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<TagValueJob>.Instance);
+
+        await job.Execute(CreateContext("tg-throws"));
+
+        var emulator = await db.Emulators.SingleAsync(e => e.Id == "em-1");
+        Assert.Contains("boom", emulator.LastError, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static IJobExecutionContext CreateContext(string tagId)
     {
         var context = new Mock<IJobExecutionContext>();
@@ -252,7 +276,8 @@ public sealed class TagValueJobTests
                     "cron",
                     TagType.Double,
                     "return 17;",
-                    new TagTriggerDto(TagTriggerMode.Cron, null, "0 0 * * *", null, null)));
+                    new TagTriggerDto(TagTriggerMode.Cron, null, "0 0 * * *", null, null)),
+                CreateTag("tg-throws", "Throwing script", "throws", TagType.Double, "throw new InvalidOperationException(\"boom\");"));
 
             await db.SaveChangesAsync();
         }

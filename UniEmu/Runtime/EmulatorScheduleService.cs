@@ -8,6 +8,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Hosting;
+using UniEmu.Mapping;
 using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
@@ -129,19 +130,26 @@ public sealed class EmulatorScheduleService(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Event tag generation failed for tag {TagId}", tag.Id);
+                var message = $"Ошибка вычисления события тега {tag.Name}: {ex.Message}";
+                emulator.LastError = message;
                 db.SystemEvents.Add(new SystemEventEntity
                 {
                     Id = $"ev-{Guid.NewGuid():N}"[..12],
                     EmulatorId = emulator.Id,
                     EmulatorName = emulator.Name,
                     Level = UniEmuJson.EnumString(EventLevel.Error),
-                    Message = $"Ошибка вычисления события тега {tag.Name}: {ex.Message}",
+                    Message = message,
                     Timestamp = now,
                 });
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(emulator.LastError))
+        {
+            dataCache.InvalidateEmulator(emulator.Id);
+            await runtimeUpdateService.PublishEmulatorUpdatedAsync(emulator.ToDto(emulator.Tags.Count), cancellationToken);
+        }
     }
 
     private async Task<GeneratedTagValue> GenerateTagValueAsync(
@@ -241,16 +249,34 @@ public sealed class EmulatorScheduleService(
         if (quartzTrigger is null)
         {
             logger.LogWarning("Skipping invalid trigger for tag {TagId}", tag.Id);
+            var message = $"Некорректное расписание тега {tag.Name}";
             db.SystemEvents.Add(new SystemEventEntity
             {
                 Id = $"ev-{Guid.NewGuid():N}"[..12],
                 EmulatorId = emulator.Id,
                 EmulatorName = emulator.Name,
                 Level = UniEmuJson.EnumString(EventLevel.Error),
-                Message = $"Некорректное расписание тега {tag.Name}",
+                Message = message,
                 Timestamp = DateTimeOffset.UtcNow,
             });
+
+            var trackedEmulator = await db.Emulators
+                .Include(e => e.Tags)
+                .FirstOrDefaultAsync(e => e.Id == emulator.Id, cancellationToken);
+            if (trackedEmulator is not null)
+            {
+                trackedEmulator.LastError = message;
+                dataCache.InvalidateEmulator(trackedEmulator.Id);
+            }
+
             await db.SaveChangesAsync(cancellationToken);
+            if (trackedEmulator is not null)
+            {
+                await runtimeUpdateService.PublishEmulatorUpdatedAsync(
+                    trackedEmulator.ToDto(trackedEmulator.Tags.Count),
+                    cancellationToken);
+            }
+
             return;
         }
 

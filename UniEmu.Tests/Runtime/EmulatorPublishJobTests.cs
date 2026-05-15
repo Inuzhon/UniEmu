@@ -377,6 +377,48 @@ public sealed class EmulatorPublishJobTests
         Assert.Equal("cron-old", value.Value);
     }
 
+    [Fact]
+    public async Task Execute_StoresTagCalculationErrorOnEmulator()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.Emulators.Add(new EmulatorEntity
+        {
+            Id = "emu-1",
+            Name = "Main emulator",
+            Status = nameof(EmulatorStatus.Running),
+            ProtocolId = 18,
+            TargetUrl = "http://dispatcher.test",
+            IntervalSec = 1,
+            Tags =
+            [
+                CreateScriptTag(
+                    "tg-throws",
+                    "Throwing tag",
+                    TagTriggerMode.Interval,
+                    null,
+                    "0",
+                    "throw new InvalidOperationException(\"script boom\");"),
+            ],
+        });
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var job = CreateJob(db, dataCache, stateStore, CreateSender(new CaptureMonitoringHandler()));
+
+        await job.Execute(CreateContext("emu-1"));
+
+        var emulator = await db.Emulators.SingleAsync(e => e.Id == "emu-1");
+        Assert.Contains("script boom", emulator.LastError, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static EmulatorTagEntity CreateTag(string name, string key, bool enabled)
     {
         return new EmulatorTagEntity

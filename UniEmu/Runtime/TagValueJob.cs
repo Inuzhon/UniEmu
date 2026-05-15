@@ -1,8 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using Quartz;
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Mapping;
 using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
@@ -56,17 +58,37 @@ public sealed class TagValueJob(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Tag value generation failed for tag {TagId}", tagId);
-            db.SystemEvents.Add(new SystemEventEntity
+            var message = $"Ошибка вычисления тега {tag.Name}: {ex.Message}";
+            var systemEvent = new SystemEventEntity
             {
                 Id = $"ev-{Guid.NewGuid():N}"[..12],
                 EmulatorId = emulator.Id,
                 EmulatorName = emulator.Name,
                 Level = UniEmuJson.EnumString(EventLevel.Error),
-                Message = $"Ошибка вычисления тега {tag.Name}: {ex.Message}",
+                Message = message,
                 Timestamp = now,
-            });
+            };
+            db.SystemEvents.Add(systemEvent);
+
+            var trackedEmulator = await db.Emulators
+                .Include(e => e.Tags)
+                .FirstOrDefaultAsync(e => e.Id == emulator.Id, cancellationToken);
+            if (trackedEmulator is not null)
+            {
+                trackedEmulator.LastError = message;
+                dataCache.InvalidateEmulator(trackedEmulator.Id);
+            }
 
             await db.SaveChangesAsync(cancellationToken);
+
+            if (trackedEmulator is not null)
+            {
+                await runtimeUpdateService.PublishEmulatorUpdatedAsync(
+                    trackedEmulator.ToDto(trackedEmulator.Tags.Count),
+                    cancellationToken);
+            }
+
+            await runtimeUpdateService.PublishEventCreatedAsync(systemEvent.ToDto(), cancellationToken);
         }
     }
 

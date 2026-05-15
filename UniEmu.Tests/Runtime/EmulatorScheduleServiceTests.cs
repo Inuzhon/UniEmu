@@ -191,6 +191,84 @@ public sealed class EmulatorScheduleServiceTests
     }
 
     [Fact]
+    public async Task ExecuteEventTagsAsync_StoresCalculationErrorOnEmulator()
+    {
+        await using var fixture = await ScheduleDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(new EmulatorTagEntity
+        {
+            Id = "tg-event-throws",
+            EmulatorId = "em-1",
+            Name = "Throwing event tag",
+            Key = "tg-event-throws",
+            Type = UniEmuJson.EnumString(TagType.Double),
+            Source = UniEmuJson.EnumString(TagSource.Script),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+            FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, "throw new InvalidOperationException(\"event boom\");")),
+        });
+        await db.SaveChangesAsync();
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var service = new EmulatorScheduleService(
+            db,
+            dataCache,
+            Mock.Of<ISchedulerFactory>(),
+            stateStore,
+            flushService,
+            NullLogger<EmulatorScheduleService>.Instance,
+            Options.Create(new UniEmuOptions()),
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
+
+        await service.ExecuteEventTagsAsync("em-1", TagTriggerEvent.OnStart, CancellationToken.None);
+
+        var emulator = await db.Emulators.SingleAsync(e => e.Id == "em-1");
+        Assert.Contains("event boom", emulator.LastError, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ScheduleEmulatorAsync_StoresInvalidTagScheduleOnEmulator()
+    {
+        await using var fixture = await ScheduleDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(ScheduleDbFixture.CreateCronTag("tg-bad-cron", "Bad cron", "bad cron"));
+        await db.SaveChangesAsync();
+        var scheduler = new Mock<IScheduler>();
+        scheduler
+            .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTimeOffset.UtcNow);
+        scheduler
+            .Setup(s => s.GetJobKeys(It.IsAny<GroupMatcher<JobKey>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<JobKey>());
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduler.Object);
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var service = new EmulatorScheduleService(
+            db,
+            dataCache,
+            schedulerFactory.Object,
+            stateStore,
+            flushService,
+            NullLogger<EmulatorScheduleService>.Instance,
+            Options.Create(new UniEmuOptions()),
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
+
+        await service.ScheduleEmulatorAsync("em-1", CancellationToken.None);
+
+        var emulator = await db.Emulators.SingleAsync(e => e.Id == "em-1");
+        Assert.Contains("Некорректное расписание тега Bad cron", emulator.LastError, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UnscheduleEmulatorAsync_FlushesDirtyTagPreviews()
     {
         await using var fixture = await ScheduleDbFixture.CreateAsync();

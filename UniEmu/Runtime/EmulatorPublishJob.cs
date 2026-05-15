@@ -43,6 +43,7 @@ public sealed class EmulatorPublishJob(
 
         var now = DateTimeOffset.UtcNow;
         var scheduledAt = context.ScheduledFireTimeUtc ?? now;
+        emulator.LastError = null;
         var generatedValues = await BuildValuesAsync(emulator, now, scheduledAt, cancellationToken);
         var telemetryValues = BuildTelemetryValues(generatedValues);
 
@@ -67,7 +68,6 @@ public sealed class EmulatorPublishJob(
             var request = new UniversalPostRequest(machineIntegrationId, UseInnerId: true, dispatcherValues);
             var answer = await sender.SendMonitoringAsync(emulator.TargetUrl, request, cancellationToken);
             await HandleDispatcherAnswerAsync(emulator, machineIntegrationId, mainProgram, subProgram, answer, cancellationToken);
-            emulator.LastError = null;
             emulator.TotalRequests++;
         }
         catch (Exception ex)
@@ -222,13 +222,15 @@ public sealed class EmulatorPublishJob(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Formula script tag generation failed for tag {TagId}", tag.Id);
+                var message = $"Ошибка вычисления формулы-скрипта тега {tag.Name}: {ex.Message}";
+                emulator.LastError = message;
                 db.SystemEvents.Add(new SystemEventEntity
                 {
                     Id = $"ev-{Guid.NewGuid():N}"[..12],
                     EmulatorId = emulator.Id,
                     EmulatorName = emulator.Name,
                     Level = UniEmuJson.EnumString(EventLevel.Error),
-                    Message = $"Ошибка вычисления формулы-скрипта тега {tag.Name}: {ex.Message}",
+                    Message = message,
                     Timestamp = timestamp,
                 });
 
@@ -248,13 +250,15 @@ public sealed class EmulatorPublishJob(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Script tag generation failed for tag {TagId}", tag.Id);
+            var message = $"Ошибка вычисления скрипта тега {tag.Name}: {ex.Message}";
+            emulator.LastError = message;
             db.SystemEvents.Add(new SystemEventEntity
             {
                 Id = $"ev-{Guid.NewGuid():N}"[..12],
                 EmulatorId = emulator.Id,
                 EmulatorName = emulator.Name,
                 Level = UniEmuJson.EnumString(EventLevel.Error),
-                Message = $"Ошибка вычисления скрипта тега {tag.Name}: {ex.Message}",
+                Message = message,
                 Timestamp = timestamp,
             });
 
