@@ -60,9 +60,9 @@
 
   <Target Name="PublishClientApp" AfterTargets="ComputeFilesToPublish" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release'">
     <ItemGroup>
-      <DistFiles Include="$(SpaRoot)**\*.*" />
+      <DistFiles Include="$(SpaRoot)dist\**\*" />
       <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
-        <RelativePath>%(DistFiles.Identity)</RelativePath>
+        <RelativePath>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       </ResolvedFileToPublish>
     </ItemGroup>
