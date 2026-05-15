@@ -101,6 +101,95 @@ public sealed class TagScriptExecutionServiceTests
     }
 
     [Fact]
+    public async Task GenerateScriptTagAsync_ExposesStateMetadataAndExecutionCounter()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        stateStore.Set("em-1", "tg-state-metadata", "State metadata", 5.5d, 5.5d, DateTimeOffset.Parse("2026-05-11T09:59:59Z"));
+        var service = CreateService(db, stateStore);
+        var (emulator, tag) = await LoadAsync(db, "tg-state-metadata");
+
+        var first = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None);
+        var second = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:01Z"), CancellationToken.None);
+
+        Assert.Equal(1011d, first.Value);
+        Assert.Equal(1111d, second.Value);
+
+        var state = await db.ScriptRuntimeStates.SingleAsync(s => s.EmulatorId == "em-1" && s.ScriptKey == "inline:tg-state-metadata");
+        Assert.Contains("\"runs\":2", state.ValuesJson);
+    }
+
+    [Fact]
+    public async Task GenerateScriptTagAsync_AllowsScriptStateRemoveAndClear()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.ScriptRuntimeStates.Add(new ScriptRuntimeStateEntity
+        {
+            Id = "srs-clear",
+            EmulatorId = "em-1",
+            ScriptKey = "inline:tg-state-clear",
+            ValuesJson = """{"stale":10,"other":20}""",
+            UpdatedAt = DateTimeOffset.Parse("2026-05-11T09:59:59Z"),
+        });
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new TagRuntimeStateStore());
+        var (emulator, tag) = await LoadAsync(db, "tg-state-clear");
+
+        var value = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(10, value.Value);
+        var state = await db.ScriptRuntimeStates.SingleAsync(s => s.EmulatorId == "em-1" && s.ScriptKey == "inline:tg-state-clear");
+        Assert.Equal("{}", state.ValuesJson);
+    }
+
+    [Fact]
+    public async Task GenerateScriptTagAsync_ExecutesSavedEmulatorScriptThatLoadsSharedHelper()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db, new TagRuntimeStateStore());
+        var (emulator, tag) = await LoadAsync(db, "tg-shared-helper");
+
+        var value = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(25d, value.Value);
+        Assert.Equal(25d, value.NumericValue);
+    }
+
+    [Fact]
+    public async Task GenerateScriptTagAsync_AllowsSharedHelperToUseScriptState()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db, new TagRuntimeStateStore());
+        var (emulator, tag) = await LoadAsync(db, "tg-shared-state");
+
+        var first = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None);
+        var second = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:01Z"), CancellationToken.None);
+
+        Assert.Equal(10, first.Value);
+        Assert.Equal(20, second.Value);
+
+        var state = await db.ScriptRuntimeStates.SingleAsync(s => s.EmulatorId == "em-1" && s.ScriptKey == "script:scr-state-entry");
+        Assert.Contains("\"sharedRuns\":2", state.ValuesJson);
+    }
+
+    [Fact]
+    public async Task GenerateScriptTagAsync_ResolvesRelativeLoadFromSavedEmulatorScriptFolder()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db, new TagRuntimeStateStore());
+        var (emulator, tag) = await LoadAsync(db, "tg-relative-load");
+
+        var value = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(77, value.Value);
+    }
+
+    [Fact]
     public async Task GenerateScriptTagAsync_BlocksForbiddenRuntimeApi()
     {
         await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
@@ -256,6 +345,31 @@ public sealed class TagScriptExecutionServiceTests
                     return count;
                     """),
                 CreateScriptTag(
+                    "tg-state-metadata",
+                    "State metadata",
+                    "state-metadata",
+                    TagType.Double,
+                    """
+                    var runs = UniEmu.State.Get<int>("runs", 0);
+                    UniEmu.State.Set("runs", runs + 1);
+
+                    return (UniEmu.State.IsRunning ? 1000 : 0)
+                        + (runs * 100)
+                        + (UniEmu.State.PrevNumericValue == 5.5 ? 10 : 0)
+                        + (UniEmu.State.PrevTimestamp.HasValue ? 1 : 0);
+                    """),
+                CreateScriptTag(
+                    "tg-state-clear",
+                    "State clear",
+                    "state-clear",
+                    TagType.Int,
+                    """
+                    var stale = UniEmu.State.Get<int>("stale", -1);
+                    UniEmu.State.Remove("stale");
+                    UniEmu.State.Clear();
+                    return stale;
+                    """),
+                CreateScriptTag(
                     "tg-forbidden-api",
                     "Forbidden API",
                     "forbidden-api",
@@ -270,10 +384,67 @@ public sealed class TagScriptExecutionServiceTests
                     var worker = await UniEmu.Rest.GetActiveWorkerAsync();
                     return worker?.Id ?? -1;
                     """),
+                CreateSavedScriptTag("tg-shared-helper", "Shared helper", "shared-helper", TagType.Double, "scr-shared-entry"),
+                CreateSavedScriptTag("tg-shared-state", "Shared state", "shared-state", TagType.Int, "scr-state-entry"),
+                CreateSavedScriptTag("tg-relative-load", "Relative load", "relative-load", TagType.Int, "scr-relative-entry"),
                 CreateTag("tg-pressure", "Pressure", "pressure", TagType.Double, TagSource.Static, "12.5"),
                 CreateTag("tg-enabled", "Enabled", "enabled", TagType.Bool, TagSource.Static, "true"),
                 CreateTag("tg-label", "Label", "label", TagType.String, TagSource.Static, "abc"),
                 CreateTag("tg-setpoint", "Setpoint", "setpoint", TagType.Double, TagSource.Static, "0", roundDigits: 2));
+
+            db.ScriptFiles.AddRange(
+                CreateScriptFile(
+                    "scr-shared-math",
+                    "shared/math.csx",
+                    ScriptScope.Shared,
+                    null,
+                    "double ClampDouble(double value, double min, double max) => Math.Min(Math.Max(value, min), max);"),
+                CreateScriptFile(
+                    "scr-shared-state",
+                    "shared/state.csx",
+                    ScriptScope.Shared,
+                    null,
+                    """
+                    int NextSharedRun(TagScriptStateContext state)
+                    {
+                        var count = state.Get<int>("sharedRuns", 0) + 1;
+                        state.Set("sharedRuns", count);
+                        return count;
+                    }
+                    """),
+                CreateScriptFile(
+                    "scr-shared-entry",
+                    "machine/calc.csx",
+                    ScriptScope.Emulator,
+                    "em-1",
+                    """
+                    #load "shared/math.csx"
+                    return ClampDouble(40, 0, 25);
+                    """),
+                CreateScriptFile(
+                    "scr-state-entry",
+                    "machine/stateful.csx",
+                    ScriptScope.Emulator,
+                    "em-1",
+                    """
+                    #load "shared/state.csx"
+                    return NextSharedRun(UniEmu.State) * 10;
+                    """),
+                CreateScriptFile(
+                    "scr-relative-entry",
+                    "machine/main.csx",
+                    ScriptScope.Emulator,
+                    "em-1",
+                    """
+                    #load "helpers/local.csx"
+                    return LocalValue();
+                    """),
+                CreateScriptFile(
+                    "scr-relative-helper",
+                    "machine/helpers/local.csx",
+                    ScriptScope.Emulator,
+                    "em-1",
+                    "int LocalValue() => 77;"));
 
             await db.SaveChangesAsync();
         }
@@ -281,6 +452,11 @@ public sealed class TagScriptExecutionServiceTests
         private static EmulatorTagEntity CreateScriptTag(string id, string name, string key, TagType type, string script)
         {
             return CreateTag(id, name, key, type, TagSource.Script, "0", script);
+        }
+
+        private static EmulatorTagEntity CreateSavedScriptTag(string id, string name, string key, TagType type, string scriptId)
+        {
+            return CreateTag(id, name, key, type, TagSource.Script, "0", scriptId: scriptId);
         }
 
         private static EmulatorTagEntity CreateTag(
@@ -291,6 +467,7 @@ public sealed class TagScriptExecutionServiceTests
             TagSource source,
             string preview,
             string? script = null,
+            string? scriptId = null,
             int? roundDigits = null)
         {
             return new EmulatorTagEntity
@@ -304,7 +481,26 @@ public sealed class TagScriptExecutionServiceTests
                 Preview = preview,
                 RoundDigits = roundDigits,
                 TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
-                FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, script)),
+                FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(scriptId, script)),
+            };
+        }
+
+        private static ScriptFileEntity CreateScriptFile(
+            string id,
+            string name,
+            ScriptScope scope,
+            string? emulatorId,
+            string content)
+        {
+            return new ScriptFileEntity
+            {
+                Id = id,
+                Name = name,
+                Scope = UniEmuJson.EnumString(scope),
+                EmulatorId = emulatorId,
+                Content = content,
+                SizeBytes = System.Text.Encoding.UTF8.GetByteCount(content),
+                UpdatedAt = DateTimeOffset.Parse("2026-05-11T09:00:00Z"),
             };
         }
     }
