@@ -15,5 +15,9 @@ public sealed class UniEmuOptions
 
     public bool DisableStaticAssets { get; set; }
 
+    public bool EnableStaticAssetCompression { get; set; }
+
+    public bool EnableStaticAssetCaching { get; set; }
+
     public int DispatcherBlockCheckIntervalSeconds { get; set; } = 5;
 }

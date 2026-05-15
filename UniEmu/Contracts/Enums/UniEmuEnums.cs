@@ -63,6 +63,10 @@ public enum TagSource
     [JsonStringEnumMemberName("generator")]
     Generator,
 
+    /// <summary>Значение, рассчитанное генератором и затем обработанное CSX-скриптом.</summary>
+    [JsonStringEnumMemberName("formulaScript")]
+    FormulaScript,
+
     /// <summary>Значение, полученное из CNC-данных.</summary>
     [JsonStringEnumMemberName("cnc")]
     Cnc,

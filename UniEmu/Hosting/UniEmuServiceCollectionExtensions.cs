@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.ResponseCompression;
 using Quartz;
 using UniEmu.Common;
 using UniEmu.Data;
@@ -34,6 +35,18 @@ public static class UniEmuServiceCollectionExtensions
                 UniEmuJson.Apply(options.PayloadSerializerOptions);
             });
         services.AddMemoryCache();
+
+        return services;
+    }
+
+    public static IServiceCollection AddUniEmuStaticAssetCompression(this IServiceCollection services)
+    {
+        services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+        });
 
         return services;
     }

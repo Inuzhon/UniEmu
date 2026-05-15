@@ -130,7 +130,7 @@ public sealed class TelemetryValueGenerator
         var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
         return source switch
         {
-            TagSource.Generator => GenerateFromCalc(UniEmuJson.Deserialize<TagCalcConfigDto>(tag.CalcJson), elapsedSec, tag.Preview),
+            TagSource.Generator or TagSource.FormulaScript => GenerateFromCalc(UniEmuJson.Deserialize<TagCalcConfigDto>(tag.CalcJson), elapsedSec, tag.Preview),
             TagSource.Scenario => GenerateFromScenario(UniEmuJson.Deserialize<TagScenarioConfigDto>(tag.ScenarioJson), elapsedSec, tag.Preview),
             _ => ParsePreview(tag.Preview),
         };

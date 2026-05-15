@@ -43,9 +43,7 @@ public sealed class TagValueJob(
         try
         {
             var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
-            var value = source is TagSource.Script or TagSource.Formula
-                ? await scriptExecutionService.GenerateScriptTagAsync(emulator, tag, now, cancellationToken)
-                : valueGenerator.GenerateTag(emulator, tag, now);
+            var value = await GenerateTagValueAsync(emulator, tag, source, now, cancellationToken);
 
             var preview = TelemetryValueGenerator.ToPreview(value.Value);
             tag.Preview = preview;
@@ -70,5 +68,28 @@ public sealed class TagValueJob(
 
             await db.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task<GeneratedTagValue> GenerateTagValueAsync(
+        EmulatorEntity emulator,
+        EmulatorTagEntity tag,
+        TagSource source,
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken)
+    {
+        if (source == TagSource.FormulaScript)
+        {
+            var generated = valueGenerator.GenerateTag(emulator, tag, timestamp);
+            return await scriptExecutionService.GenerateScriptTagAsync(
+                emulator,
+                tag,
+                timestamp,
+                cancellationToken,
+                generated.Value);
+        }
+
+        return source is TagSource.Script or TagSource.Formula
+            ? await scriptExecutionService.GenerateScriptTagAsync(emulator, tag, timestamp, cancellationToken)
+            : valueGenerator.GenerateTag(emulator, tag, timestamp);
     }
 }

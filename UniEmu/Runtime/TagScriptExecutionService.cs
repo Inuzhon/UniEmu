@@ -104,7 +104,8 @@ public sealed class TagScriptExecutionService
         EmulatorEntity emulator,
         EmulatorTagEntity tag,
         DateTimeOffset timestamp,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        object? currentValue = null)
     {
         var script = await ResolveEntryScriptAsync(emulator.Id, tag, cancellationToken);
         var entryContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(script.Content);
@@ -117,7 +118,7 @@ public sealed class TagScriptExecutionService
         var state = await GetOrCreateStateAsync(emulator.Id, script.StateKey, cancellationToken);
         var stateValues = UniEmuJson.Deserialize<Dictionary<string, object?>>(state.ValuesJson)
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        var globals = BuildGlobals(emulator, tag, timestamp, stateValues, cancellationToken);
+        var globals = BuildGlobals(emulator, tag, timestamp, stateValues, cancellationToken, currentValue);
         var scriptOptions = scriptEnvironment.CreateScriptOptions(script.Path, scripts);
         ValidateSecurity(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals), cancellationToken);
         var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals));
@@ -232,13 +233,17 @@ public sealed class TagScriptExecutionService
         EmulatorTagEntity tag,
         DateTimeOffset timestamp,
         Dictionary<string, object?> stateValues,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        object? currentValue)
     {
         var values = emulator.Tags
             .Select(t =>
             {
                 var tagType = UniEmuJson.EnumValue<TagType>(t.Type);
                 var scriptTagType = ToScriptValueType(tagType);
+                if (t.Id == tag.Id && currentValue is not null)
+                    return new TagScriptValue(t.Key, t.Name, currentValue, scriptTagType, timestamp);
+
                 if (stateStore.TryGet(emulator.Id, t.Id, out var runtimeValue))
                     return new TagScriptValue(t.Key, t.Name, runtimeValue.Value, scriptTagType, runtimeValue.Timestamp);
 
@@ -251,9 +256,11 @@ public sealed class TagScriptExecutionService
         var scriptNow = ApplicationGlobalization.ToApplicationTime(timestamp);
 
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
+        var tagValue = currentValue ?? previous?.Value;
+        var tagTimestamp = currentValue is null ? previous?.Timestamp : timestamp;
         return new TagScriptGlobals(
             scriptNow,
-            new TagScriptValue(tag.Key, tag.Name, previous?.Value, ToScriptValueType(tagType), previous?.Timestamp),
+            new TagScriptValue(tag.Key, tag.Name, tagValue, ToScriptValueType(tagType), tagTimestamp),
             new TagScriptTagAccessor(
                 values,
                 (tagName, value) => SetStaticTag(emulator, tagName, value, timestamp)),

@@ -128,6 +128,34 @@ public sealed class TagValueJobTests
     }
 
     [Fact]
+    public async Task Execute_FormulaScriptPassesGeneratedValueToScriptTagValue()
+    {
+        await using var fixture = await TagValueJobDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var job = new TagValueJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            flushService,
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<TagValueJob>.Instance);
+
+        await job.Execute(CreateContext("tg-formula-script"));
+        await flushService.FlushAsync();
+
+        Assert.True(stateStore.TryGet("em-1", "tg-formula-script", out var value));
+        Assert.Equal(42d, value.Value);
+        Assert.Equal(42d, value.NumericValue);
+        var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-formula-script");
+        Assert.Equal("42", tag.Preview);
+    }
+
+    [Fact]
     public async Task Execute_DoesNotPersistPreviewBeforeFlush()
     {
         await using var fixture = await TagValueJobDbFixture.CreateAsync();
@@ -217,6 +245,7 @@ public sealed class TagValueJobTests
                 CreateTag("tg-start", "Start script", "start", TagType.Double, "return 5;"),
                 CreateTag("tg-now", "Now script", "now", TagType.String, "return Now;"),
                 CreateTag("tg-now-offset", "Now offset script", "now-offset", TagType.Double, "return Now.Offset.TotalHours;"),
+                CreateFormulaScriptTag("tg-formula-script", "Formula script", "formula-script"),
                 CreateTag(
                     "tg-cron",
                     "Cron script",
@@ -247,6 +276,31 @@ public sealed class TagValueJobTests
                 Preview = "(computed)",
                 TriggerJson = UniEmuJson.Serialize(trigger ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
                 FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, script)),
+            };
+        }
+
+        private static EmulatorTagEntity CreateFormulaScriptTag(string id, string name, string key)
+        {
+            return new EmulatorTagEntity
+            {
+                Id = id,
+                EmulatorId = "em-1",
+                Name = name,
+                Key = key,
+                Type = UniEmuJson.EnumString(TagType.Double),
+                Source = UniEmuJson.EnumString(TagSource.FormulaScript),
+                Preview = "0",
+                TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+                CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(
+                    CalcType.Sequence,
+                    Start: "[21]",
+                    Finish: null,
+                    Duration: 1,
+                    Amplitude: null,
+                    Period: null,
+                    Curvature: null,
+                    Distortion: null)),
+                FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, "return (double)UniEmu.Tag.Value! * 2;")),
             };
         }
     }

@@ -17,6 +17,8 @@ public sealed class UniEmuOptionsTests
                 ["UniEmu:SkipStartupDatabase"] = "true",
                 ["UniEmu:SeedData"] = "true",
                 ["UniEmu:DisableStaticAssets"] = "true",
+                ["UniEmu:EnableStaticAssetCompression"] = "true",
+                ["UniEmu:EnableStaticAssetCaching"] = "true",
                 ["UniEmu:DispatcherBlockCheckIntervalSeconds"] = "9",
             })
             .Build();
@@ -30,6 +32,8 @@ public sealed class UniEmuOptionsTests
         Assert.True(options.SkipStartupDatabase);
         Assert.True(options.SeedData);
         Assert.True(options.DisableStaticAssets);
+        Assert.True(options.EnableStaticAssetCompression);
+        Assert.True(options.EnableStaticAssetCaching);
         Assert.Equal(9, options.DispatcherBlockCheckIntervalSeconds);
     }
 }

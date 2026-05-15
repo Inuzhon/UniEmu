@@ -207,6 +207,35 @@ public sealed class EmulatorPublishJob(
         CancellationToken cancellationToken)
     {
         var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+        if (source == TagSource.FormulaScript)
+        {
+            var generated = valueGenerator.GenerateTag(emulator, tag, timestamp);
+            try
+            {
+                return await scriptExecutionService.GenerateScriptTagAsync(
+                    emulator,
+                    tag,
+                    timestamp,
+                    cancellationToken,
+                    generated.Value);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Formula script tag generation failed for tag {TagId}", tag.Id);
+                db.SystemEvents.Add(new SystemEventEntity
+                {
+                    Id = $"ev-{Guid.NewGuid():N}"[..12],
+                    EmulatorId = emulator.Id,
+                    EmulatorName = emulator.Name,
+                    Level = UniEmuJson.EnumString(EventLevel.Error),
+                    Message = $"Ошибка вычисления формулы-скрипта тега {tag.Name}: {ex.Message}",
+                    Timestamp = timestamp,
+                });
+
+                return generated;
+            }
+        }
+
         if (source is not (TagSource.Script or TagSource.Formula))
         {
             return valueGenerator.GenerateTag(emulator, tag, timestamp);

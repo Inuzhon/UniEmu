@@ -28,6 +28,7 @@ builder.Host.ConfigureContainer<ContainerBuilder>(UniEmuBackendServiceRegistrati
 
 builder.Services
     .AddUniEmuOptions(builder.Configuration)
+    .AddUniEmuStaticAssetCompression()
     .AddUniEmuWebApi()
     .AddUniEmuDatabase(builder.Configuration)
     .AddUniEmuHttpClients()
@@ -37,6 +38,7 @@ var app = builder.Build();
 
 await app.InitializeUniEmuDatabaseAsync();
 app.PersistRuntimeStateOnShutdown();
+app.UseUniEmuStaticAssetCompression();
 app.UseUniEmuStaticAssets();
 
 if (app.Environment.IsDevelopment())
