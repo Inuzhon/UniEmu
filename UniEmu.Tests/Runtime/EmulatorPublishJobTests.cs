@@ -189,6 +189,147 @@ public sealed class EmulatorPublishJobTests
     }
 
     [Fact]
+    public async Task BuildValuesAsync_CalculatesFrameNumberAndTextFromProgramName()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.CncPrograms.Add(CreateProgram("cnc-main", "Cycle.nc", CncScope.Shared, null, "N10\r\nN20\r\nN30\r\nM30\r\n"));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var timestamp = DateTimeOffset.Parse("2026-05-10T12:00:10Z");
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 2,
+            StartedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z"),
+            Tags =
+            [
+                CreateSpecialTag("tg-prg", "Program", "PrgName", TagType.String, TagSource.Static, "Cycle.nc", SpecialParameter.PrgName),
+                CreateSpecialTag("tg-frame-num", "Frame number", "FrameNum", TagType.Int, TagSource.Static, "0", SpecialParameter.FrameNum),
+                CreateSpecialTag("tg-frame-text", "Frame text", "FrameText", TagType.String, TagSource.Static, "", SpecialParameter.FrameText),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+
+        Assert.Equal("Cycle.nc", values.Single(value => value.SpecialParameter == SpecialParameter.PrgName).Value);
+        Assert.Equal(1, values.Single(value => value.SpecialParameter == SpecialParameter.FrameNum).Value);
+        Assert.Equal("N20", values.Single(value => value.SpecialParameter == SpecialParameter.FrameText).Value);
+        Assert.Equal("1", emulator.Tags.Single(tag => tag.Id == "tg-frame-num").Preview);
+        Assert.Equal("N20", emulator.Tags.Single(tag => tag.Id == "tg-frame-text").Preview);
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_AdvancesThroughEveryFrameUntilShortProgramEnd()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.CncPrograms.Add(CreateProgram("cnc-short", "Short.nc", CncScope.Shared, null, "N10\nN20\nM30"));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var startedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var emulator = CreateFrameCalculationEmulator(startedAt, intervalSec: 1, programName: "Short.nc");
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var firstFrame = await InvokeBuildValuesAsync(job, emulator, startedAt);
+        var secondFrame = await InvokeBuildValuesAsync(job, emulator, startedAt.AddSeconds(1));
+        var lastFrame = await InvokeBuildValuesAsync(job, emulator, startedAt.AddSeconds(2));
+
+        AssertProgramFrame(firstFrame, 0, "N10");
+        AssertProgramFrame(secondFrame, 1, "N20");
+        AssertProgramFrame(lastFrame, 2, "M30");
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_LoopsShortProgramFrameCounterAfterLastFrame()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.CncPrograms.Add(CreateProgram("cnc-short", "Short.nc", CncScope.Shared, null, "N10\nN20\nM30"));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var startedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var emulator = CreateFrameCalculationEmulator(startedAt, intervalSec: 1, programName: "Short.nc");
+        var job = CreateJob(db, dataCache, stateStore);
+
+        _ = await InvokeBuildValuesAsync(job, emulator, startedAt);
+        _ = await InvokeBuildValuesAsync(job, emulator, startedAt.AddSeconds(1));
+        _ = await InvokeBuildValuesAsync(job, emulator, startedAt.AddSeconds(2));
+        var loopedFrame = await InvokeBuildValuesAsync(job, emulator, startedAt.AddSeconds(3));
+
+        AssertProgramFrame(loopedFrame, 0, "N10");
+        Assert.Equal("0", emulator.Tags.Single(tag => tag.Id == "tg-frame-num").Preview);
+        Assert.Equal("N10", emulator.Tags.Single(tag => tag.Id == "tg-frame-text").Preview);
+    }
+
+    [Fact]
+    public async Task Execute_ResolvesProgramByPrgNameAndSendsMatchingContent_WhenDispatcherRequestsMainProgram()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        const string programContent = "G1 X10\nM30";
+        db.Emulators.Add(new EmulatorEntity
+        {
+            Id = "emu-1",
+            Name = "Main emulator",
+            Status = nameof(EmulatorStatus.Running),
+            ProtocolId = 18,
+            TargetUrl = "http://dispatcher.test",
+            IntervalSec = 1,
+            Tags =
+            [
+                CreateSpecialTag("tg-prg", "Program", "PrgName", TagType.String, TagSource.Static, "MAIN.NC", SpecialParameter.PrgName),
+            ],
+        });
+        db.CncPrograms.Add(CreateProgram("cnc-main", "main.nc", CncScope.Shared, null, programContent));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var handler = new DispatcherProgramUploadHandler();
+        var job = CreateJob(db, dataCache, stateStore, CreateSender(handler));
+
+        await job.Execute(CreateContext("emu-1"));
+
+        Assert.Contains("\"Key\":\"PrgName\"", handler.MonitoringJson);
+        Assert.Contains("\"Value\":\"MAIN.NC\"", handler.MonitoringJson);
+        Assert.Equal(programContent, handler.UploadedProgramText);
+        Assert.Equal(18, handler.UploadedMachineIntegrationId);
+    }
+
+    [Fact]
     public async Task HandleDispatcherAnswerAsync_StoresReceivedProgramNameInStaticPrgName()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -504,6 +645,35 @@ public sealed class EmulatorPublishJobTests
         };
     }
 
+    private static EmulatorEntity CreateFrameCalculationEmulator(
+        DateTimeOffset startedAt,
+        int intervalSec,
+        string programName)
+    {
+        return new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = intervalSec,
+            StartedAt = startedAt,
+            Tags =
+            [
+                CreateSpecialTag("tg-prg", "Program", "PrgName", TagType.String, TagSource.Static, programName, SpecialParameter.PrgName),
+                CreateSpecialTag("tg-frame-num", "Frame number", "FrameNum", TagType.Int, TagSource.Static, "0", SpecialParameter.FrameNum),
+                CreateSpecialTag("tg-frame-text", "Frame text", "FrameText", TagType.String, TagSource.Static, "", SpecialParameter.FrameText),
+            ],
+        };
+    }
+
+    private static void AssertProgramFrame(
+        IReadOnlyList<GeneratedTagValue> values,
+        int expectedNumber,
+        string expectedText)
+    {
+        Assert.Equal(expectedNumber, values.Single(value => value.SpecialParameter == SpecialParameter.FrameNum).Value);
+        Assert.Equal(expectedText, values.Single(value => value.SpecialParameter == SpecialParameter.FrameText).Value);
+    }
+
     private static EmulatorTagEntity CreateScriptTag(
         string id,
         string name,
@@ -651,6 +821,60 @@ public sealed class EmulatorPublishJobTests
             {
                 Content = new StringContent("not found"),
             });
+        }
+    }
+
+    private sealed class DispatcherProgramUploadHandler : HttpMessageHandler
+    {
+        private readonly MemoryStream uploadedProgram = new();
+
+        public string MonitoringJson { get; private set; } = string.Empty;
+
+        public string UploadedProgramText => Encoding.UTF8.GetString(uploadedProgram.ToArray());
+
+        public int? UploadedMachineIntegrationId { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.AbsolutePath.EndsWith("PostUniversalMonitoringDataJson", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                MonitoringJson = request.Content is null
+                    ? string.Empty
+                    : await request.Content.ReadAsStringAsync(cancellationToken);
+
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("FileType=1;GetFile=0"),
+                };
+            }
+
+            if (request.RequestUri?.AbsolutePath.EndsWith("PostFileUniversal", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                var content = request.Content is null
+                    ? string.Empty
+                    : await request.Content.ReadAsStringAsync(cancellationToken);
+                using var document = JsonDocument.Parse(content);
+                UploadedMachineIntegrationId = int.Parse(document.RootElement.GetProperty("MachineIntegrationId").GetString()!);
+
+                foreach (var value in document.RootElement.GetProperty("ListValues").EnumerateArray())
+                {
+                    if (value.GetProperty("Key").GetString() == "FileUP")
+                    {
+                        var chunk = Convert.FromBase64String(value.GetProperty("Value").GetString()!);
+                        uploadedProgram.Write(chunk);
+                    }
+                }
+
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("ok"),
+                };
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+            {
+                Content = new StringContent("not found"),
+            };
         }
     }
 
