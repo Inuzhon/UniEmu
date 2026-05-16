@@ -7,6 +7,8 @@ using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
+using UniEmu.Features.Common;
+using UniEmu.Features.Scripts;
 using UniEmu.Runtime;
 using UniEmu.Runtime.Scripting;
 using UniEmu.Scripting.Api;
@@ -159,6 +161,45 @@ public sealed class TagScriptExecutionServiceTests
     }
 
     [Fact]
+    public async Task GenerateScriptTagAsync_RecomputesSavedScriptTag_WhenLoadedParentScriptChanges()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var dataCache = new CachedUniEmuDataService(db, memoryCache);
+        var compiledCache = new CompiledTagScriptCache();
+        var executionService = CreateService(db, new TagRuntimeStateStore(), dataCache: dataCache, compiledCache: compiledCache);
+        var scriptService = new ScriptService(
+            db,
+            dataCache,
+            new ScopedResourceValidator(db),
+            new CsxLanguageService(),
+            compiledCache);
+        var (emulator, tag) = await LoadAsync(db, "tg-shared-helper");
+
+        var first = await executionService.GenerateScriptTagAsync(
+            emulator,
+            tag,
+            DateTimeOffset.Parse("2026-05-11T10:00:00Z"),
+            CancellationToken.None);
+
+        await scriptService.PatchAsync(
+            "scr-shared-math",
+            new(null, "double ClampDouble(double value, double min, double max) => 31;"),
+            CancellationToken.None);
+
+        var second = await executionService.GenerateScriptTagAsync(
+            emulator,
+            tag,
+            DateTimeOffset.Parse("2026-05-11T10:00:01Z"),
+            CancellationToken.None);
+
+        Assert.Equal(25d, first.Value);
+        Assert.Equal(31d, second.Value);
+        Assert.Equal(31d, second.NumericValue);
+    }
+
+    [Fact]
     public async Task GenerateScriptTagAsync_AllowsSharedHelperToUseScriptState()
     {
         await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
@@ -229,13 +270,15 @@ public sealed class TagScriptExecutionServiceTests
         UniEmuDbContext db,
         TagRuntimeStateStore stateStore,
         ITagScriptRestOperations? restOperations = null,
-        TagPreviewFlushService? previewFlushService = null)
+        TagPreviewFlushService? previewFlushService = null,
+        CachedUniEmuDataService? dataCache = null,
+        CompiledTagScriptCache? compiledCache = null)
     {
         return new TagScriptExecutionService(
             db,
-            new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions())),
+            dataCache ?? new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions())),
             stateStore,
-            new CompiledTagScriptCache(),
+            compiledCache ?? new CompiledTagScriptCache(),
             restOperations,
             previewFlushService);
     }
