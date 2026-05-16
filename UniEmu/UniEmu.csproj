@@ -51,6 +51,12 @@
     <InternalsVisibleTo Include="UniEmu.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="appsettings.*.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
   <Target Name="BuildClientApp" BeforeTargets="ComputeFilesToPublish" Condition="'$(SkipYarnBuild)'!='True' AND '$(Configuration)' == 'Release'">
     <Message Text="ClientApp -&gt; yarn install" Importance="high" Condition="!Exists('$(SpaRoot)node_modules')" />
     <Exec WorkingDirectory="$(SpaRoot)" Command="yarn install --frozen-lockfile" Condition="!Exists('$(SpaRoot)node_modules')" />
