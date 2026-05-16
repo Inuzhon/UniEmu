@@ -119,7 +119,7 @@ public sealed class TagScriptExecutionService
         var stateValues = UniEmuJson.Deserialize<Dictionary<string, object?>>(state.ValuesJson)
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var globals = BuildGlobals(emulator, tag, timestamp, stateValues, cancellationToken, currentValue);
-        var scriptOptions = scriptEnvironment.CreateScriptOptions(script.Path, scripts);
+        var scriptOptions = scriptEnvironment.CreateScriptOptions(script.Path, scripts, typeof(TagScriptGlobals));
         ValidateSecurity(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals), cancellationToken);
         var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals));
         var scriptState = await compiledScript.RunAsync(globals, cancellationToken);

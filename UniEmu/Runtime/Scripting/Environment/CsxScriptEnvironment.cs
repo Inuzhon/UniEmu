@@ -31,14 +31,11 @@ public sealed class CsxScriptEnvironment
 
     public ScriptOptions CreateScriptOptions(
         string entryPath,
-        IReadOnlyDictionary<string, string> visibleScripts)
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null)
     {
         return ScriptOptions.Default
-            .WithReferences(
-                typeof(object).Assembly,
-                typeof(Enumerable).Assembly,
-                typeof(DateTimeOffset).Assembly,
-                typeof(TagScriptGlobals).Assembly)
+            .WithReferences(CreateMetadataReferences(globalsType ?? typeof(TagScriptGlobals)))
             .WithImports(s_imports)
             .WithFilePath(TagScriptPath.Normalize(entryPath))
             .WithSourceResolver(new DbScriptSourceResolver(visibleScripts));
@@ -46,14 +43,9 @@ public sealed class CsxScriptEnvironment
 
     public IReadOnlyList<MetadataReference> CreateMetadataReferences(Type globalsType)
     {
-        return metadataReferenceCache.GetOrAdd(globalsType, static type =>
+        return metadataReferenceCache.GetOrAdd(globalsType, static _ =>
         {
             var references = CreateTrustedPlatformReferences();
-            AddAssemblyReference(references, typeof(object).Assembly);
-            AddAssemblyReference(references, typeof(Enumerable).Assembly);
-            AddAssemblyReference(references, typeof(DateTimeOffset).Assembly);
-            AddAssemblyReference(references, typeof(TagScriptGlobals).Assembly);
-            AddAssemblyReference(references, type.Assembly);
 
             return references
                 .DistinctBy(reference => reference.Display)
@@ -66,14 +58,6 @@ public sealed class CsxScriptEnvironment
     internal void ClearMetadataReferenceCacheForTests()
     {
         metadataReferenceCache.Clear();
-    }
-
-    private static void AddAssemblyReference(List<MetadataReference> references, System.Reflection.Assembly assembly)
-    {
-        if (!string.IsNullOrWhiteSpace(assembly.Location))
-        {
-            references.Add(CreateMetadataReference(assembly.Location));
-        }
     }
 
     private static List<MetadataReference> CreateTrustedPlatformReferences()

@@ -32,7 +32,7 @@ public sealed class CsxDiagnosticsService
         cancellationToken.ThrowIfCancellationRequested();
 
         var normalizedContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(content);
-        var options = environment.CreateScriptOptions(entryPath, visibleScripts);
+        var options = environment.CreateScriptOptions(entryPath, visibleScripts, globalsType);
         var script = CreateScript(normalizedContent, options, globalsType, expectedReturnType);
 
         var compilerDiagnostics = script.Compile(cancellationToken)

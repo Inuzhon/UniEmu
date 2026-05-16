@@ -1,5 +1,6 @@
 using UniEmu.Scripting.Api;
 using UniEmu.Runtime.Scripting;
+using UniEmu.Runtime.Scripting.Environment;
 
 namespace UniEmu.Tests.Runtime.Scripting;
 
@@ -175,6 +176,26 @@ public sealed class CsxLanguageServiceTests
 
         Assert.Contains("UniEmu.Scripting.Api.dll", displays);
         Assert.DoesNotContain("UniEmu.dll", displays);
+    }
+
+    [Fact]
+    public void CreateScriptOptions_UsesResolvedMetadataReferencesForSingleFilePublish()
+    {
+        var environment = new CsxScriptEnvironment();
+        var options = environment.CreateScriptOptions(
+            "inline/tag-1.csx",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+        var expectedDisplays = environment
+            .CreateMetadataReferences(typeof(TagScriptGlobals))
+            .Select(reference => reference.Display)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        var actualDisplays = options.MetadataReferences
+            .Select(reference => reference.Display)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(expectedDisplays, actualDisplays);
     }
 
     [Fact]
