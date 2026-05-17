@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -39,24 +38,29 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState('');
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const emulatorRef = useRef<Emulator | null>(null);
+  const editorSessionKey = open && emulator ? emulator.id : null;
+
+  emulatorRef.current = emulator;
 
   useEffect(() => {
-    if (emulator && open) {
-      setName(emulator.name);
-      setProtocolId(emulator.protocolId);
-      setTargetUrl(emulator.targetUrl);
-      setIntervalSec(emulator.intervalSec);
-      setError(null);
-      setInitialSnapshot(
-        JSON.stringify({
-          name: emulator.name,
-          protocolId: emulator.protocolId,
-          targetUrl: emulator.targetUrl,
-          intervalSec: emulator.intervalSec,
-        })
-      );
-    }
-  }, [emulator, open]);
+    const currentEmulator = emulatorRef.current;
+    if (!currentEmulator || !editorSessionKey) return;
+
+    setName(currentEmulator.name);
+    setProtocolId(currentEmulator.protocolId);
+    setTargetUrl(currentEmulator.targetUrl);
+    setIntervalSec(currentEmulator.intervalSec);
+    setError(null);
+    setInitialSnapshot(
+      JSON.stringify({
+        name: currentEmulator.name,
+        protocolId: currentEmulator.protocolId,
+        targetUrl: currentEmulator.targetUrl,
+        intervalSec: currentEmulator.intervalSec,
+      })
+    );
+  }, [editorSessionKey]);
 
   const buildSnapshot = () =>
     JSON.stringify({
