@@ -1,11 +1,41 @@
 using UniEmu.Scripting.Api;
 using UniEmu.Runtime.Scripting;
+using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Runtime.Scripting.Environment;
 
 namespace UniEmu.Tests.Runtime.Scripting;
 
 public sealed class CsxLanguageServiceTests
 {
+    [Theory]
+    [InlineData("Class", "class")]
+    [InlineData("Constant", "constant")]
+    [InlineData("Delegate", "function")]
+    [InlineData("Enum", "enum")]
+    [InlineData("EnumMember", "enumMember")]
+    [InlineData("Event", "event")]
+    [InlineData("ExtensionMethod", "method")]
+    [InlineData("Field", "field")]
+    [InlineData("Interface", "interface")]
+    [InlineData("Keyword", "keyword")]
+    [InlineData("Label", "reference")]
+    [InlineData("Local", "variable")]
+    [InlineData("Method", "method")]
+    [InlineData("Module", "module")]
+    [InlineData("Namespace", "module")]
+    [InlineData("Operator", "operator")]
+    [InlineData("Parameter", "variable")]
+    [InlineData("Property", "property")]
+    [InlineData("RangeVariable", "variable")]
+    [InlineData("Struct", "struct")]
+    [InlineData("TypeParameter", "typeParameter")]
+    public void GetCompletionKind_MapsRoslynTagsToEditorKinds(string roslynTag, string expectedKind)
+    {
+        var kind = CsxRoslynSymbolHelpers.GetCompletionKind([roslynTag]);
+
+        Assert.Equal(expectedKind, kind);
+    }
+
     [Fact]
     public async Task AnalyzeAsync_ReturnsCompilerErrorDiagnostic_WhenScriptReferencesUnknownIdentifier()
     {

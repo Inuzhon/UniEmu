@@ -30,26 +30,25 @@ export function dedupeCompletionItems(items: languages.CompletionItem[]) {
 }
 
 function mapCompletionKind(monacoApi: MonacoApi, kind?: string) {
-  switch (kind?.toLowerCase()) {
-    case 'method':
-      return monacoApi.languages.CompletionItemKind.Method;
-    case 'property':
-      return monacoApi.languages.CompletionItemKind.Property;
-    case 'class':
-      return monacoApi.languages.CompletionItemKind.Class;
-    case 'struct':
-      return monacoApi.languages.CompletionItemKind.Struct;
-    case 'enum':
-      return monacoApi.languages.CompletionItemKind.Enum;
-    case 'enummember':
-      return monacoApi.languages.CompletionItemKind.EnumMember;
-    case 'field':
-      return monacoApi.languages.CompletionItemKind.Field;
-    case 'keyword':
-      return monacoApi.languages.CompletionItemKind.Keyword;
-    case 'variable':
-      return monacoApi.languages.CompletionItemKind.Variable;
-    default:
-      return monacoApi.languages.CompletionItemKind.Text;
-  }
+  const kindByServerKind: Record<string, languages.CompletionItemKind> = {
+    class: monacoApi.languages.CompletionItemKind.Class,
+    constant: monacoApi.languages.CompletionItemKind.Constant,
+    enum: monacoApi.languages.CompletionItemKind.Enum,
+    enummember: monacoApi.languages.CompletionItemKind.EnumMember,
+    event: monacoApi.languages.CompletionItemKind.Event,
+    field: monacoApi.languages.CompletionItemKind.Field,
+    function: monacoApi.languages.CompletionItemKind.Function,
+    interface: monacoApi.languages.CompletionItemKind.Interface,
+    keyword: monacoApi.languages.CompletionItemKind.Keyword,
+    method: monacoApi.languages.CompletionItemKind.Method,
+    module: monacoApi.languages.CompletionItemKind.Module,
+    operator: monacoApi.languages.CompletionItemKind.Operator,
+    property: monacoApi.languages.CompletionItemKind.Property,
+    reference: monacoApi.languages.CompletionItemKind.Reference,
+    struct: monacoApi.languages.CompletionItemKind.Struct,
+    typeparameter: monacoApi.languages.CompletionItemKind.TypeParameter,
+    variable: monacoApi.languages.CompletionItemKind.Variable,
+  };
+
+  return kindByServerKind[kind?.toLowerCase() ?? ''] ?? monacoApi.languages.CompletionItemKind.Text;
 }

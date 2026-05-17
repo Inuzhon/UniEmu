@@ -118,6 +118,23 @@ test('csx completion keeps basic snippets in a dedicated snippet source', async 
 test('csx completion maps server enum members to Monaco enum member kind', async () => {
   const mappingSource = await readComponentFile('completionMapping.ts');
 
-  assert.match(mappingSource, /case 'enummember':/);
-  assert.match(mappingSource, /CompletionItemKind\.EnumMember/);
+  assert.match(mappingSource, /enummember:\s*monacoApi\.languages\.CompletionItemKind\.EnumMember/);
+});
+
+test('csx completion maps expanded server symbol kinds to Monaco kinds', async () => {
+  const mappingSource = await readComponentFile('completionMapping.ts');
+  const expectedMappings = [
+    ['constant', 'Constant'],
+    ['event', 'Event'],
+    ['function', 'Function'],
+    ['interface', 'Interface'],
+    ['module', 'Module'],
+    ['operator', 'Operator'],
+    ['reference', 'Reference'],
+    ['typeparameter', 'TypeParameter'],
+  ];
+
+  for (const [serverKind, monacoKind] of expectedMappings) {
+    assert.match(mappingSource, new RegExp(`${serverKind}:\\s*monacoApi\\.languages\\.CompletionItemKind\\.${monacoKind}`));
+  }
 });
