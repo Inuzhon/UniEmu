@@ -1,12 +1,14 @@
+using System.Diagnostics;
 using UniEmu.Scripting.Api;
 using UniEmu.Runtime.Scripting;
 using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Runtime.Scripting.Environment;
 using UniEmu.Runtime.Scripting.Services;
+using Xunit.Abstractions;
 
 namespace UniEmu.Tests.Runtime.Scripting;
 
-public sealed class CsxLanguageServiceTests
+public sealed class CsxLanguageServiceTests(ITestOutputHelper output)
 {
     [Theory]
     [InlineData("Class", "class")]
@@ -207,6 +209,21 @@ public sealed class CsxLanguageServiceTests
 
         Assert.Contains("UniEmu.Scripting.Api.dll", displays);
         Assert.DoesNotContain("UniEmu.dll", displays);
+    }
+
+    [Fact]
+    public void CreateMetadataReferences_UsesSmallScriptHostReferenceSet()
+    {
+        var references = CsxLanguageService.CreateMetadataReferencesForTests(typeof(TagScriptGlobals));
+        var displays = references
+            .Select(reference => Path.GetFileName(reference.Display ?? string.Empty))
+            .ToList();
+
+        Assert.True(displays.Count <= 32, $"Expected a compact reference set, got {displays.Count}: {string.Join(", ", displays.Order())}");
+        Assert.DoesNotContain("Microsoft.AspNetCore.Mvc.Core.dll", displays);
+        Assert.DoesNotContain("Microsoft.EntityFrameworkCore.dll", displays);
+        Assert.DoesNotContain("Quartz.dll", displays);
+        Assert.DoesNotContain("Microsoft.CodeAnalysis.CSharp.Workspaces.dll", displays);
     }
 
     [Fact]
@@ -516,6 +533,91 @@ public sealed class CsxLanguageServiceTests
         AssertSortTextPrecedes(completions, "LoadedHelper", "TagScriptValue");
         AssertSortTextPrecedes(completions, "TagScriptValue", "DateTime");
         AssertSortTextPrecedes(completions, "TagScriptValue", "double");
+    }
+
+    [Fact]
+    public async Task LanguageFeatures_CompleteWithinWarmPathBudget()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["shared/math.csx"] = "double LoadedHelper(double value) => value * 2;",
+        };
+        const string content = """
+            #load "shared/math.csx"
+
+            var value = LoadedHelper(Math.Abs(-12.5));
+            return UniEmu.Tags.TryGetValue("pressure", out var pressure)
+                ? value
+                : 0;
+            """;
+
+        await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            content,
+            content.IndexOf("UniEmu.", StringComparison.Ordinal) + "UniEmu.".Length,
+            visibleScripts,
+            typeof(TagScriptGlobals));
+
+        var timings = new[]
+        {
+            await MeasureAsync("diagnostics", () => service.AnalyzeAsync(
+                "inline/tag-1.csx",
+                content,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+            await MeasureAsync("completions", () => service.GetCompletionsAsync(
+                "inline/tag-1.csx",
+                content,
+                content.IndexOf("UniEmu.", StringComparison.Ordinal) + "UniEmu.".Length,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+            await MeasureAsync("hover", () => service.GetHoverAsync(
+                "inline/tag-1.csx",
+                content,
+                content.IndexOf("TryGetValue", StringComparison.Ordinal) + 2,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+            await MeasureAsync("signature-help", () => service.GetSignatureHelpAsync(
+                "inline/tag-1.csx",
+                "var value = Math.Round(",
+                "var value = Math.Round(".Length,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+            await MeasureAsync("definition", () => service.GetDefinitionsAsync(
+                "inline/tag-1.csx",
+                content,
+                content.IndexOf("LoadedHelper", StringComparison.Ordinal) + 2,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+            await MeasureAsync("references", () => service.GetReferencesAsync(
+                "inline/tag-1.csx",
+                content,
+                content.IndexOf("value", StringComparison.Ordinal) + 2,
+                includeDeclaration: true,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+            await MeasureAsync("semantic-tokens", () => service.GetSemanticTokensAsync(
+                "inline/tag-1.csx",
+                content,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+            await MeasureAsync("folding-ranges", () => service.GetFoldingRangesAsync(
+                "inline/tag-1.csx",
+                content,
+                visibleScripts,
+                typeof(TagScriptGlobals))),
+        };
+
+        foreach (var timing in timings)
+        {
+            output.WriteLine($"{timing.Name}: {timing.Elapsed.TotalMilliseconds:N0} ms");
+        }
+
+        Assert.All(timings, timing =>
+            Assert.True(
+                timing.Elapsed < TimeSpan.FromSeconds(2),
+                $"{timing.Name} took {timing.Elapsed.TotalMilliseconds:N0} ms."));
     }
 
     [Fact]
@@ -848,4 +950,14 @@ public sealed class CsxLanguageServiceTests
             string.CompareOrdinal(first.SortText, second.SortText) < 0,
             $"Expected sortText for '{firstLabel}' ('{first.SortText}') to sort before '{secondLabel}' ('{second.SortText}').");
     }
+
+    private static async Task<LanguageFeatureTiming> MeasureAsync<T>(string name, Func<Task<T>> action)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _ = await action();
+        stopwatch.Stop();
+        return new LanguageFeatureTiming(name, stopwatch.Elapsed);
+    }
+
+    private sealed record LanguageFeatureTiming(string Name, TimeSpan Elapsed);
 }

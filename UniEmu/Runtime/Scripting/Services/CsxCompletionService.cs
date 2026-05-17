@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis.Completion;
 using System.Reflection;
 using UniEmu.Runtime.Scripting.Common;
@@ -61,6 +62,8 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
     /// Закэшированные reflection-метаданные скриптового API для проверки видимости через <see cref="ScriptingApiAttribute"/>.
     /// </summary>
     private static readonly Type[] s_scriptingApiTypes = typeof(ScriptingApiAttribute).Assembly.GetTypes();
+
+    private static readonly ConcurrentDictionary<Type, IReadOnlySet<string>> s_globalObjectLabels = new();
 
     /// <summary>
     /// Имена типов и членов скриптового API, для которых нужно оставить проверку документации,
@@ -333,9 +336,12 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
     /// <returns>Метки подсказок, которые должны получить максимальный приоритет.</returns>
     private static IReadOnlySet<string> GetGlobalObjectLabels(Type globalsType)
     {
-        var labels = new HashSet<string>(StringComparer.Ordinal);
-        AddGlobalObjectLabels(globalsType, labels, []);
-        return labels;
+        return s_globalObjectLabels.GetOrAdd(globalsType, static type =>
+        {
+            var labels = new HashSet<string>(StringComparer.Ordinal);
+            AddGlobalObjectLabels(type, labels, []);
+            return labels;
+        });
     }
 
     /// <summary>

@@ -434,6 +434,7 @@ public sealed class CsxIntellisenseService(
         var scripts = await query
             .OrderBy(script => script.Scope == sharedScope ? 0 : 1)
             .ThenBy(script => script.Name)
+            .Select(script => new { script.Name, script.Content })
             .ToListAsync(cancellationToken);
 
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

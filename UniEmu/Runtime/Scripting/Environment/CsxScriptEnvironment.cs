@@ -8,6 +8,29 @@ namespace UniEmu.Runtime.Scripting.Environment;
 
 public sealed class CsxScriptEnvironment
 {
+    private static readonly HashSet<string> s_allowedTrustedPlatformAssemblyNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Microsoft.CSharp.dll",
+        "mscorlib.dll",
+        "netstandard.dll",
+        "System.Collections.Concurrent.dll",
+        "System.Collections.dll",
+        "System.ComponentModel.dll",
+        "System.ComponentModel.Primitives.dll",
+        "System.Console.dll",
+        "System.Globalization.dll",
+        "System.Linq.dll",
+        "System.Linq.Expressions.dll",
+        "System.ObjectModel.dll",
+        "System.Private.CoreLib.dll",
+        "System.Private.Uri.dll",
+        "System.Runtime.dll",
+        "System.Runtime.Extensions.dll",
+        "System.Threading.dll",
+        "System.Threading.Tasks.dll",
+        "UniEmu.Scripting.Api.dll",
+    };
+
     private static readonly string[] s_imports =
     [
         "System",
@@ -43,9 +66,9 @@ public sealed class CsxScriptEnvironment
 
     public IReadOnlyList<MetadataReference> CreateMetadataReferences(Type globalsType)
     {
-        return metadataReferenceCache.GetOrAdd(globalsType, static _ =>
+        return metadataReferenceCache.GetOrAdd(globalsType, static type =>
         {
-            var references = CreateTrustedPlatformReferences();
+            var references = CreateTrustedPlatformReferences(type);
 
             return references
                 .DistinctBy(reference => reference.Display)
@@ -60,7 +83,7 @@ public sealed class CsxScriptEnvironment
         metadataReferenceCache.Clear();
     }
 
-    private static List<MetadataReference> CreateTrustedPlatformReferences()
+    private static List<MetadataReference> CreateTrustedPlatformReferences(Type globalsType)
     {
         var value = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
         if (string.IsNullOrWhiteSpace(value))
@@ -68,18 +91,29 @@ public sealed class CsxScriptEnvironment
             return [];
         }
 
-        return value
+        var globalsAssemblyPath = globalsType.Assembly.Location;
+        var references = value
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(IsAllowedTrustedPlatformAssembly)
+            .Where(path => IsAllowedTrustedPlatformAssembly(path, globalsAssemblyPath))
             .Select(CreateMetadataReference)
             .Cast<MetadataReference>()
             .ToList();
+
+        if (!string.IsNullOrWhiteSpace(globalsAssemblyPath)
+            && File.Exists(globalsAssemblyPath)
+            && references.All(reference => !string.Equals(reference.Display, globalsAssemblyPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            references.Add(CreateMetadataReference(globalsAssemblyPath));
+        }
+
+        return references;
     }
 
-    private static bool IsAllowedTrustedPlatformAssembly(string path)
+    private static bool IsAllowedTrustedPlatformAssembly(string path, string globalsAssemblyPath)
     {
         var fileName = Path.GetFileName(path);
-        return !fileName.Equals("UniEmu.dll", StringComparison.OrdinalIgnoreCase);
+        return s_allowedTrustedPlatformAssemblyNames.Contains(fileName)
+            || string.Equals(path, globalsAssemblyPath, StringComparison.OrdinalIgnoreCase);
     }
 
     private static PortableExecutableReference CreateMetadataReference(string assemblyPath)
