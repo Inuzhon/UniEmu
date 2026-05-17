@@ -1,0 +1,307 @@
+@import 'tailwindcss' source(none);
+@source "../src";
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * UniEmu — Industrial dark design system.
+ * Inspired by SCADA/HMI consoles: deep slate background, amber/cyan signals,
+ * mono accents for telemetry. All color values use oklch.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-signal-online: var(--signal-online);
+  --color-signal-offline: var(--signal-offline);
+  --color-signal-warning: var(--signal-warning);
+  --color-signal-info: var(--signal-info);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --shadow-glow-online: 0 0 12px oklch(0.78 0.18 155 / 0.55);
+  --shadow-glow-offline: 0 0 12px oklch(0.65 0.22 27 / 0.55);
+}
+
+/* Industrial dark — primary aesthetic */
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.18 0.015 240);
+  --foreground: oklch(0.94 0.01 230);
+
+  --card: oklch(0.22 0.018 240);
+  --card-foreground: oklch(0.94 0.01 230);
+
+  --popover: oklch(0.24 0.02 240);
+  --popover-foreground: oklch(0.94 0.01 230);
+
+  --primary: oklch(0.78 0.16 195); /* cyan signal */
+  --primary-foreground: oklch(0.16 0.02 240);
+
+  --secondary: oklch(0.28 0.02 240);
+  --secondary-foreground: oklch(0.94 0.01 230);
+
+  --muted: oklch(0.26 0.018 240);
+  --muted-foreground: oklch(0.68 0.025 235);
+
+  --accent: oklch(0.82 0.16 80); /* amber accent */
+  --accent-foreground: oklch(0.16 0.02 240);
+
+  --destructive: oklch(0.62 0.22 27);
+  --destructive-foreground: oklch(0.98 0.01 230);
+
+  --border: oklch(0.32 0.02 240);
+  --input: oklch(0.3 0.02 240);
+  --ring: oklch(0.78 0.16 195);
+
+  --signal-online: oklch(0.78 0.18 155); /* green */
+  --signal-offline: oklch(0.65 0.22 27); /* red */
+  --signal-warning: oklch(0.82 0.16 80); /* amber */
+  --signal-info: oklch(0.78 0.16 195); /* cyan */
+
+  --chart-1: oklch(0.78 0.16 195);
+  --chart-2: oklch(0.82 0.16 80);
+  --chart-3: oklch(0.78 0.18 155);
+  --chart-4: oklch(0.7 0.2 320);
+  --chart-5: oklch(0.65 0.22 27);
+
+  --sidebar: oklch(0.15 0.015 240);
+  --sidebar-foreground: oklch(0.88 0.012 230);
+  --sidebar-primary: oklch(0.78 0.16 195);
+  --sidebar-primary-foreground: oklch(0.16 0.02 240);
+  --sidebar-accent: oklch(0.24 0.02 240);
+  --sidebar-accent-foreground: oklch(0.94 0.01 230);
+  --sidebar-border: oklch(0.28 0.02 240);
+  --sidebar-ring: oklch(0.78 0.16 195);
+
+  --editor-background: #0b1220;
+  --editor-foreground: #d4d4d4;
+}
+
+/* Light theme — soft industrial */
+.light {
+  --background: oklch(0.98 0.005 240);
+  --foreground: oklch(0.2 0.025 240);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.025 240);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.025 240);
+
+  --primary: oklch(0.55 0.18 220);
+  --primary-foreground: oklch(0.98 0.005 240);
+
+  --secondary: oklch(0.94 0.012 240);
+  --secondary-foreground: oklch(0.2 0.025 240);
+
+  --muted: oklch(0.95 0.01 240);
+  --muted-foreground: oklch(0.45 0.025 240);
+
+  --accent: oklch(0.7 0.16 60);
+  --accent-foreground: oklch(0.18 0.02 240);
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.98 0.005 240);
+
+  --border: oklch(0.88 0.012 240);
+  --input: oklch(0.9 0.012 240);
+  --ring: oklch(0.55 0.18 220);
+
+  --signal-online: oklch(0.62 0.18 155);
+  --signal-offline: oklch(0.58 0.22 27);
+  --signal-warning: oklch(0.7 0.16 70);
+  --signal-info: oklch(0.55 0.18 220);
+
+  --chart-1: oklch(0.55 0.18 220);
+  --chart-2: oklch(0.7 0.16 70);
+  --chart-3: oklch(0.62 0.18 155);
+  --chart-4: oklch(0.55 0.2 320);
+  --chart-5: oklch(0.58 0.22 27);
+
+  --sidebar: oklch(0.96 0.008 240);
+  --sidebar-foreground: oklch(0.22 0.025 240);
+  --sidebar-primary: oklch(0.55 0.18 220);
+  --sidebar-primary-foreground: oklch(0.98 0.005 240);
+  --sidebar-accent: oklch(0.9 0.014 240);
+  --sidebar-accent-foreground: oklch(0.18 0.025 240);
+  --sidebar-border: oklch(0.86 0.012 240);
+  --sidebar-ring: oklch(0.55 0.18 220);
+
+  --editor-background: #fffffe;
+  --editor-foreground: #1f2328;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: oklch(0.78 0.16 195 / 0.35);
+  }
+
+  /* Scrollbar — thin industrial */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(oklch(1 0 0 / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(1 0 0 / 0.025) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .signal-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+  }
+
+  .editor-surface {
+    background-color: var(--editor-background);
+    color: var(--editor-foreground);
+  }
+
+  .editor-text {
+    color: var(--editor-foreground);
+  }
+
+  .pulse-online {
+    animation: pulse-online 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-online {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 oklch(0.78 0.18 155 / 0.6);
+    }
+    50% {
+      box-shadow: 0 0 0 6px oklch(0.78 0.18 155 / 0);
+    }
+  }
+
+  .prose-changelog {
+    color: var(--foreground);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  .prose-changelog h1,
+  .prose-changelog h2,
+  .prose-changelog h3 {
+    color: var(--foreground);
+    font-weight: 600;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .prose-changelog h2 {
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+  }
+  .prose-changelog h3 {
+    font-size: 0.9rem;
+  }
+  .prose-changelog ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
+  }
+  .prose-changelog li {
+    margin: 0.25rem 0;
+  }
+  .prose-changelog p {
+    margin: 0.5rem 0;
+    color: var(--muted-foreground);
+  }
+  .prose-changelog code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: oklch(1 0 0 / 0.06);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--primary);
+  }
+  .prose-changelog strong {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  .prose-changelog a {
+    color: var(--primary);
+    text-decoration: underline;
+  }
+
+  .monaco-editor .suggest-widget,
+  .monaco-editor .hoverWidget,
+  .monaco-editor .parameter-hints-widget {
+    z-index: 1000 !important;
+  }
+}

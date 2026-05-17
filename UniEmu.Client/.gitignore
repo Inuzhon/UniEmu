@@ -1,0 +1,68 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+#VS
+.vs
+[Oo]bj
+[Bb]in
+[Pp]ublish
+[Bb]uild[Oo]utput
+*.user
+*.suo
+*.bak
+!/WixServerSetup/Files/db/CleanDB.bak
+*.log
+*.orig
+/*.doc
+/*.docx
+/*.pdf
+/*.testsettings
+/*.psess
+/*storage.ide
+*.DotSettings
+/InstallShieldServerSetup/InstallShieldServerSetup
+/InstallShieldMonPostSetup/InstallShieldMonPostSetup
+/InstallShieldClientSetup/InstallShieldClientSetup
+/UpgradeLog*.XML
+/UpgradeLog*.htm
+*.vs
+*.vscode/
+.idea
+.vs/
+WiXClientSetup/
+
+# dependencies
+**/node_modules
+
+# production
+/dist
+/.vscode
+/.cursor
+/.lovable
+/.tanstack
+
+# misc
+.DS_Store
+npm-debug.log*
+yarn-error.log
+.merge_file*
+
+/coverage
+.idea
+*bak
+.vscode
+.cursor
+
+# visual studio code
+.history
+*.log
+
+# Vite
+dist/
+dist-ssr/
+.vite
+*.local
+
+# Yarn Berry
+.yarn
+.yarnrc.yml
+/.bun-cache

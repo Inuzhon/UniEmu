@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.5171056">
+  <PropertyGroup>
+    <JavaScriptTestRoot>src\</JavaScriptTestRoot>
+    <JavaScriptTestFramework>Vitest</JavaScriptTestFramework>
+    <!-- Allows the build (or compile) script located on package.json to run on Build -->
+    <ShouldRunBuildScript>false</ShouldRunBuildScript>
+    <!-- Folder where production build objects will be placed -->
+    <BuildOutputFolder>$(MSBuildProjectDirectory)\dist</BuildOutputFolder>
+    <ShouldRunNpmInstall>false</ShouldRunNpmInstall>
+    <StartupCommand>yarn run dev</StartupCommand>
+    <ProductionBuildCommand>yarn run build</ProductionBuildCommand>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove=".git\**" />
+    <TypeScriptConfiguration Remove=".git\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove=".git" />
+  </ItemGroup>
+</Project>
