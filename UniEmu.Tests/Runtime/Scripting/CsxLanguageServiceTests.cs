@@ -521,6 +521,25 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task GetHoverAsync_ReturnsSystemMethodDocumentation()
+    {
+        var service = new CsxLanguageService();
+        const string content = "var value = Math.Abs(-1);";
+        var position = content.IndexOf("Abs", StringComparison.Ordinal) + 1;
+
+        var hover = await service.GetHoverAsync(
+            "inline/tag-1.csx",
+            content,
+            position,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.NotNull(hover);
+        Assert.Contains("Abs", hover.Signature, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(hover.Documentation));
+        Assert.Contains("absolute value", hover.Documentation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GetHoverAsync_ReturnsScriptingApiSymbolForUniEmuTags()
     {
         var service = new CsxLanguageService();
@@ -554,6 +573,27 @@ public sealed class CsxLanguageServiceTests
 
         Assert.NotNull(hover);
         Assert.False(string.IsNullOrWhiteSpace(hover.Documentation));
+    }
+
+    [Fact]
+    public async Task GetHoverAsync_PreservesLangwordDocumentationReferences()
+    {
+        var service = new CsxLanguageService();
+        const string content = "return UniEmu.Tags.TryGetValue(\"pressure\", out var pressure);";
+        var position = content.IndexOf("TryGetValue", StringComparison.Ordinal) + 2;
+
+        var hover = await service.GetHoverAsync(
+            "inline/tag-1.csx",
+            content,
+            position,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.NotNull(hover);
+        Assert.Contains("null", hover.Documentation, StringComparison.Ordinal);
+        Assert.Contains("true", hover.Documentation, StringComparison.Ordinal);
+        Assert.Contains("false", hover.Documentation, StringComparison.Ordinal);
+        Assert.DoesNotContain("или ,", hover.Documentation, StringComparison.Ordinal);
     }
 
     [Fact]

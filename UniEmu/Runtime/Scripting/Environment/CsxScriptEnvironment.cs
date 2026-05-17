@@ -84,11 +84,101 @@ public sealed class CsxScriptEnvironment
 
     private static PortableExecutableReference CreateMetadataReference(string assemblyPath)
     {
-        var documentationPath = Path.ChangeExtension(assemblyPath, ".xml");
+        var documentationPath = ResolveDocumentationPath(assemblyPath);
         var documentation = File.Exists(documentationPath)
             ? XmlDocumentationProvider.CreateFromFile(documentationPath)
             : DocumentationProvider.Default;
 
         return MetadataReference.CreateFromFile(assemblyPath, documentation: documentation);
+    }
+
+    private static string ResolveDocumentationPath(string assemblyPath)
+    {
+        var adjacentDocumentationPath = Path.ChangeExtension(assemblyPath, ".xml");
+        if (File.Exists(adjacentDocumentationPath))
+        {
+            return adjacentDocumentationPath;
+        }
+
+        return ResolveReferencePackDocumentationPath(assemblyPath) ?? adjacentDocumentationPath;
+    }
+
+    private static string? ResolveReferencePackDocumentationPath(string assemblyPath)
+    {
+        var fileName = Path.GetFileName(assemblyPath);
+        var documentationFileName = fileName.Equals("System.Private.CoreLib.dll", StringComparison.OrdinalIgnoreCase)
+            ? "System.Runtime.xml"
+            : Path.ChangeExtension(fileName, ".xml");
+
+        var runtimeVersion = Path.GetFileName(Path.GetDirectoryName(assemblyPath));
+        var dotnetRoot = ResolveDotnetRoot(assemblyPath);
+        if (string.IsNullOrWhiteSpace(runtimeVersion) || string.IsNullOrWhiteSpace(dotnetRoot))
+        {
+            return null;
+        }
+
+        var refPackRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
+        if (!Directory.Exists(refPackRoot))
+        {
+            return null;
+        }
+
+        foreach (var refPackVersion in EnumerateReferencePackVersions(refPackRoot, runtimeVersion))
+        {
+            var documentationPath = Path.Combine(refPackVersion, "ref", $"net{GetTargetFrameworkMajor(runtimeVersion)}.0", documentationFileName);
+            if (File.Exists(documentationPath))
+            {
+                return documentationPath;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ResolveDotnetRoot(string assemblyPath)
+    {
+        var directory = new DirectoryInfo(Path.GetDirectoryName(assemblyPath) ?? string.Empty);
+        while (directory is not null)
+        {
+            if (directory.Name.Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateReferencePackVersions(string refPackRoot, string runtimeVersion)
+    {
+        var runtimeMajor = GetVersionMajor(runtimeVersion);
+        return Directory.EnumerateDirectories(refPackRoot)
+            .Select(path => new
+            {
+                Path = path,
+                Version = Path.GetFileName(path),
+            })
+            .Where(item => GetVersionMajor(item.Version) == runtimeMajor)
+            .OrderByDescending(item => item.Version.Equals(runtimeVersion, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(item => ParseVersionPrefix(item.Version))
+            .Select(item => item.Path);
+    }
+
+    private static int GetTargetFrameworkMajor(string version)
+    {
+        return Math.Max(1, GetVersionMajor(version));
+    }
+
+    private static int GetVersionMajor(string version)
+    {
+        return ParseVersionPrefix(version)?.Major ?? 0;
+    }
+
+    private static Version? ParseVersionPrefix(string version)
+    {
+        var versionPrefix = version.Split('-', 2)[0];
+        return Version.TryParse(versionPrefix, out var parsed) ? parsed : null;
     }
 }
