@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
@@ -17,18 +17,14 @@ public static class UniEmuApplicationStartup
         var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
 
         if (options.SkipStartupDatabase)
-        {
             return;
-        }
 
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UniEmuDbContext>();
         await db.Database.MigrateAsync();
 
         if (options.SeedData)
-        {
             await UniEmuSeeder.SeedAsync(db);
-        }
 
         if (!options.DisableRuntime)
         {
@@ -45,9 +41,7 @@ public static class UniEmuApplicationStartup
         var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
 
         if (options.DisableRuntime)
-        {
             return;
-        }
 
         app.Lifetime.ApplicationStopping.Register(() =>
         {
@@ -62,9 +56,7 @@ public static class UniEmuApplicationStartup
         var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
 
         if (options.DisableStaticAssets)
-        {
             return;
-        }
 
         var staticFileOptions = CreateStaticFileOptions(options);
 
@@ -78,9 +70,7 @@ public static class UniEmuApplicationStartup
         var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
 
         if (!ShouldUseStaticAssetCompression(app.Environment, options))
-        {
             return;
-        }
 
         app.UseWhen(ShouldCompressStaticAssetRequest, branch =>
         {
@@ -93,9 +83,7 @@ public static class UniEmuApplicationStartup
         var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
 
         if (!options.DisableStaticAssets)
-        {
             app.MapFallbackToFile("/index.html", CreateStaticFileOptions(options));
-        }
     }
 
     internal static void ApplyStaticAssetCacheHeaders(
@@ -104,9 +92,7 @@ public static class UniEmuApplicationStartup
         UniEmuOptions options)
     {
         if (!options.EnableStaticAssetCaching)
-        {
             return;
-        }
 
         response.Headers.CacheControl = string.Equals(fileName, "index.html", StringComparison.OrdinalIgnoreCase)
             ? "no-cache"
@@ -117,19 +103,17 @@ public static class UniEmuApplicationStartup
             }.ToString();
     }
 
-    internal static bool ShouldUseStaticAssetCompression(
-        IHostEnvironment environment,
-        UniEmuOptions options)
+    internal static bool ShouldUseStaticAssetCompression(IHostEnvironment environment, UniEmuOptions options)
     {
         return !options.DisableStaticAssets &&
-            options.EnableStaticAssetCompression &&
-            environment.IsProduction();
+                options.EnableStaticAssetCompression &&
+                environment.IsProduction();
     }
 
     internal static bool ShouldCompressStaticAssetRequest(HttpContext context)
     {
         return !context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) &&
-            !context.Request.Path.StartsWithSegments("/hubs", StringComparison.OrdinalIgnoreCase);
+               !context.Request.Path.StartsWithSegments("/hubs", StringComparison.OrdinalIgnoreCase);
     }
 
     private static StaticFileOptions CreateStaticFileOptions(UniEmuOptions options)

@@ -236,6 +236,8 @@ Backend:
 - `UniEmu:DisableRuntime` - отключает Quartz runtime.
 - `UniEmu:SkipStartupDatabase` - пропускает startup database creation/seed.
 - `UniEmu:DisableStaticAssets` - отключает static frontend assets и fallback.
+- `UniEmu:EnableStaticAssetCompression` - enables runtime response compression for production static assets.
+- `UniEmu:EnableStaticAssetCaching` - enables production static asset cache headers; `index.html` stays `no-cache`.
 
 Frontend:
 
