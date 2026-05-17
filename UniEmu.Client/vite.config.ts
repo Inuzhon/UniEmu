@@ -57,6 +57,7 @@ const vendorChunkGroups = [
     test: (id: string) => matchesNodeModule(id, [
       "recharts",
       "d3-",
+      "internmap",
       "victory-vendor",
     ]),
     priority: 40,
