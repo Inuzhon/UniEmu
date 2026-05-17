@@ -1,7 +1,0 @@
-[submodule "UniEmu.Client"]
-	path = UniEmu.Client
-	url = ssh://git@mini-frame:10022/uniemu/clientapp.git
-[submodule "docs"]
-	path = docs/obsidian
-	url = ssh://git@mini-frame:10022/uniemu/docs.git
-	branch = main
