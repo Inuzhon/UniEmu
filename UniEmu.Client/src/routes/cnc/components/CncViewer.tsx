@@ -52,7 +52,7 @@ export function CncViewer({
           )}
           {dirty && (
             <span className="rounded bg-signal-warning/15 px-1.5 py-px font-mono text-[10px] uppercase text-signal-warning">
-              {localization.routes.cnc.components.cncViewer.text1}
+              {localization.routes.cnc.components.cncViewer.dirtyBadgeLabel}
             </span>
           )}
         </div>
@@ -60,13 +60,13 @@ export function CncViewer({
           <span>{fmtSize(file.sizeBytes)}</span>
           <span> </span>
           <span>
-            {localization.routes.cnc.components.cncViewer.text2}
+            {localization.routes.cnc.components.cncViewer.updatedBadgeLabel}
             <span> </span>
             <TimeAgo iso={file.updatedAt} />
           </span>
           <Button size="sm" variant="outline" className="gap-2" onClick={onDownload}>
             <Download className="h-3.5 w-3.5" />{' '}
-            {localization.routes.cnc.components.cncViewer.text3}
+            {localization.routes.cnc.components.cncViewer.downloadButtonLabel}
           </Button>
           {!file.isBinary &&
             (editing ? (
@@ -79,7 +79,7 @@ export function CncViewer({
                   className="gap-2"
                 >
                   <Save className="h-3.5 w-3.5" />{' '}
-                  {localization.routes.cnc.components.cncViewer.text4}
+                  {localization.routes.cnc.components.cncViewer.saveButtonLabel}
                 </Button>
                 <Button
                   size="sm"
@@ -102,7 +102,7 @@ export function CncViewer({
                 onClick={() => setEditing(true)}
               >
                 <Pencil className="h-3.5 w-3.5" />{' '}
-                {localization.routes.cnc.components.cncViewer.text5}
+                {localization.routes.cnc.components.cncViewer.editButtonLabel}
               </Button>
             ))}
         </div>
@@ -111,20 +111,20 @@ export function CncViewer({
       {/* Description */}
       <div className="border-b border-border bg-card/20 px-4 py-2">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          {localization.routes.cnc.components.cncViewer.text6}
+          {localization.routes.cnc.components.cncViewer.descriptionLabel}
         </div>
         {editing ? (
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={localization.routes.cnc.components.cncViewer.text7}
+            placeholder={localization.routes.cnc.components.cncViewer.descriptionPlaceholder}
             className="mt-1 h-8 text-sm"
           />
         ) : (
           <p className="mt-0.5 text-sm text-foreground/90">
             {file.description || (
               <span className="italic text-muted-foreground/60">
-                {localization.routes.cnc.components.cncViewer.text8}
+                {localization.routes.cnc.components.cncViewer.missingDescriptionText}
               </span>
             )}
           </p>
@@ -137,8 +137,8 @@ export function CncViewer({
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center text-muted-foreground">
               <FileText className="mx-auto h-10 w-10 opacity-40" />
-              <p className="mt-3 text-sm">{localization.routes.cnc.components.cncViewer.text9}</p>
-              <p className="mt-1 text-xs">{localization.routes.cnc.components.cncViewer.text10}</p>
+              <p className="mt-3 text-sm">{localization.routes.cnc.components.cncViewer.binaryPreviewUnavailable}</p>
+              <p className="mt-1 text-xs">{localization.routes.cnc.components.cncViewer.downloadBinaryHint}</p>
             </div>
           </div>
         ) : editing ? (
@@ -162,12 +162,12 @@ export function CncViewer({
           <span>UTF-8</span>
           {!file.isBinary && (
             <span>
-              {lineCount} {localization.routes.cnc.components.cncViewer.text11}
+              {lineCount} {localization.routes.cnc.components.cncViewer.lineCountSuffix}
             </span>
           )}
         </div>
         <div>
-          {localization.routes.cnc.components.cncViewer.text12}
+          {localization.routes.cnc.components.cncViewer.loadedBadgeLabel}
           <TimeAgo iso={file.uploadedAt} />
         </div>
       </div>

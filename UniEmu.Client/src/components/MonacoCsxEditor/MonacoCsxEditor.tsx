@@ -102,7 +102,7 @@ export function MonacoCsxEditor({
       onMount={handleMount}
       loading={
         <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
-          {localization.components.monacoCsxEditor.text14}
+          {localization.components.monacoCsxEditor.loadingLabel}
         </div>
       }
       options={{
@@ -111,7 +111,7 @@ export function MonacoCsxEditor({
         fontSize: 13,
         lineHeight: 22,
         minimap: {
-          enabled: false,
+          enabled: minimap,
           renderCharacters: false,
           maxColumn: 80,
         },

@@ -3,25 +3,25 @@ import { localization } from '@/localization';
 
 const config: Record<EmulatorStatus, { label: string; dot: string; text: string; bg: string }> = {
   Running: {
-    label: localization.components.statusBadge.text1,
+    label: localization.components.statusBadge.runningLabel,
     dot: 'bg-signal-online pulse-online',
     text: 'text-signal-online',
     bg: 'bg-signal-online/10 border-signal-online/30',
   },
   Stopped: {
-    label: localization.components.statusBadge.text2,
+    label: localization.components.statusBadge.stoppedLabel,
     dot: 'bg-muted-foreground',
     text: 'text-muted-foreground',
     bg: 'bg-muted/40 border-border',
   },
   Error: {
-    label: localization.components.statusBadge.text3,
+    label: localization.components.statusBadge.errorLabel,
     dot: 'bg-signal-offline',
     text: 'text-signal-offline',
     bg: 'bg-signal-offline/10 border-signal-offline/30',
   },
   // Idle: {
-  //   label: localization.components.statusBadge.text4,
+  //   label: localization.components.statusBadge.idleLabel,
   //   dot: 'bg-signal-warning',
   //   text: 'text-signal-warning',
   //   bg: 'bg-signal-warning/10 border-signal-warning/30',

@@ -130,34 +130,34 @@ export function CncStoragePage() {
       />
 
       <StorageExplorerLayout
-        title={localization.routes.cnc.components.cncStoragePage.text1}
-        description={localization.routes.cnc.components.cncStoragePage.text2}
+        title={localization.routes.cnc.components.cncStoragePage.title}
+        description={localization.routes.cnc.components.cncStoragePage.description}
         totalValue={formatNumber(totalCount)}
         totalCaption={
           <>
-            {localization.routes.cnc.components.cncStoragePage.text3}
+            {localization.routes.cnc.components.cncStoragePage.filesCountSuffix}
             {fmtSize(totalBytes)}
           </>
         }
         action={
           <Button className="gap-2" onClick={() => triggerUpload({ scope: 'shared' })}>
-            <Upload className="h-4 w-4" /> {localization.routes.cnc.components.cncStoragePage.text4}
+            <Upload className="h-4 w-4" /> {localization.routes.cnc.components.cncStoragePage.uploadButtonLabel}
           </Button>
         }
         searchValue={query}
-        searchPlaceholder={localization.routes.cnc.components.cncStoragePage.text5}
+        searchPlaceholder={localization.routes.cnc.components.cncStoragePage.searchPlaceholder}
         onSearchChange={setQuery}
         sidebar={
           <>
             <StorageTreeGroup
               groupKey="shared"
-              label={localization.routes.cnc.components.cncStoragePage.text6}
+              label={localization.routes.cnc.components.cncStoragePage.sharedProgramsTitle}
               count={sharedPrograms.length}
               icon={Globe2}
               open={openGroups.shared}
               onToggle={() => toggleGroup('shared')}
               accent="text-accent"
-              addTitle={localization.routes.cnc.components.treeGroup.text1}
+              addTitle={localization.routes.cnc.components.treeGroup.uploadToGroupTitle}
               dragActive={dragOver === 'shared'}
               onDragEnter={() => setDragOver('shared')}
               onDragLeave={() => setDragOver(null)}
@@ -175,8 +175,8 @@ export function CncStoragePage() {
                   active={p.id === selectedId}
                   onSelect={() => setSelectedId(p.id)}
                   onRename={(name) => void updateCncProgram(p.id, { name })}
-                  deleteTitle={localization.routes.cnc.components.fileRow.text3}
-                  confirmDeleteMessage={localization.routes.cnc.components.fileRow.text2(p.name)}
+                  deleteTitle={localization.routes.cnc.components.fileRow.deleteActionLabel}
+                  confirmDeleteMessage={localization.routes.cnc.components.fileRow.confirmDeleteMessage(p.name)}
                   meta={
                     <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground/70">
                       {fmtSize(p.sizeBytes)}
@@ -185,7 +185,7 @@ export function CncStoragePage() {
                   actions={[
                     {
                       icon: Download,
-                      title: localization.routes.cnc.components.fileRow.text1,
+                      title: localization.routes.cnc.components.fileRow.downloadActionLabel,
                       onClick: () => handleDownload(p),
                       className: 'hover:text-primary',
                     },
@@ -197,14 +197,14 @@ export function CncStoragePage() {
                 />
               ))}
               {sharedPrograms.length === 0 && (
-                <StorageEmptyHint label={localization.routes.cnc.components.cncStoragePage.text7} />
+                <StorageEmptyHint label={localization.routes.cnc.components.cncStoragePage.sharedProgramsDropHint} />
               )}
             </StorageTreeGroup>
 
             <div className="my-2 mx-3 border-t border-border/60" />
 
             <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground">
-              {localization.routes.cnc.components.cncStoragePage.text8}
+              {localization.routes.cnc.components.cncStoragePage.emulatorProgramsTitle}
             </div>
 
             {emulators.map((em) => {
@@ -219,7 +219,7 @@ export function CncStoragePage() {
                   open={openGroups[em.id]}
                   onToggle={() => toggleGroup(em.id)}
                   accent="text-primary"
-                  addTitle={localization.routes.cnc.components.treeGroup.text1}
+                  addTitle={localization.routes.cnc.components.treeGroup.uploadToGroupTitle}
                   dragActive={dragOver === em.id}
                   onDragEnter={() => setDragOver(em.id)}
                   onDragLeave={() => setDragOver(null)}
@@ -240,8 +240,8 @@ export function CncStoragePage() {
                       active={p.id === selectedId}
                       onSelect={() => setSelectedId(p.id)}
                       onRename={(name) => void updateCncProgram(p.id, { name })}
-                      deleteTitle={localization.routes.cnc.components.fileRow.text3}
-                      confirmDeleteMessage={localization.routes.cnc.components.fileRow.text2(
+                      deleteTitle={localization.routes.cnc.components.fileRow.deleteActionLabel}
+                      confirmDeleteMessage={localization.routes.cnc.components.fileRow.confirmDeleteMessage(
                         p.name
                       )}
                       meta={
@@ -252,7 +252,7 @@ export function CncStoragePage() {
                       actions={[
                         {
                           icon: Download,
-                          title: localization.routes.cnc.components.fileRow.text1,
+                          title: localization.routes.cnc.components.fileRow.downloadActionLabel,
                           onClick: () => handleDownload(p),
                           className: 'hover:text-primary',
                         },
@@ -265,7 +265,7 @@ export function CncStoragePage() {
                   ))}
                   {list.length === 0 && (
                     <StorageEmptyHint
-                      label={localization.routes.cnc.components.cncStoragePage.text9}
+                      label={localization.routes.cnc.components.cncStoragePage.emptyEmulatorProgramsHint}
                     />
                   )}
                 </StorageTreeGroup>

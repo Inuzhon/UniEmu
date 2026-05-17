@@ -12,26 +12,26 @@ export function SettingsPage() {
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold">
-          {localization.routes.settings.components.settingsPage.text1}
+          {localization.routes.settings.components.settingsPage.title}
         </h1>
         <p className="text-sm text-muted-foreground">
-          {localization.routes.settings.components.settingsPage.text2}
+          {localization.routes.settings.components.settingsPage.description}
         </p>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-6">
         <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          {localization.routes.settings.components.settingsPage.text3}
+          {localization.routes.settings.components.settingsPage.telemetrySectionTitle}
         </h2>
         <p className="mb-6 text-xs text-muted-foreground">
-          {localization.routes.settings.components.settingsPage.text4}
+          {localization.routes.settings.components.settingsPage.telemetryHistoryDescription}
         </p>
 
         <div className="max-w-md space-y-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="retention">
-                {localization.routes.settings.components.settingsPage.text5}
+                {localization.routes.settings.components.settingsPage.packetHistoryLimitLabel}
               </Label>
               <Input
                 id="retention"
@@ -51,7 +51,7 @@ export function SettingsPage() {
               onValueChange={([v]) => setRetention(v)}
             />
             <p className="text-xs text-muted-foreground">
-              {localization.routes.settings.components.settingsPage.text6}
+              {localization.routes.settings.components.settingsPage.packetHistoryLimitHint}
             </p>
           </div>
         </div>

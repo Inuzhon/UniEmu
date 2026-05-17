@@ -73,7 +73,7 @@ export function ScenarioPreviewChart({
         className="flex items-center justify-center rounded-md border border-dashed border-border bg-muted/10 text-xs text-muted-foreground"
         style={{ height }}
       >
-        {localization.routes.emulators.components.tagScenario.scenarioPreviewChart.text1}
+        {localization.routes.emulators.components.tagScenario.scenarioPreviewChart.emptyPreviewMessage}
       </div>
     );
   }

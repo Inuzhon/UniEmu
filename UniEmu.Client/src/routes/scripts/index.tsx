@@ -5,10 +5,10 @@ import { localization } from '@/localization';
 export const Route = createFileRoute('/scripts/')({
   head: () => ({
     meta: [
-      { title: localization.routes.scripts.index.text1 },
+      { title: localization.routes.scripts.index.title },
       {
         name: 'description',
-        content: localization.routes.scripts.index.text2,
+        content: localization.routes.scripts.index.description,
       },
     ],
   }),

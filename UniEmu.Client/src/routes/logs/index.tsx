@@ -3,6 +3,6 @@ import { LogsPage } from './components/LogsPage';
 import { localization } from '@/localization';
 
 export const Route = createFileRoute('/logs/')({
-  head: () => ({ meta: [{ title: localization.routes.logs.index.text1 }] }),
+  head: () => ({ meta: [{ title: localization.routes.logs.index.title }] }),
   component: LogsPage,
 });

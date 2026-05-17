@@ -79,7 +79,7 @@ export function CalcConfigFields({ value, onChange, hideDuration, compact }: Pro
           <div className="space-y-1">
             <Label className={labelCls}>
               {value.type === 'Sequence'
-                ? localization.routes.emulators.components.tagScenario.calcConfigFields.text1
+                ? localization.routes.emulators.components.tagScenario.calcConfigFields.sequenceJsonLabel
                 : value.type === 'Random'
                   ? localization.routes.emulators.components.addTagDrawer.minLabel
                   : localization.routes.emulators.components.addTagDrawer.startLabel}
@@ -133,7 +133,7 @@ export function CalcConfigFields({ value, onChange, hideDuration, compact }: Pro
           </div>
           <div className="space-y-1">
             <Label className={labelCls}>
-              {localization.routes.emulators.components.tagScenario.calcConfigFields.text2}
+              {localization.routes.emulators.components.tagScenario.calcConfigFields.periodSecondsLabel}
             </Label>
             <Input
               type="number"
@@ -162,7 +162,7 @@ export function CalcConfigFields({ value, onChange, hideDuration, compact }: Pro
       {showDurationField && (
         <div className="space-y-1">
           <Label className={labelCls}>
-            {localization.routes.emulators.components.tagScenario.calcConfigFields.text3}
+            {localization.routes.emulators.components.tagScenario.calcConfigFields.durationSecondsLabel}
           </Label>
           <Input
             type="number"
@@ -176,7 +176,7 @@ export function CalcConfigFields({ value, onChange, hideDuration, compact }: Pro
 
       <div className="space-y-1">
         <Label className={labelCls}>
-          {localization.routes.emulators.components.tagScenario.calcConfigFields.text4}
+          {localization.routes.emulators.components.tagScenario.calcConfigFields.distortionPercentLabel}
         </Label>
         <Input
           type="number"

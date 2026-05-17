@@ -92,7 +92,7 @@ function matchesNodeModule(id: string, packageNames: string[]) {
 }
 
 export default defineConfig(async (env) => {
-  const { command, mode } = env;
+  const { mode } = env;
 
   const plugins: PluginOption[] = [
     tailwindcss(),

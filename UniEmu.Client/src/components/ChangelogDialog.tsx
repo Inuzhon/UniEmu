@@ -28,7 +28,7 @@ export function ChangelogDialog({ open, onOpenChange }: Props) {
             CHANGELOG
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {localization.components.changelogDialog.text1}
+            {localization.components.changelogDialog.title}
           </DialogDescription>
         </DialogHeader>
 

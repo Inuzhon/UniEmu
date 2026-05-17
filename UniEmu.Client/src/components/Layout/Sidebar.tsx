@@ -1,4 +1,3 @@
-import { APP_VERSION } from '@/data/changelog';
 import { cn } from '@/lib/utils';
 import { localization } from '@/localization';
 import { Link, useRouterState } from '@tanstack/react-router';
@@ -7,7 +6,6 @@ import {
   Moon,
   PanelLeftOpen,
   PanelLeftClose,
-  ChevronRight,
   FolderCog,
   LayoutDashboard,
   Cpu,
@@ -25,22 +23,22 @@ export type NavItem = {
 export const navItems: NavItem[] = [
   {
     to: '/',
-    label: localization.components.layout.appLayout.text1,
+    label: localization.components.layout.appLayout.dashboardNavLabel,
     icon: LayoutDashboard,
     exact: true,
   },
-  { to: '/emulators', label: localization.components.layout.appLayout.text2, icon: Cpu },
-  { to: '/cnc', label: localization.components.layout.appLayout.text3, icon: FolderCog },
-  { to: '/scripts', label: localization.components.layout.appLayout.text4, icon: FileCode2 },
+  { to: '/emulators', label: localization.components.layout.appLayout.emulatorsNavLabel, icon: Cpu },
+  { to: '/cnc', label: localization.components.layout.appLayout.cncStorageNavLabel, icon: FolderCog },
+  { to: '/scripts', label: localization.components.layout.appLayout.scriptsNavLabel, icon: FileCode2 },
   // TODO: Временно скрыты, не удалять
-  // { to: '/logs', label: localization.components.layout.appLayout.text5, icon: ScrollText },
-  // { to: '/settings', label: localization.components.layout.appLayout.text6, icon: Settings },
+  // { to: '/logs', label: localization.components.layout.appLayout.logsNavLabel, icon: ScrollText },
+  // { to: '/settings', label: localization.components.layout.appLayout.settingsNavLabel, icon: Settings },
 ];
 
 export function Sidebar({
   collapsed,
   onToggle,
-  onOpenChangelog,
+  onOpenChangelog: _onOpenChangelog,
   theme,
   onThemeToggle,
 }: {
@@ -145,8 +143,8 @@ export function Sidebar({
                   className="mb-1 flex h-9 w-full items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-colors"
                   aria-label={
                     theme === 'dark'
-                      ? localization.components.layout.appLayout.text7
-                      : localization.components.layout.appLayout.text8
+                      ? localization.components.layout.appLayout.switchToLightThemeAriaLabel
+                      : localization.components.layout.appLayout.switchToDarkThemeAriaLabel
                   }
                 >
                   {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -154,8 +152,8 @@ export function Sidebar({
               </TooltipTrigger>
               <TooltipContent side="right">
                 {theme === 'dark'
-                  ? localization.components.layout.appLayout.text9
-                  : localization.components.layout.appLayout.text10}
+                  ? localization.components.layout.appLayout.collapsedLightThemeTooltip
+                  : localization.components.layout.appLayout.collapsedDarkThemeTooltip}
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -165,8 +163,8 @@ export function Sidebar({
             >
               <span>
                 {theme === 'dark'
-                  ? localization.components.layout.appLayout.text11
-                  : localization.components.layout.appLayout.text12}
+                  ? localization.components.layout.appLayout.expandedLightThemeLabel
+                  : localization.components.layout.appLayout.expandedDarkThemeLabel}
               </span>
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -179,13 +177,13 @@ export function Sidebar({
                 <button
                   onClick={onToggle}
                   className="flex h-9 w-full items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-colors"
-                  aria-label={localization.components.layout.appLayout.text13}
+                  aria-label={localization.components.layout.appLayout.expandMenuAriaLabel}
                 >
                   <PanelLeftOpen className="h-4 w-4" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                {localization.components.layout.appLayout.text14}
+                {localization.components.layout.appLayout.expandMenuTooltip}
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -193,7 +191,7 @@ export function Sidebar({
               onClick={onToggle}
               className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-colors"
             >
-              <span>{localization.components.layout.appLayout.text15}</span>
+              <span>{localization.components.layout.appLayout.collapseMenuLabel}</span>
               <PanelLeftClose className="h-3.5 w-3.5" />
             </button>
           )}
@@ -212,7 +210,7 @@ export function Sidebar({
               </TooltipTrigger>
               <TooltipContent side="right">
                 {localization.components.layout.appLayout.version(APP_VERSION)}
-                {localization.components.layout.appLayout.text18}
+                {localization.components.layout.appLayout.openChangelogSuffix}
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -222,7 +220,7 @@ export function Sidebar({
             >
               <div className="flex flex-col items-start leading-tight">
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  {localization.components.layout.appLayout.text19}
+                  {localization.components.layout.appLayout.versionLabel}
                 </span>
                 <span className="font-mono text-xs text-sidebar-foreground">v{APP_VERSION}</span>
               </div>

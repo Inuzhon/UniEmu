@@ -5,8 +5,8 @@ import { localization } from '@/localization';
 export const Route = createFileRoute('/emulators/')({
   head: () => ({
     meta: [
-      { title: localization.routes.emulators.index.text1 },
-      { name: 'description', content: localization.routes.emulators.index.text2 },
+      { title: localization.routes.emulators.index.title },
+      { name: 'description', content: localization.routes.emulators.index.description },
     ],
   }),
   component: EmulatorsListPage,

@@ -4,8 +4,8 @@ import { localization } from '@/localization';
 export function LogsPage() {
   return (
     <PagePlaceholder
-      title={localization.routes.logs.components.logsPage.text1}
-      description={localization.routes.logs.components.logsPage.text2}
+      title={localization.routes.logs.components.logsPage.title}
+      description={localization.routes.logs.components.logsPage.description}
     />
   );
 }

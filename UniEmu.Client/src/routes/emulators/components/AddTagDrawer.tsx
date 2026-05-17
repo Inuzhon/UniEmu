@@ -5,7 +5,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
   SheetFooter,
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
@@ -69,12 +68,12 @@ import type {
 import { localization } from '@/localization';
 
 const SOURCES: { id: TagSource; label: string }[] = [
-  { id: 'static', label: localization.routes.emulators.components.addTagDrawer.text1 },
-  { id: 'generator', label: localization.routes.emulators.components.addTagDrawer.text2 },
-  { id: 'scenario', label: localization.routes.emulators.components.addTagDrawer.text3 },
-  { id: 'formulaScript', label: localization.routes.emulators.components.addTagDrawer.text4 },
-  { id: 'script', label: localization.routes.emulators.components.addTagDrawer.text5 },
-  // { id: 'cnc', label: localization.routes.emulators.components.addTagDrawer.text6 },
+  { id: 'static', label: localization.routes.emulators.components.addTagDrawer.staticSourceLabel },
+  { id: 'generator', label: localization.routes.emulators.components.addTagDrawer.generatorSourceLabel },
+  { id: 'scenario', label: localization.routes.emulators.components.addTagDrawer.scenarioSourceLabel },
+  { id: 'formulaScript', label: localization.routes.emulators.components.addTagDrawer.formulaScriptSourceLabel },
+  { id: 'script', label: localization.routes.emulators.components.addTagDrawer.scriptSourceLabel },
+  // { id: 'cnc', label: localization.routes.emulators.components.addTagDrawer.cncSourceLabel },
 ];
 
 const TAG_TYPES: TagType[] = ['int', 'double', 'string', 'bool'];
@@ -431,12 +430,12 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
       source === 'static'
         ? staticValue
         : source === 'cnc'
-          ? localization.routes.emulators.components.addTagDrawer.text7
+          ? localization.routes.emulators.components.addTagDrawer.cncPreviewLabel
           : isScenario
-            ? localization.routes.emulators.components.addTagDrawer.text8
+            ? localization.routes.emulators.components.addTagDrawer.scenarioPreviewLabel
             : calc?.type === 'Text'
               ? calcStart
-              : localization.routes.emulators.components.addTagDrawer.text9;
+              : localization.routes.emulators.components.addTagDrawer.computedPreviewLabel;
     const normalizedPreview =
       source === 'static' && type === 'bool'
         ? staticValue === 'true' ? 'true' : 'false'
@@ -674,11 +673,11 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
           <SheetHeader>
             <SheetTitle>
               {isEdit
-                ? localization.routes.emulators.components.addTagDrawer.text10
-                : localization.routes.emulators.components.addTagDrawer.text11}
+                ? localization.routes.emulators.components.addTagDrawer.editTitle
+                : localization.routes.emulators.components.addTagDrawer.createTitle}
             </SheetTitle>
             {/* <SheetDescription>
-              {localization.routes.emulators.components.addTagDrawer.text12}
+              {localization.routes.emulators.components.addTagDrawer.description}
             </SheetDescription> */}
           </SheetHeader>
 
@@ -686,13 +685,13 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
             {/* Базовые параметры */}
             <section className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
               <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {localization.routes.emulators.components.addTagDrawer.text13}
+                {localization.routes.emulators.components.addTagDrawer.basicsSectionTitle}
               </h4>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.text14}
+                    {localization.routes.emulators.components.addTagDrawer.tagNameLabel}
                   </Label>
                   <Input
                     value={name}
@@ -701,7 +700,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     className="font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    {localization.routes.emulators.components.addTagDrawer.text15}
+                    {localization.routes.emulators.components.addTagDrawer.tagNameHint}
                   </p>
                 </div>
                 <div className="space-y-1.5">
@@ -716,7 +715,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     className="font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    {localization.routes.emulators.components.addTagDrawer.text16}
+                    {localization.routes.emulators.components.addTagDrawer.tagKeyHint}
                   </p>
                 </div>
               </div>
@@ -727,7 +726,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   <Sparkles className="h-3 w-3 text-primary" />
                   {localization.routes.emulators.components.addTagDrawer.specialParameterLabel}
                   <span className="text-[10px] font-normal text-muted-foreground">
-                    {localization.routes.emulators.components.addTagDrawer.text17}
+                    {localization.routes.emulators.components.addTagDrawer.optionalBadge}
                   </span>
                 </Label>
                 <Select
@@ -746,7 +745,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   </SelectContent>
                 </Select>
                 {/* <p className="text-[10px] text-muted-foreground">
-                  {localization.routes.emulators.components.addTagDrawer.text18}
+                  {localization.routes.emulators.components.addTagDrawer.specialParameterHint}
                 </p> */}
               </div>
 
@@ -771,7 +770,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
               {type === 'double' && (
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background/40 px-3 py-2">
                   <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.text19}
+                    {localization.routes.emulators.components.addTagDrawer.roundDigitsLabel}
                   </Label>
                   <div className="flex shrink-0 items-center gap-2">
                     <Switch checked={roundEnabled} onCheckedChange={setRoundEnabled} />
@@ -788,7 +787,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                       className="h-8 w-20 font-mono"
                     />
                     <span className="text-xs text-muted-foreground">
-                      {localization.routes.emulators.components.addTagDrawer.text20}
+                      {localization.routes.emulators.components.addTagDrawer.digitsSuffixLabel}
                     </span>
                   </div>
                 </div>
@@ -796,7 +795,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
               <div className="space-y-1.5">
                 <Label className="text-xs">
-                  {localization.routes.emulators.components.addTagDrawer.text21}
+                  {localization.routes.emulators.components.addTagDrawer.valueSourceLabel}
                 </Label>
                 <Select value={source} onValueChange={(v) => setSource(v as TagSource)}>
                   <SelectTrigger className="h-9">
@@ -815,7 +814,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
               {source === 'static' && (
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.text22}
+                    {localization.routes.emulators.components.addTagDrawer.staticValueLabel}
                   </Label>
                   {renderStaticValueInput()}
                 </div>
@@ -823,7 +822,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
               <div className="space-y-1.5">
                 <Label className="text-xs">
-                  {localization.routes.emulators.components.addTagDrawer.text23}
+                  {localization.routes.emulators.components.addTagDrawer.descriptionLabel}
                 </Label>
                 <Textarea
                   value={description}
@@ -835,10 +834,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
               <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background/40 p-2.5">
                 <div className="space-y-0.5">
                   <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.text24}
+                    {localization.routes.emulators.components.addTagDrawer.sendTagLabel}
                   </Label>
                   <p className="text-[10px] text-muted-foreground">
-                    {localization.routes.emulators.components.addTagDrawer.text25}
+                    {localization.routes.emulators.components.addTagDrawer.sendTagHint}
                   </p>
                 </div>
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -850,10 +849,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
               <section className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
                 <div className="flex items-baseline justify-between">
                   <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {localization.routes.emulators.components.addTagDrawer.text26}
+                    {localization.routes.emulators.components.addTagDrawer.scenarioTimelineTitle}
                   </h4>
                   <span className="text-[10px] text-muted-foreground">
-                    {localization.routes.emulators.components.addTagDrawer.text27}
+                    {localization.routes.emulators.components.addTagDrawer.scenarioTimelineTriggerHint}
                   </span>
                 </div>
                 <ScenarioEditor value={scenario} onChange={setScenario} />
@@ -864,7 +863,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
             {showTrigger && (
               <section className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.addTagDrawer.text28}
+                  {localization.routes.emulators.components.addTagDrawer.triggerSectionTitle}
                 </h4>
                 <Select
                   value={triggerMode}
@@ -875,13 +874,13 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="once">
-                      {localization.routes.emulators.components.addTagDrawer.text29}
+                      {localization.routes.emulators.components.addTagDrawer.triggerModeOnceLabel}
                     </SelectItem>
                     <SelectItem value="cron">
-                      {localization.routes.emulators.components.addTagDrawer.text30}
+                      {localization.routes.emulators.components.addTagDrawer.triggerModeCronLabel}
                     </SelectItem>
                     <SelectItem value="interval">
-                      {localization.routes.emulators.components.addTagDrawer.text31}
+                      {localization.routes.emulators.components.addTagDrawer.triggerModeIntervalLabel}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -889,7 +888,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                 {triggerMode === 'once' && (
                   <div className="space-y-1.5">
                     <Label className="text-xs">
-                      {localization.routes.emulators.components.addTagDrawer.text32}
+                      {localization.routes.emulators.components.addTagDrawer.triggerEventLabel}
                     </Label>
                     <Select
                       value={triggerEvent}
@@ -900,10 +899,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="onStart">
-                          {localization.routes.emulators.components.addTagDrawer.text33}
+                          {localization.routes.emulators.components.addTagDrawer.triggerEventOnStartLabel}
                         </SelectItem>
                         <SelectItem value="onStop">
-                          {localization.routes.emulators.components.addTagDrawer.text34}
+                          {localization.routes.emulators.components.addTagDrawer.triggerEventOnStopLabel}
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -913,7 +912,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                 {triggerMode === 'cron' && (
                   <div className="space-y-1.5">
                     <Label className="text-xs">
-                      {localization.routes.emulators.components.addTagDrawer.text35}
+                      {localization.routes.emulators.components.addTagDrawer.cronExpressionLabel}
                     </Label>
                     <Input
                       value={cron}
@@ -923,9 +922,9 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                       className="font-mono"
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      {localization.routes.emulators.components.addTagDrawer.text36}
+                      {localization.routes.emulators.components.addTagDrawer.cronExamplePrefix}
                       <code className="font-mono">0 0 * * *</code>{' '}
-                      {localization.routes.emulators.components.addTagDrawer.text37}
+                      {localization.routes.emulators.components.addTagDrawer.cronDailyMidnightHint}
                     </p>
                   </div>
                 )}
@@ -934,7 +933,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs">
-                        {localization.routes.emulators.components.addTagDrawer.text38}
+                        {localization.routes.emulators.components.addTagDrawer.intervalEveryLabel}
                       </Label>
                       <Input
                         type="number"
@@ -946,7 +945,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">
-                        {localization.routes.emulators.components.addTagDrawer.text39}
+                        {localization.routes.emulators.components.addTagDrawer.intervalUnitLabel}
                       </Label>
                       <Select
                         value={intervalUnit}
@@ -957,13 +956,13 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ms">
-                            {localization.routes.emulators.components.addTagDrawer.text40}
+                            {localization.routes.emulators.components.addTagDrawer.millisecondsUnitLabel}
                           </SelectItem>
                           <SelectItem value="sec">
-                            {localization.routes.emulators.components.addTagDrawer.text41}
+                            {localization.routes.emulators.components.addTagDrawer.secondsUnitLabel}
                           </SelectItem>
                           <SelectItem value="min">
-                            {localization.routes.emulators.components.addTagDrawer.text42}
+                            {localization.routes.emulators.components.addTagDrawer.minutesUnitLabel}
                           </SelectItem>
                         </SelectContent>
                       </Select>
@@ -977,7 +976,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
             {showCalc && (
               <section className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.addTagDrawer.text43}
+                  {localization.routes.emulators.components.addTagDrawer.calcFormulaTitle}
                 </h4>
                 <Select value={calcType} onValueChange={(v) => setCalcType(v as CalcType)}>
                   <SelectTrigger className="h-9">
@@ -1003,7 +1002,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     <div className="space-y-1.5">
                       <Label className="text-xs">
                         {calcType === 'Sequence'
-                          ? localization.routes.emulators.components.addTagDrawer.text44
+                          ? localization.routes.emulators.components.addTagDrawer.sequenceJsonLabel
                           : localization.routes.emulators.components.addTagDrawer.startLabel}
                       </Label>
                       <Input
@@ -1036,7 +1035,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   calcType === 'SquircleLate') && (
                   <div className="space-y-1.5">
                     <Label className="text-xs">
-                      {localization.routes.emulators.components.addTagDrawer.text45}
+                      {localization.routes.emulators.components.addTagDrawer.durationSecondsLabel}
                     </Label>
                     <Input
                       type="number"
@@ -1063,7 +1062,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">
-                        {localization.routes.emulators.components.addTagDrawer.text46}
+                        {localization.routes.emulators.components.addTagDrawer.periodSecondsLabel}
                       </Label>
                       <Input
                         type="number"
@@ -1091,7 +1090,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.text47}
+                    {localization.routes.emulators.components.addTagDrawer.distortionPercentLabel}
                   </Label>
                   <Input
                     type="number"
@@ -1109,11 +1108,11 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
             {showScript && (
               <section className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.addTagDrawer.text48}
+                  {localization.routes.emulators.components.addTagDrawer.scriptSectionTitle}
                 </h4>
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.text49}
+                    {localization.routes.emulators.components.addTagDrawer.existingScriptLabel}
                   </Label>
                   <Select
                     value={scriptId || '__inline__'}
@@ -1124,7 +1123,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__inline__">
-                        {localization.routes.emulators.components.addTagDrawer.text50}
+                        {localization.routes.emulators.components.addTagDrawer.customScriptDividerLabel}
                       </SelectItem>
                       {availableScripts.map((s) => (
                         <SelectItem key={s.id} value={s.id} className="font-mono text-xs">
@@ -1139,7 +1138,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs">
-                        {localization.routes.emulators.components.addTagDrawer.text51}
+                        {localization.routes.emulators.components.addTagDrawer.inlineScriptLabel}
                       </Label>
                       <Button
                         size="sm"
@@ -1148,7 +1147,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                         onClick={openEditor}
                       >
                         <Pencil className="h-3 w-3" />{' '}
-                        {localization.routes.emulators.components.addTagDrawer.text52}
+                        {localization.routes.emulators.components.addTagDrawer.editScriptButtonLabel}
                       </Button>
                     </div>
                     {/* Read-only Monaco preview */}
@@ -1168,12 +1167,12 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
           <SheetFooter className="gap-2">
             <Button variant="outline" onClick={requestClose}>
-              {localization.routes.emulators.components.addTagDrawer.text53}
+              {localization.routes.emulators.components.addTagDrawer.cancelButtonLabel}
             </Button>
             <Button onClick={() => void handleSubmit()} disabled={!canSubmit}>
               {isEdit
-                ? localization.routes.emulators.components.addTagDrawer.text54
-                : localization.routes.emulators.components.addTagDrawer.text55}
+                ? localization.routes.emulators.components.addTagDrawer.saveButtonLabel
+                : localization.routes.emulators.components.addTagDrawer.createTagButtonLabel}
             </Button>
           </SheetFooter>
 
@@ -1187,10 +1186,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
             >
               <SheetHeader className="border-b border-border px-6 py-4">
                 <SheetTitle>
-                  {localization.routes.emulators.components.addTagDrawer.text56}
+                  {localization.routes.emulators.components.addTagDrawer.inlineScriptEditorTitle}
                 </SheetTitle>
                 {/* <SheetDescription>
-                  {localization.routes.emulators.components.addTagDrawer.text57}
+                  {localization.routes.emulators.components.addTagDrawer.inlineScriptEditorDescription}
                 </SheetDescription> */}
               </SheetHeader>
               <div className="flex-1 overflow-hidden">
@@ -1202,10 +1201,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
               </div>
               <SheetFooter className="border-t border-border px-6 py-4">
                 <Button variant="outline" onClick={requestEditorClose}>
-                  {localization.routes.emulators.components.addTagDrawer.text58}
+                  {localization.routes.emulators.components.addTagDrawer.editorCancelButtonLabel}
                 </Button>
                 <Button onClick={applyEditorDraft}>
-                  {localization.routes.emulators.components.addTagDrawer.text59}
+                  {localization.routes.emulators.components.addTagDrawer.applyScriptButtonLabel}
                 </Button>
               </SheetFooter>
             </SheetContent>
@@ -1216,18 +1215,18 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {localization.routes.emulators.components.addTagDrawer.text60}
+              {localization.routes.emulators.components.addTagDrawer.confirmCloseTitle}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {localization.routes.emulators.components.addTagDrawer.text61}
+              {localization.routes.emulators.components.addTagDrawer.confirmCloseDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {localization.routes.emulators.components.addTagDrawer.text62}
+              {localization.routes.emulators.components.addTagDrawer.stayButtonLabel}
             </AlertDialogCancel>
             <AlertDialogAction onClick={closeWithoutSaving}>
-              {localization.routes.emulators.components.addTagDrawer.text63}
+              {localization.routes.emulators.components.addTagDrawer.closeButtonLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1236,18 +1235,18 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {localization.routes.emulators.components.addTagDrawer.text64}
+              {localization.routes.emulators.components.addTagDrawer.confirmScriptEditorCloseTitle}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {localization.routes.emulators.components.addTagDrawer.text65}
+              {localization.routes.emulators.components.addTagDrawer.confirmScriptEditorCloseDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {localization.routes.emulators.components.addTagDrawer.text66}
+              {localization.routes.emulators.components.addTagDrawer.scriptEditorStayButtonLabel}
             </AlertDialogCancel>
             <AlertDialogAction onClick={closeEditorWithoutSaving}>
-              {localization.routes.emulators.components.addTagDrawer.text67}
+              {localization.routes.emulators.components.addTagDrawer.scriptEditorCloseButtonLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

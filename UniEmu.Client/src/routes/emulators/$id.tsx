@@ -12,16 +12,16 @@ export const Route = createFileRoute('/emulators/$id')({
       {
         title: `UniEmu - ${
           useUniEmuStore.getState().emulators.find((e) => e.id === loaderData?.emulatorId)?.name ??
-          localization.routes.emulators.id.text1
+          localization.routes.emulators.id.title
         }`,
       },
     ],
   }),
   notFoundComponent: () => (
     <div className="p-12 text-center">
-      <p className="text-lg">{localization.routes.emulators.id.text2}</p>
+      <p className="text-lg">{localization.routes.emulators.id.notFoundTitle}</p>
       <Link to="/emulators" className="mt-4 inline-block text-primary hover:underline">
-        {localization.routes.emulators.id.text3}
+        {localization.routes.emulators.id.backToListLabel}
       </Link>
     </div>
   ),

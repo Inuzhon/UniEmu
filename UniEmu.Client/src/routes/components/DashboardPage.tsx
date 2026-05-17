@@ -9,7 +9,6 @@ import { SHOW_EVENTS_FEED } from '@/lib/feature-flags';
 import { formatNumber } from '@/utils/format';
 import type { Emulator } from '@/types/uniemu';
 import { EmulatorTile } from './EmulatorTile';
-import { DistributionBar } from './DistributionBar';
 import { StatTile } from './StatTile';
 import { localization } from '@/localization';
 
@@ -70,35 +69,35 @@ export function DashboardPage() {
                 />
               </span>
               {errors
-                ? localization.routes.components.dashboardPage.text1(
+                ? localization.routes.components.dashboardPage.attentionSummary(
                   errors,
                   errors === 1
-                    ? localization.routes.components.dashboardPage.text29
-                    : localization.routes.components.dashboardPage.text30
+                    ? localization.routes.components.dashboardPage.singleEmulatorRequiresLabel
+                    : localization.routes.components.dashboardPage.multipleEmulatorsRequireLabel
                 )
                 : running
-                  ? localization.routes.components.dashboardPage.text2
-                  : localization.routes.components.dashboardPage.text3}
+                  ? localization.routes.components.dashboardPage.allSystemsHealthyLabel
+                  : localization.routes.components.dashboardPage.allEmulatorsStoppedLabel}
             </div>
             <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              {localization.routes.components.dashboardPage.text4}
+              {localization.routes.components.dashboardPage.title}
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground">
-              {localization.routes.components.dashboardPage.text5}
+              {localization.routes.components.dashboardPage.description}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-2">
               <Link to="/emulators">
-                {localization.routes.components.dashboardPage.text6}
+                {localization.routes.components.dashboardPage.allEmulatorsButtonLabel}
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
             {/* <Button asChild size="sm" className="gap-2">
               <Link to="/emulators">
                 <Plus className="h-3.5 w-3.5" />{' '}
-                {localization.routes.components.dashboardPage.text7}
+                {localization.routes.components.dashboardPage.newEmulatorButtonLabel}
               </Link>
             </Button> */}
           </div>
@@ -109,10 +108,10 @@ export function DashboardPage() {
           <div>
             <div className="flex items-baseline justify-between text-xs text-muted-foreground">
               <span className="uppercase tracking-wider">
-                {localization.routes.components.dashboardPage.text8}
+                {localization.routes.components.dashboardPage.fleetReadinessLabel}
               </span>
               <span className="font-mono">
-                {running} / {total} {localization.routes.components.dashboardPage.text9}
+                {running} / {total} {localization.routes.components.dashboardPage.activeCountSuffix}
               </span>
             </div>
             <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
@@ -133,33 +132,33 @@ export function DashboardPage() {
       <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <StatTile
           icon={Cpu}
-          label={localization.routes.components.dashboardPage.text10}
+          label={localization.routes.components.dashboardPage.totalStatLabel}
           value={String(total)}
-          hint={localization.routes.components.dashboardPage.text11}
+          hint={localization.routes.components.dashboardPage.registeredHint}
         />
         <StatTile
           icon={Activity}
-          label={localization.routes.components.dashboardPage.text12}
+          label={localization.routes.components.dashboardPage.activeStatLabel}
           value={String(running)}
-          hint={localization.routes.components.dashboardPage.text13(stopped, idle)}
+          hint={localization.routes.components.dashboardPage.stoppedCountHint(stopped, idle)}
           accent="online"
         />
         <StatTile
           icon={AlertTriangle}
-          label={localization.routes.components.dashboardPage.text14}
+          label={localization.routes.components.dashboardPage.errorsStatLabel}
           value={String(errors)}
           hint={
             errors
-              ? localization.routes.components.dashboardPage.text15
-              : localization.routes.components.dashboardPage.text16
+              ? localization.routes.components.dashboardPage.requiresAttentionHint
+              : localization.routes.components.dashboardPage.noErrorsHint
           }
           accent={errors ? 'offline' : 'muted'}
         />
         <StatTile
           icon={Zap}
-          label={localization.routes.components.dashboardPage.text17}
+          label={localization.routes.components.dashboardPage.totalRequestsStatLabel}
           value={formatNumber(totalRequests)}
-          hint={localization.routes.components.dashboardPage.text18(totalTags)}
+          hint={localization.routes.components.dashboardPage.payloadTagsHint(totalTags)}
           accent="info"
         />
       </section>
@@ -168,11 +167,11 @@ export function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {localization.routes.components.dashboardPage.text19}
+              {localization.routes.components.dashboardPage.statusDistributionTitle}
             </h2>
           </div>
           <span className="font-mono text-xs text-muted-foreground">
-            {total} {localization.routes.components.dashboardPage.text20}
+            {total} {localization.routes.components.dashboardPage.devicesCountSuffix}
           </span>
         </div>
         <DistributionBar
@@ -194,14 +193,14 @@ export function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
             <div>
               <h2 className="font-semibold">
-                {localization.routes.components.dashboardPage.text21}
+                {localization.routes.components.dashboardPage.emulatorsSectionTitle}
               </h2>
               <p className="text-xs text-muted-foreground">
-                {localization.routes.components.dashboardPage.text22}
+                {localization.routes.components.dashboardPage.emulatorsSectionDescription}
               </p>
             </div>
             <Input
-              placeholder={localization.routes.components.dashboardPage.text23}
+              placeholder={localization.routes.components.dashboardPage.searchPlaceholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full sm:w-64"
@@ -211,8 +210,8 @@ export function DashboardPage() {
           {filtered.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">
               {total === 0
-                ? localization.routes.components.dashboardPage.text24
-                : localization.routes.components.dashboardPage.text25}
+                ? localization.routes.components.dashboardPage.emptyFleetMessage
+                : localization.routes.components.dashboardPage.emptySearchMessage}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2">
@@ -238,11 +237,11 @@ export function DashboardPage() {
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border p-4">
               <h2 className="font-semibold">
-                {localization.routes.components.dashboardPage.text26}
+                {localization.routes.components.dashboardPage.eventsFeedTitle}
               </h2>
               <p className="text-xs text-muted-foreground">
-                {localization.routes.components.dashboardPage.text27}
-                {events.length} {localization.routes.components.dashboardPage.text28}
+                {localization.routes.components.dashboardPage.latestEventsPrefix}
+                {events.length} {localization.routes.components.dashboardPage.eventsCountSuffix}
               </p>
             </div>
             <div className="max-h-[520px] overflow-y-auto">

@@ -76,18 +76,18 @@ export function ScriptEditor({
           </span>
           {dirty && (
             <span className="rounded bg-signal-warning/15 px-1.5 py-px font-mono text-[10px] uppercase text-signal-warning">
-              {localization.routes.scripts.components.scriptEditor.text1}
+              {localization.routes.scripts.components.scriptEditor.dirtyBadgeLabel}
             </span>
           )}
         </div>
         <div className="flex items-center gap-3 font-mono text-[11px] text-muted-foreground">
           <span>
             {(visibleContentLength / 1024).toFixed(2)}{' '}
-            {localization.routes.scripts.components.scriptEditor.text2}
+            {localization.routes.scripts.components.scriptEditor.kilobytesUnitLabel}
           </span>
           <span> </span>
           <span>
-            {localization.routes.scripts.components.scriptEditor.text3}
+            {localization.routes.scripts.components.scriptEditor.updatedBadgeLabel}
             <span> </span>
             <TimeAgo iso={file.updatedAt} />
           </span>
@@ -101,7 +101,7 @@ export function ScriptEditor({
                 className="gap-2"
               >
                 <Save className="h-3.5 w-3.5" />{' '}
-                {localization.routes.scripts.components.scriptEditor.text4}
+                {localization.routes.scripts.components.scriptEditor.saveButtonLabel}
               </Button>
               <Button size="sm" variant="ghost" onClick={cancelEditing} className="gap-2">
                 <X className="h-3.5 w-3.5" />
@@ -110,7 +110,7 @@ export function ScriptEditor({
           ) : (
             <Button size="sm" variant="outline" className="gap-2" onClick={startEditing}>
               <Pencil className="h-3.5 w-3.5" />{' '}
-              {localization.routes.scripts.components.scriptEditor.text7}
+              {localization.routes.scripts.components.scriptEditor.editButtonLabel}
             </Button>
           )}
         </div>
@@ -149,7 +149,7 @@ export function ScriptEditor({
           {file.scope === 'shared' && (
             <span className="flex items-center gap-1">
               <Share2 className="h-3 w-3" />{' '}
-              {localization.routes.scripts.components.scriptEditor.text5}
+              {localization.routes.scripts.components.scriptEditor.sharedScopeHint}
             </span>
           )}
         </div>
@@ -179,5 +179,5 @@ function readApiError(error: unknown) {
 
   return error instanceof Error
     ? error.message
-    : localization.routes.scripts.components.scriptEditor.text6;
+    : localization.routes.scripts.components.scriptEditor.saveErrorMessage;
 }

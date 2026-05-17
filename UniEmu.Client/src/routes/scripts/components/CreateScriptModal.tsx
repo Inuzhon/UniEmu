@@ -27,17 +27,17 @@ export function CreateScriptModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-2xl">
         <h2 className="text-lg font-semibold">
-          {localization.routes.scripts.components.createScriptModal.text1}
+          {localization.routes.scripts.components.createScriptModal.title}
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          {localization.routes.scripts.components.createScriptModal.text2}
+          {localization.routes.scripts.components.createScriptModal.descriptionPrefix}
           <span className="mx-1 font-mono text-primary">#load</span>.
         </p>
 
         <div className="mt-5 space-y-4">
           <div>
             <label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">
-              {localization.routes.scripts.components.createScriptModal.text3}
+              {localization.routes.scripts.components.createScriptModal.scopeLabel}
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -49,7 +49,7 @@ export function CreateScriptModal({
                 }`}
               >
                 <Globe2 className="h-4 w-4" />{' '}
-                {localization.routes.scripts.components.createScriptModal.text4}
+                {localization.routes.scripts.components.createScriptModal.sharedScopeLabel}
               </button>
               <button
                 onClick={() =>
@@ -66,7 +66,7 @@ export function CreateScriptModal({
                 }`}
               >
                 <FolderOpen className="h-4 w-4" />{' '}
-                {localization.routes.scripts.components.createScriptModal.text5}
+                {localization.routes.scripts.components.createScriptModal.emulatorScopeLabel}
               </button>
             </div>
           </div>
@@ -74,7 +74,7 @@ export function CreateScriptModal({
           {draft.scope === 'emulator' && (
             <div>
               <label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">
-                {localization.routes.scripts.components.createScriptModal.text6}
+                {localization.routes.scripts.components.createScriptModal.emulatorLabel}
               </label>
               <select
                 value={draft.emulatorId ?? ''}
@@ -92,14 +92,14 @@ export function CreateScriptModal({
 
           <div>
             <label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">
-              {localization.routes.scripts.components.createScriptModal.text7}
+              {localization.routes.scripts.components.createScriptModal.fileNameLabel}
             </label>
             <Input
               autoFocus
               value={draft.name}
               spellCheck={false}
               onChange={(e) => onChange({ ...draft, name: e.target.value })}
-              placeholder={localization.routes.scripts.components.createScriptModal.text8}
+              placeholder={localization.routes.scripts.components.createScriptModal.fileNamePlaceholder}
               className="font-mono"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onSubmit();
@@ -107,19 +107,19 @@ export function CreateScriptModal({
               }}
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {localization.routes.scripts.components.createScriptModal.text9}
+              {localization.routes.scripts.components.createScriptModal.extensionLabel}
               <span className="font-mono">.csx</span>{' '}
-              {localization.routes.scripts.components.createScriptModal.text10}
+              {localization.routes.scripts.components.createScriptModal.extensionHint}
             </p>
           </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onCancel}>
-            {localization.routes.scripts.components.createScriptModal.text11}
+            {localization.routes.scripts.components.createScriptModal.cancelButtonLabel}
           </Button>
           <Button size="sm" onClick={onSubmit} disabled={!draft.name.trim()}>
-            {localization.routes.scripts.components.createScriptModal.text12}
+            {localization.routes.scripts.components.createScriptModal.createButtonLabel}
           </Button>
         </div>
       </div>

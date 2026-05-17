@@ -98,19 +98,19 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
   const handleSave = async () => {
     if (!emulator) return;
     if (!name.trim())
-      return setError(localization.routes.emulators.components.editEmulatorDrawer.text1);
+      return setError(localization.routes.emulators.components.editEmulatorDrawer.nameRequiredMessage);
     if (!Number.isFinite(protocolId) || protocolId < 1) {
-      return setError(localization.routes.emulators.components.editEmulatorDrawer.text2);
+      return setError(localization.routes.emulators.components.editEmulatorDrawer.protocolIdMinMessage);
     }
     if (!targetUrl.trim())
-      return setError(localization.routes.emulators.components.editEmulatorDrawer.text3);
+      return setError(localization.routes.emulators.components.editEmulatorDrawer.targetUrlRequiredMessage);
     try {
       new URL(targetUrl);
     } catch {
-      return setError(localization.routes.emulators.components.editEmulatorDrawer.text4);
+      return setError(localization.routes.emulators.components.editEmulatorDrawer.targetUrlInvalidMessage);
     }
     if (!Number.isFinite(intervalSec) || intervalSec < 1) {
-      return setError(localization.routes.emulators.components.editEmulatorDrawer.text5);
+      return setError(localization.routes.emulators.components.editEmulatorDrawer.intervalMinMessage);
     }
     await updateEmulator(emulator.id, {
       name: name.trim(),
@@ -127,11 +127,11 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
         <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
           <SheetHeader className="border-b border-border p-6">
             <SheetTitle>
-              {localization.routes.emulators.components.editEmulatorDrawer.text6}
+              {localization.routes.emulators.components.editEmulatorDrawer.editTitle}
             </SheetTitle>
             {/* <SheetDescription>
               {emulator
-                ? localization.routes.emulators.components.editEmulatorDrawer.text7(emulator.name)
+                ? localization.routes.emulators.components.editEmulatorDrawer.emulatorTitle(emulator.name)
                 : ''}
             </SheetDescription> */}
           </SheetHeader>
@@ -139,7 +139,7 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
           <div className="flex-1 space-y-5 overflow-y-auto p-6">
             <div className="space-y-2">
               <Label htmlFor="em-name">
-                {localization.routes.emulators.components.editEmulatorDrawer.text8}
+                {localization.routes.emulators.components.editEmulatorDrawer.nameLabel}
               </Label>
               <Input
                 id="em-name"
@@ -164,13 +164,13 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
                 className="font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                {localization.routes.emulators.components.editEmulatorDrawer.text9}
+                {localization.routes.emulators.components.editEmulatorDrawer.protocolIdHint}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="em-url">
-                {localization.routes.emulators.components.editEmulatorDrawer.text10}
+                {localization.routes.emulators.components.editEmulatorDrawer.targetUrlLabel}
               </Label>
               <Input
                 id="em-url"
@@ -181,13 +181,13 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                {localization.routes.emulators.components.editEmulatorDrawer.text11}
+                {localization.routes.emulators.components.editEmulatorDrawer.targetUrlHint}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="em-interval">
-                {localization.routes.emulators.components.editEmulatorDrawer.text12}
+                {localization.routes.emulators.components.editEmulatorDrawer.sendIntervalLabel}
               </Label>
               <Input
                 id="em-interval"
@@ -207,7 +207,7 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
                   <span className="font-mono">{emulator.id}</span>
                 </div>
                 <div className="mt-1 flex justify-between">
-                  <span>{localization.routes.emulators.components.editEmulatorDrawer.text13}</span>
+                  <span>{localization.routes.emulators.components.editEmulatorDrawer.tagsCountLabel}</span>
                   <span className="font-mono">{emulator.tagsCount}</span>
                 </div>
               </div>
@@ -222,10 +222,10 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
 
           <SheetFooter className="border-t border-border p-4">
             <Button variant="outline" onClick={requestClose}>
-              {localization.routes.emulators.components.editEmulatorDrawer.text14}
+              {localization.routes.emulators.components.editEmulatorDrawer.cancelButtonLabel}
             </Button>
             <Button onClick={() => void handleSave()}>
-              {localization.routes.emulators.components.editEmulatorDrawer.text15}
+              {localization.routes.emulators.components.editEmulatorDrawer.saveButtonLabel}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -234,18 +234,18 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {localization.routes.emulators.components.editEmulatorDrawer.text16}
+              {localization.routes.emulators.components.editEmulatorDrawer.confirmCloseTitle}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {localization.routes.emulators.components.editEmulatorDrawer.text17}
+              {localization.routes.emulators.components.editEmulatorDrawer.confirmCloseDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {localization.routes.emulators.components.editEmulatorDrawer.text18}
+              {localization.routes.emulators.components.editEmulatorDrawer.stayButtonLabel}
             </AlertDialogCancel>
             <AlertDialogAction onClick={closeWithoutSaving}>
-              {localization.routes.emulators.components.editEmulatorDrawer.text19}
+              {localization.routes.emulators.components.editEmulatorDrawer.closeButtonLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

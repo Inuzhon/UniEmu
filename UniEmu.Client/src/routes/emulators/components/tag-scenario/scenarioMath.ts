@@ -23,7 +23,7 @@ function sampleCalcAt(calc: TagCalcConfig, u: number, durationSec: number, prevV
   const distortion = (calc.distortion ?? 0) / 100;
   const tSec = u * durationSec;
 
-  let v = prevValue;
+  let v: number;
   switch (calc.type) {
     case "Line":
       v = start + (finish - start) * u;

@@ -108,34 +108,34 @@ export function ScriptsPage() {
   return (
     <>
       <StorageExplorerLayout
-        title={localization.routes.scripts.components.scriptsPage.text1}
-        description={localization.routes.scripts.components.scriptsPage.text2}
+        title={localization.routes.scripts.components.scriptsPage.title}
+        description={localization.routes.scripts.components.scriptsPage.description}
         totalValue={formatNumber(totalCount)}
         totalCaption={
           <>
-            {localization.routes.scripts.components.scriptsPage.text3}
+            {localization.routes.scripts.components.scriptsPage.filesCountSuffix}
             {(totalBytes / 1024).toFixed(1)}{' '}
-            {localization.routes.scripts.components.scriptsPage.text4}
+            {localization.routes.scripts.components.scriptsPage.kilobytesUnitLabel}
           </>
         }
         action={
           <Button className="gap-2" onClick={() => beginCreate({ name: '', scope: 'shared' })}>
-            <Plus className="h-4 w-4" /> {localization.routes.scripts.components.scriptsPage.text5}
+            <Plus className="h-4 w-4" /> {localization.routes.scripts.components.scriptsPage.newScriptButtonLabel}
           </Button>
         }
         searchValue={query}
-        searchPlaceholder={localization.routes.scripts.components.scriptsPage.text6}
+        searchPlaceholder={localization.routes.scripts.components.scriptsPage.searchPlaceholder}
         onSearchChange={setQuery}
         sidebar={
           <>
             <StorageTreeGroup
-              label={localization.routes.scripts.components.scriptsPage.text7}
+              label={localization.routes.scripts.components.scriptsPage.sharedScriptsTitle}
               count={sharedScripts.length}
               icon={Globe2}
               open={openGroups.shared}
               onToggle={() => toggleGroup('shared')}
               accent="text-accent"
-              addTitle={localization.routes.scripts.components.treeGroup.text1}
+              addTitle={localization.routes.scripts.components.treeGroup.addFileToGroupTitle}
               onAdd={() => beginCreate({ name: '', scope: 'shared' })}
             >
               {sharedScripts.map((sc) => (
@@ -146,8 +146,8 @@ export function ScriptsPage() {
                   active={sc.id === selectedId}
                   onSelect={() => selectScript(sc.id)}
                   onRename={(name) => void renameScript(sc.id, name)}
-                  deleteTitle={localization.routes.scripts.components.fileRow.text2}
-                  confirmDeleteMessage={localization.routes.scripts.components.fileRow.text1(
+                  deleteTitle={localization.routes.scripts.components.fileRow.deleteActionLabel}
+                  confirmDeleteMessage={localization.routes.scripts.components.fileRow.confirmDeleteMessage(
                     sc.name
                   )}
                   onDelete={() => removeScript(sc.id)}
@@ -155,7 +155,7 @@ export function ScriptsPage() {
               ))}
               {sharedScripts.length === 0 && (
                 <StorageEmptyHint
-                  label={localization.routes.scripts.components.scriptsPage.text8}
+                  label={localization.routes.scripts.components.scriptsPage.emptySharedScriptsMessage}
                 />
               )}
             </StorageTreeGroup>
@@ -163,7 +163,7 @@ export function ScriptsPage() {
             <div className="my-2 mx-3 border-t border-border/60" />
 
             <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground">
-              {localization.routes.scripts.components.scriptsPage.text9}
+              {localization.routes.scripts.components.scriptsPage.emulatorScriptsTitle}
             </div>
 
             {emulators.map((em) => {
@@ -177,7 +177,7 @@ export function ScriptsPage() {
                   open={openGroups[em.id]}
                   onToggle={() => toggleGroup(em.id)}
                   accent="text-primary"
-                  addTitle={localization.routes.scripts.components.treeGroup.text1}
+                  addTitle={localization.routes.scripts.components.treeGroup.addFileToGroupTitle}
                   onAdd={() => beginCreate({ name: '', scope: 'emulator', emulatorId: em.id })}
                 >
                   {list.map((sc) => (
@@ -188,8 +188,8 @@ export function ScriptsPage() {
                       active={sc.id === selectedId}
                       onSelect={() => selectScript(sc.id)}
                       onRename={(name) => void renameScript(sc.id, name)}
-                      deleteTitle={localization.routes.scripts.components.fileRow.text2}
-                      confirmDeleteMessage={localization.routes.scripts.components.fileRow.text1(
+                      deleteTitle={localization.routes.scripts.components.fileRow.deleteActionLabel}
+                      confirmDeleteMessage={localization.routes.scripts.components.fileRow.confirmDeleteMessage(
                         sc.name
                       )}
                       onDelete={() => removeScript(sc.id)}
@@ -197,7 +197,7 @@ export function ScriptsPage() {
                   ))}
                   {list.length === 0 && (
                     <StorageEmptyHint
-                      label={localization.routes.scripts.components.scriptsPage.text10}
+                      label={localization.routes.scripts.components.scriptsPage.emptyEmulatorScriptsMessage}
                     />
                   )}
                 </StorageTreeGroup>
@@ -223,7 +223,7 @@ export function ScriptsPage() {
             <div className="text-center">
               <FileCode2 className="mx-auto h-10 w-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">
-                {localization.routes.scripts.components.scriptsPage.text11}
+                {localization.routes.scripts.components.scriptsPage.emptySelectionMessage}
               </p>
             </div>
           </div>

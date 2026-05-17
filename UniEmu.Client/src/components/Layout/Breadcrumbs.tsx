@@ -9,14 +9,14 @@ export function Breadcrumbs() {
     .map((m) => {
       const seg =
         m.pathname === '/'
-          ? localization.components.layout.appLayout.text20
+          ? localization.components.layout.appLayout.dashboardBreadcrumbLabel
           : m.pathname.split('/').filter(Boolean).pop();
       const labels: Record<string, string> = {
-        emulators: localization.components.layout.appLayout.text21,
-        cnc: localization.components.layout.appLayout.text22,
-        scripts: localization.components.layout.appLayout.text23,
-        logs: localization.components.layout.appLayout.text24,
-        settings: localization.components.layout.appLayout.text25,
+        emulators: localization.components.layout.appLayout.emulatorsBreadcrumbLabel,
+        cnc: localization.components.layout.appLayout.cncStorageBreadcrumbLabel,
+        scripts: localization.components.layout.appLayout.scriptsBreadcrumbLabel,
+        logs: localization.components.layout.appLayout.logsBreadcrumbLabel,
+        settings: localization.components.layout.appLayout.settingsBreadcrumbLabel,
       };
       const label = seg ? (labels[seg] ?? decodeURIComponent(seg)) : '-';
       return { pathname: m.pathname, label };

@@ -18,9 +18,9 @@ export function PagePlaceholder({ title, description }: PlaceholderProps) {
           <Construction className="h-5 w-5 text-signal-warning" />
         </div>
         <div className="max-w-md">
-          <p className="font-medium">{localization.components.pagePlaceholder.text1}</p>
+          <p className="font-medium">{localization.components.pagePlaceholder.title}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {localization.components.pagePlaceholder.text2}
+            {localization.components.pagePlaceholder.description}
           </p>
         </div>
       </div>

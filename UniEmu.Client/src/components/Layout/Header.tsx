@@ -10,11 +10,11 @@ export function Header() {
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" className="gap-2">
           <RefreshCw className="h-3.5 w-3.5" />
-          <span className="text-xs">{localization.components.layout.appLayout.text26}</span>
+          <span className="text-xs">{localization.components.layout.appLayout.reloadButtonLabel}</span>
         </Button>
         <Button variant="outline" size="sm" className="gap-2">
           <Settings className="h-3.5 w-3.5" />
-          <span className="text-xs">{localization.components.layout.appLayout.text27}</span>
+          <span className="text-xs">{localization.components.layout.appLayout.headerSettingsLabel}</span>
         </Button>
       </div>
     </header>

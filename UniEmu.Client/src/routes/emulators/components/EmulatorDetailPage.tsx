@@ -75,23 +75,23 @@ import { localization } from '@/localization';
 
 function formatTrigger(t: TagTrigger, source?: TagSource): string {
   if (source === 'scenario')
-    return localization.routes.emulators.components.emulatorDetailPage.text1;
+    return localization.routes.emulators.components.emulatorDetailPage.timelineTriggerLabel;
   if (t.mode === 'once')
     return t.event === 'onStop'
-      ? localization.routes.emulators.components.emulatorDetailPage.text2
-      : localization.routes.emulators.components.emulatorDetailPage.text3;
+      ? localization.routes.emulators.components.emulatorDetailPage.onStopTriggerLabel
+      : localization.routes.emulators.components.emulatorDetailPage.onStartTriggerLabel;
   if (t.mode === 'cron') return `cron: ${t.cron ?? '-'}`;
-  return localization.routes.emulators.components.emulatorDetailPage.text4(
+  return localization.routes.emulators.components.emulatorDetailPage.intervalTriggerLabel(
     t.intervalValue ?? 0,
     getTagIntervalUnitLabel(t.intervalUnit ?? 'sec')
   );
 }
 
 const tabs = [
-  { id: 'overview', label: localization.routes.emulators.components.emulatorDetailPage.text5 },
-  { id: 'tags', label: localization.routes.emulators.components.emulatorDetailPage.text6 },
-  { id: 'monitoring', label: localization.routes.emulators.components.emulatorDetailPage.text7 },
-  { id: 'logs', label: localization.routes.emulators.components.emulatorDetailPage.text8 },
+  { id: 'overview', label: localization.routes.emulators.components.emulatorDetailPage.overviewTabLabel },
+  { id: 'tags', label: localization.routes.emulators.components.emulatorDetailPage.tagsTabLabel },
+  { id: 'monitoring', label: localization.routes.emulators.components.emulatorDetailPage.monitoringTabLabel },
+  { id: 'logs', label: localization.routes.emulators.components.emulatorDetailPage.logsTabLabel },
 ] as const;
 
 type TabId = (typeof tabs)[number]['id'];
@@ -440,7 +440,7 @@ export function EmulatorDetailPage() {
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-3 w-3" />{' '}
-            {localization.routes.emulators.components.emulatorDetailPage.text9}
+            {localization.routes.emulators.components.emulatorDetailPage.backToListLabel}
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="font-mono text-2xl font-semibold">{emulator.name}</h1>
@@ -450,7 +450,7 @@ export function EmulatorDetailPage() {
         <div className="flex gap-2">
           {/* <Button variant="outline" size="sm" className="gap-2">
             <RotateCw className="h-3.5 w-3.5" />{' '}
-            {localization.routes.emulators.components.emulatorDetailPage.text10}
+            {localization.routes.emulators.components.emulatorDetailPage.runOnceButtonLabel}
           </Button> */}
           <Button
             size="sm"
@@ -472,12 +472,12 @@ export function EmulatorDetailPage() {
             {emulator.status === 'Running' ? (
               <>
                 <StopCircle className="h-3.5 w-3.5" />{' '}
-                {localization.routes.emulators.components.emulatorDetailPage.text11}
+                {localization.routes.emulators.components.emulatorDetailPage.stopButtonLabel}
               </>
             ) : (
               <>
                 <PlayCircle className="h-3.5 w-3.5" />{' '}
-                {localization.routes.emulators.components.emulatorDetailPage.text12}
+                {localization.routes.emulators.components.emulatorDetailPage.startButtonLabel}
               </>
             )}
           </Button>
@@ -486,10 +486,10 @@ export function EmulatorDetailPage() {
             variant="outline"
             className="gap-2 border-signal-offline/40 text-signal-offline hover:bg-signal-offline/10 hover:text-signal-offline"
             onClick={() => setDeleteOpen(true)}
-            title={localization.routes.emulators.components.emulatorDetailPage.text13}
+            title={localization.routes.emulators.components.emulatorDetailPage.deleteEmulatorButtonLabel}
           >
             <Trash2 className="h-3.5 w-3.5" />{' '}
-            {localization.routes.emulators.components.emulatorDetailPage.text14}
+            {localization.routes.emulators.components.emulatorDetailPage.deleteButtonLabel}
           </Button>
         </div>
       </div>
@@ -498,23 +498,23 @@ export function EmulatorDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {localization.routes.emulators.components.emulatorDetailPage.text15}
+              {localization.routes.emulators.components.emulatorDetailPage.deleteDialogTitle}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {localization.routes.emulators.components.emulatorDetailPage.text16}
+              {localization.routes.emulators.components.emulatorDetailPage.deleteDialogSubjectLabel}
               <span className="font-mono text-foreground">{emulator.name}</span>{' '}
-              {localization.routes.emulators.components.emulatorDetailPage.text17}
+              {localization.routes.emulators.components.emulatorDetailPage.deleteDialogDescriptionSuffix}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {localization.routes.emulators.components.emulatorDetailPage.text18}
+              {localization.routes.emulators.components.emulatorDetailPage.cancelButtonLabel}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void handleDelete()}
               className="bg-signal-offline text-white hover:bg-signal-offline/90"
             >
-              {localization.routes.emulators.components.emulatorDetailPage.text19}
+              {localization.routes.emulators.components.emulatorDetailPage.confirmDeleteButtonLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -541,27 +541,27 @@ export function EmulatorDetailPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="rounded-lg border border-border bg-card p-4 lg:col-span-2">
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {localization.routes.emulators.components.emulatorDetailPage.text20}
+              {localization.routes.emulators.components.emulatorDetailPage.configurationTitle}
             </h3>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <dt className="text-xs text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text21}
+                  {localization.routes.emulators.components.emulatorDetailPage.targetUrlLabel}
                 </dt>
                 <dd className="mt-1 font-mono text-xs">{emulator.targetUrl}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text22}
+                  {localization.routes.emulators.components.emulatorDetailPage.intervalLabel}
                 </dt>
                 <dd className="mt-1 font-mono">
                   {emulator.intervalSec}{' '}
-                  {localization.routes.emulators.components.emulatorDetailPage.text23}
+                  {localization.routes.emulators.components.emulatorDetailPage.secondsUnitLabel}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text24}
+                  {localization.routes.emulators.components.emulatorDetailPage.emulatorIdLabel}
                 </dt>
                 <dd className="mt-1 font-mono text-xs">{emulator.id}</dd>
               </div>
@@ -573,7 +573,7 @@ export function EmulatorDetailPage() {
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text25}
+                  {localization.routes.emulators.components.emulatorDetailPage.payloadTagsLabel}
                 </dt>
                 <dd className="mt-1 font-mono">{emulator.tagsCount}</dd>
               </div>
@@ -585,14 +585,14 @@ export function EmulatorDetailPage() {
               onClick={() => setEditConfigOpen(true)}
             >
               <SettingsIcon className="h-3.5 w-3.5" />{' '}
-              {localization.routes.emulators.components.emulatorDetailPage.text26}
+              {localization.routes.emulators.components.emulatorDetailPage.editConfigurationButtonLabel}
             </Button>
           </div>
 
           <div className="space-y-4">
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                {localization.routes.emulators.components.emulatorDetailPage.text27}
+                {localization.routes.emulators.components.emulatorDetailPage.uptimeLabel}
               </p>
               <p className="mt-2 font-mono text-2xl font-semibold">
                 {formatUptime(emulator.uptimeSec)}
@@ -600,7 +600,7 @@ export function EmulatorDetailPage() {
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                {localization.routes.emulators.components.emulatorDetailPage.text28}
+                {localization.routes.emulators.components.emulatorDetailPage.totalRequestsLabel}
               </p>
               <p className="mt-2 font-mono text-2xl font-semibold">
                 {formatNumber(emulator.totalRequests)}
@@ -608,7 +608,7 @@ export function EmulatorDetailPage() {
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                {localization.routes.emulators.components.emulatorDetailPage.text29}
+                {localization.routes.emulators.components.emulatorDetailPage.lastRunLabel}
               </p>
               <p className="mt-2 font-mono text-sm">
                 <TimeAgo iso={emulator.lastRun} />
@@ -645,7 +645,7 @@ export function EmulatorDetailPage() {
               </td>
               <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
                 {t.source === 'scenario' && t.scenario
-                  ? localization.routes.emulators.components.emulatorDetailPage.text30(
+                  ? localization.routes.emulators.components.emulatorDetailPage.scenarioSummary(
                       t.scenario.segments.length,
                       formatDuration(totalDuration(t.scenario)),
                       getContinueOnFormulaEndLabel(t.scenario.continueOnFormulaEnd ?? 'Repeat')
@@ -692,7 +692,7 @@ export function EmulatorDetailPage() {
                   <Switch
                     checked={t.enabled !== false}
                     onCheckedChange={(v) => void updateTag(id, t.id, { ...t, enabled: v })}
-                    title={localization.routes.emulators.components.emulatorDetailPage.text31}
+                    title={localization.routes.emulators.components.emulatorDetailPage.sendTagTitle}
                   />
                   <Button
                     size="icon"
@@ -702,7 +702,7 @@ export function EmulatorDetailPage() {
                       setEditingTag(t);
                       setAddTagOpen(true);
                     }}
-                    title={localization.routes.emulators.components.emulatorDetailPage.text32}
+                    title={localization.routes.emulators.components.emulatorDetailPage.editTagTitle}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -711,7 +711,7 @@ export function EmulatorDetailPage() {
                     variant="ghost"
                     className="h-7 w-7 text-muted-foreground hover:text-signal-offline"
                     onClick={() => void deleteTag(id, t.id)}
-                    title={localization.routes.emulators.components.emulatorDetailPage.text33}
+                    title={localization.routes.emulators.components.emulatorDetailPage.deleteTagTitle}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -725,25 +725,25 @@ export function EmulatorDetailPage() {
               <thead className="border-b border-border bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 font-medium">
-                    {localization.routes.emulators.components.emulatorDetailPage.text34}
+                    {localization.routes.emulators.components.emulatorDetailPage.nameColumnLabel}
                   </th>
                   <th className="px-4 py-2 font-medium">
                     {localization.routes.emulators.components.emulatorDetailPage.keyColumnLabel}
                   </th>
                   <th className="px-4 py-2 font-medium">
-                    {localization.routes.emulators.components.emulatorDetailPage.text35}
+                    {localization.routes.emulators.components.emulatorDetailPage.typeColumnLabel}
                   </th>
                   <th className="px-4 py-2 font-medium">
-                    {localization.routes.emulators.components.emulatorDetailPage.text36}
+                    {localization.routes.emulators.components.emulatorDetailPage.sourceColumnLabel}
                   </th>
                   <th className="px-4 py-2 font-medium">
-                    {localization.routes.emulators.components.emulatorDetailPage.text37}
+                    {localization.routes.emulators.components.emulatorDetailPage.triggerColumnLabel}
                   </th>
                   <th className="px-4 py-2 font-medium">
                     {localization.routes.emulators.components.emulatorDetailPage.calcColumnLabel}
                   </th>
                   <th className="px-4 py-2 font-medium">
-                    {localization.routes.emulators.components.emulatorDetailPage.text38}
+                    {localization.routes.emulators.components.emulatorDetailPage.previewColumnLabel}
                   </th>
                   <th className="px-4 py-2"></th>
                 </tr>
@@ -767,14 +767,14 @@ export function EmulatorDetailPage() {
                 <div className="flex items-center justify-between border-b border-border p-4">
                   <div>
                     <h3 className="font-semibold">
-                      {localization.routes.emulators.components.emulatorDetailPage.text39}
+                      {localization.routes.emulators.components.emulatorDetailPage.enabledTagsSectionTitle}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      {localization.routes.emulators.components.emulatorDetailPage.text40}{' '}
+                      {localization.routes.emulators.components.emulatorDetailPage.enabledTagsSectionDescription}{' '}
                       {enabledTags.length}{' '}
                       {enabledTags.length === 1
-                        ? localization.routes.emulators.components.emulatorDetailPage.text41
-                        : localization.routes.emulators.components.emulatorDetailPage.text42}
+                        ? localization.routes.emulators.components.emulatorDetailPage.singleTagCountLabel
+                        : localization.routes.emulators.components.emulatorDetailPage.multipleTagsCountLabel}
                     </p>
                   </div>
                   <Button
@@ -783,15 +783,15 @@ export function EmulatorDetailPage() {
                       setEditingTag(null);
                       setAddTagOpen(true);
                     }}
-                    title={localization.routes.emulators.components.emulatorDetailPage.text43}
+                    title={localization.routes.emulators.components.emulatorDetailPage.addTagButtonLabel}
                   >
                     <Plus className="h-3.5 w-3.5" />{' '}
-                    {localization.routes.emulators.components.emulatorDetailPage.text43}
+                    {localization.routes.emulators.components.emulatorDetailPage.addTagButtonLabel}
                   </Button>
                 </div>
                 {renderTable(
                   enabledTags,
-                  localization.routes.emulators.components.emulatorDetailPage.text44
+                  localization.routes.emulators.components.emulatorDetailPage.emptyEnabledTagsMessage
                 )}
               </div>
 
@@ -799,18 +799,18 @@ export function EmulatorDetailPage() {
                 <div className="rounded-lg border border-dashed border-border bg-card/50">
                   <div className="border-b border-border/60 p-4">
                     <h3 className="font-semibold text-muted-foreground">
-                      {localization.routes.emulators.components.emulatorDetailPage.text45}
+                      {localization.routes.emulators.components.emulatorDetailPage.disabledTagsSectionTitle}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      {localization.routes.emulators.components.emulatorDetailPage.text46}{' '}
+                      {localization.routes.emulators.components.emulatorDetailPage.disabledTagsSectionDescription}{' '}
                       {disabledTags.length === 1
-                        ? localization.routes.emulators.components.emulatorDetailPage.text41
-                        : localization.routes.emulators.components.emulatorDetailPage.text42}
+                        ? localization.routes.emulators.components.emulatorDetailPage.singleTagCountLabel
+                        : localization.routes.emulators.components.emulatorDetailPage.multipleTagsCountLabel}
                     </p>
                   </div>
                   {renderTable(
                     disabledTags,
-                    localization.routes.emulators.components.emulatorDetailPage.text47,
+                    localization.routes.emulators.components.emulatorDetailPage.emptyDisabledTagsMessage,
                     true
                   )}
                 </div>
@@ -841,13 +841,13 @@ export function EmulatorDetailPage() {
             <div className="rounded-lg border border-border bg-card p-4 xl:col-span-2">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Телеметрия - временной ряд
+                  {localization.routes.emulators.components.emulatorDetailPage.telemetryTimeSeriesTitle}
                 </h3>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <p className="font-mono text-[11px] text-muted-foreground">
                     {hoverIdx !== null
                       ? `t = ${telemetry[hoverIdx]?.time ?? '-'}`
-                      : localization.routes.emulators.components.emulatorDetailPage.text48}
+                      : localization.routes.emulators.components.emulatorDetailPage.chartHoverHint}
                   </p>
                   <Button
                     size="sm"
@@ -937,12 +937,12 @@ export function EmulatorDetailPage() {
             <div className="rounded-lg border border-border bg-card">
               <div className="border-b border-border p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text49}
+                  {localization.routes.emulators.components.emulatorDetailPage.tagValuesTitle}
                 </h3>
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                   {hoverIdx !== null
-                    ? localization.routes.emulators.components.emulatorDetailPage.text50
-                    : localization.routes.emulators.components.emulatorDetailPage.text51}
+                    ? localization.routes.emulators.components.emulatorDetailPage.cursorSnapshotLabel
+                    : localization.routes.emulators.components.emulatorDetailPage.latestSnapshotLabel}
                 </p>
               </div>
               <div className="max-h-[320px] overflow-auto">
@@ -950,13 +950,13 @@ export function EmulatorDetailPage() {
                   <thead className="sticky top-0 border-b border-border bg-card text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 font-medium">
-                        {localization.routes.emulators.components.emulatorDetailPage.text52}
+                        {localization.routes.emulators.components.emulatorDetailPage.tagColumnLabel}
                       </th>
                       <th className="px-3 py-2 font-medium">
-                        {localization.routes.emulators.components.emulatorDetailPage.text53}
+                        {localization.routes.emulators.components.emulatorDetailPage.valueTypeColumnLabel}
                       </th>
                       <th className="px-3 py-2 text-right font-medium">
-                        {localization.routes.emulators.components.emulatorDetailPage.text54}
+                        {localization.routes.emulators.components.emulatorDetailPage.valueColumnLabel}
                       </th>
                     </tr>
                   </thead>
@@ -967,7 +967,7 @@ export function EmulatorDetailPage() {
                           colSpan={3}
                           className="px-3 py-6 text-center text-xs text-muted-foreground"
                         >
-                          {localization.routes.emulators.components.emulatorDetailPage.text55}
+                          {localization.routes.emulators.components.emulatorDetailPage.emptyTagsMessage}
                         </td>
                       </tr>
                     )}
@@ -995,10 +995,10 @@ export function EmulatorDetailPage() {
             <div className="rounded-lg border border-border bg-card">
               <div className="border-b border-border p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text56}
+                  {localization.routes.emulators.components.emulatorDetailPage.tagScenariosTitle}
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text57}
+                  {localization.routes.emulators.components.emulatorDetailPage.tagScenariosDescription}
                 </p>
               </div>
               <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
@@ -1022,7 +1022,7 @@ export function EmulatorDetailPage() {
                             <p className="font-mono text-sm">{t.name}</p>
                             <p className="text-[11px] text-muted-foreground">
                               {t.scenario!.segments.length}{' '}
-                              {localization.routes.emulators.components.emulatorDetailPage.text58}
+                              {localization.routes.emulators.components.emulatorDetailPage.segmentsSumLabel}
                               {formatDuration(total)}
                               {` · ${endMode}`}
                             </p>
@@ -1046,12 +1046,12 @@ export function EmulatorDetailPage() {
             <div className="flex items-center justify-between border-b border-border p-4">
               <div>
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text59}
+                  {localization.routes.emulators.components.emulatorDetailPage.packetHistoryTitle}
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.text60}{' '}
+                  {localization.routes.emulators.components.emulatorDetailPage.packetHistoryRetentionPrefix}{' '}
                   {packetRetention}{' '}
-                  {localization.routes.emulators.components.emulatorDetailPage.text61}{' '}
+                  {localization.routes.emulators.components.emulatorDetailPage.packetHistoryShownSuffix}{' '}
                   {packets.length}
                 </p>
               </div>
@@ -1091,13 +1091,13 @@ export function EmulatorDetailPage() {
                         </span>
                         {listIdx === 0 && (
                           <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
-                            {localization.routes.emulators.components.emulatorDetailPage.text62}
+                            {localization.routes.emulators.components.emulatorDetailPage.latestPacketLabel}
                           </span>
                         )}
                       </div>
                       <span className="font-mono text-[11px] text-muted-foreground">
                         {enabledTagsForDispatcher.length}{' '}
-                        {localization.routes.emulators.components.emulatorDetailPage.text63}
+                        {localization.routes.emulators.components.emulatorDetailPage.packetTagsSuffix}
                       </span>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -1117,16 +1117,16 @@ export function EmulatorDetailPage() {
         <div className="rounded-lg border border-border bg-card">
           <div className="border-b border-border p-4">
             <h3 className="font-semibold">
-              {localization.routes.emulators.components.emulatorDetailPage.text64}
+              {localization.routes.emulators.components.emulatorDetailPage.eventsLogTitle}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {events.length} {localization.routes.emulators.components.emulatorDetailPage.text65}
+              {events.length} {localization.routes.emulators.components.emulatorDetailPage.eventsCountSuffix}
             </p>
           </div>
           <div className="divide-y divide-border/40">
             {events.length === 0 && (
               <div className="p-8 text-center text-sm text-muted-foreground">
-                {localization.routes.emulators.components.emulatorDetailPage.text66}
+                {localization.routes.emulators.components.emulatorDetailPage.emptyEventsMessage}
               </div>
             )}
             {events.map((ev) => (

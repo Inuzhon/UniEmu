@@ -58,10 +58,10 @@ export function EmulatorsListPage() {
   });
 
   const filters = [
-    { id: 'all', label: localization.routes.emulators.components.emulatorsListPage.text1 },
-    { id: 'Running', label: localization.routes.emulators.components.emulatorsListPage.text2 },
-    { id: 'Stopped', label: localization.routes.emulators.components.emulatorsListPage.text3 },
-    { id: 'Error', label: localization.routes.emulators.components.emulatorsListPage.text4 },
+    { id: 'all', label: localization.routes.emulators.components.emulatorsListPage.allFilterLabel },
+    { id: 'Running', label: localization.routes.emulators.components.emulatorsListPage.runningFilterLabel },
+    { id: 'Stopped', label: localization.routes.emulators.components.emulatorsListPage.stoppedFilterLabel },
+    { id: 'Error', label: localization.routes.emulators.components.emulatorsListPage.errorsFilterLabel },
   ] as const;
 
   return (
@@ -69,15 +69,15 @@ export function EmulatorsListPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {localization.routes.emulators.components.emulatorsListPage.text5}
+            {localization.routes.emulators.components.emulatorsListPage.title}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {localization.routes.emulators.components.emulatorsListPage.text6}
+            {localization.routes.emulators.components.emulatorsListPage.description}
           </p>
         </div>
         <Button className="gap-2" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4" />
-          {localization.routes.emulators.components.emulatorsListPage.text7}
+          {localization.routes.emulators.components.emulatorsListPage.createButtonLabel}
         </Button>
       </div>
 
@@ -87,7 +87,7 @@ export function EmulatorsListPage() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={localization.routes.emulators.components.emulatorsListPage.text8}
+            placeholder={localization.routes.emulators.components.emulatorsListPage.searchPlaceholder}
             className="pl-9"
           />
         </div>
@@ -138,19 +138,19 @@ export function EmulatorsListPage() {
             <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border/60 pt-3 text-center">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorsListPage.text9}
+                  {localization.routes.emulators.components.emulatorsListPage.tagsCountLabel}
                 </p>
                 <p className="font-mono text-sm font-medium">{e.tagsCount}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorsListPage.text10}
+                  {localization.routes.emulators.components.emulatorsListPage.uptimeLabel}
                 </p>
                 <p className="font-mono text-sm font-medium">{formatUptime(e.uptimeSec)}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorsListPage.text11}
+                  {localization.routes.emulators.components.emulatorsListPage.requestsCountLabel}
                 </p>
                 <p className="font-mono text-sm font-medium">{formatNumber(e.totalRequests)}</p>
               </div>
@@ -158,7 +158,7 @@ export function EmulatorsListPage() {
 
             <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>
-                {localization.routes.emulators.components.emulatorsListPage.text12}
+                {localization.routes.emulators.components.emulatorsListPage.lastRunPrefix}
                 <TimeAgo iso={e.lastRun} />
               </span>
               <div className="flex gap-1">
@@ -188,7 +188,7 @@ export function EmulatorsListPage() {
       {filtered.length === 0 && (
         <div className="rounded-lg border border-dashed border-border bg-card/40 p-12 text-center">
           <p className="text-sm text-muted-foreground">
-            {localization.routes.emulators.components.emulatorsListPage.text13}
+            {localization.routes.emulators.components.emulatorsListPage.emptySearchMessage}
           </p>
         </div>
       )}
@@ -197,16 +197,16 @@ export function EmulatorsListPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {localization.routes.emulators.components.emulatorsListPage.text14}
+              {localization.routes.emulators.components.emulatorsListPage.newEmulatorTitle}
             </DialogTitle>
             <DialogDescription>
-              {localization.routes.emulators.components.emulatorsListPage.text15}
+              {localization.routes.emulators.components.emulatorsListPage.newEmulatorDescription}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="em-name">
-                {localization.routes.emulators.components.emulatorsListPage.text16}
+                {localization.routes.emulators.components.emulatorsListPage.nameLabel}
               </Label>
               <Input
                 id="em-name"
@@ -229,7 +229,7 @@ export function EmulatorsListPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="em-url">
-                {localization.routes.emulators.components.emulatorsListPage.text17}
+                {localization.routes.emulators.components.emulatorsListPage.targetUrlLabel}
               </Label>
               <Input
                 id="em-url"
@@ -240,7 +240,7 @@ export function EmulatorsListPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="em-interval">
-                {localization.routes.emulators.components.emulatorsListPage.text18}
+                {localization.routes.emulators.components.emulatorsListPage.sendIntervalLabel}
               </Label>
               <Input
                 id="em-interval"
@@ -253,10 +253,10 @@ export function EmulatorsListPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              {localization.routes.emulators.components.emulatorsListPage.text19}
+              {localization.routes.emulators.components.emulatorsListPage.cancelButtonLabel}
             </Button>
             <Button onClick={() => void handleCreate()} disabled={!form.name.trim()}>
-              {localization.routes.emulators.components.emulatorsListPage.text20}
+              {localization.routes.emulators.components.emulatorsListPage.createButtonText}
             </Button>
           </DialogFooter>
         </DialogContent>

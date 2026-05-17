@@ -38,15 +38,15 @@ export function DropZone({
       >
         <Upload className="h-10 w-10" />
         <p className="mt-4 text-sm">
-          {localization.routes.cnc.components.dropZone.text1}
+          {localization.routes.cnc.components.dropZone.title}
           <br />
-          {localization.routes.cnc.components.dropZone.text2}
+          {localization.routes.cnc.components.dropZone.separatorLabel}
         </p>
         <Button onClick={onPick} className="mt-3 gap-2">
-          <Upload className="h-4 w-4" /> {localization.routes.cnc.components.dropZone.text3}
+          <Upload className="h-4 w-4" /> {localization.routes.cnc.components.dropZone.chooseFilesButtonLabel}
         </Button>
         <p className="mt-4 text-[11px] text-muted-foreground">
-          {localization.routes.cnc.components.dropZone.text4}
+          {localization.routes.cnc.components.dropZone.supportedFormatsHint}
         </p>
       </div>
     </div>

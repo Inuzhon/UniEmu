@@ -5,10 +5,10 @@ import { localization } from '@/localization';
 export const Route = createFileRoute('/cnc/')({
   head: () => ({
     meta: [
-      { title: localization.routes.cnc.index.text1 },
+      { title: localization.routes.cnc.index.title },
       {
         name: 'description',
-        content: localization.routes.cnc.index.text2,
+        content: localization.routes.cnc.index.description,
       },
     ],
   }),
