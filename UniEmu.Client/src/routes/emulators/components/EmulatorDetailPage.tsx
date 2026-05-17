@@ -2,9 +2,13 @@ import { Link, useNavigate, useParams, useRouter } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
+  Check,
   ChevronDown,
   ChevronRight,
+  ChevronsUpDown,
   Download,
+  FileText,
+  Folder,
   PauseCircle,
   Pencil,
   PlayCircle,
@@ -37,7 +41,20 @@ import { useUniEmuStore } from '@/store/uniemu-store';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { formatNumber, formatUptime } from '@/utils/format';
 import { TimeAgo } from '@/components/TimeAgo';
@@ -52,7 +69,8 @@ import {
   getTagTypeLabel,
 } from './tag-scenario/calcLabels';
 import { formatDuration, totalDuration } from './tag-scenario/scenarioMath';
-import type { EmulatorTag, TagSource, TagTrigger, TelemetryPoint } from '@/types/uniemu';
+import { cn } from '@/lib/utils';
+import type { CncProgram, EmulatorTag, TagSource, TagTrigger, TelemetryPoint } from '@/types/uniemu';
 import { localization } from '@/localization';
 
 function formatTrigger(t: TagTrigger, source?: TagSource): string {
@@ -126,6 +144,7 @@ export function EmulatorDetailPage() {
   const loadEmulatorDetails = useUniEmuStore((s) => s.loadEmulatorDetails);
   const subscribeRealtimeEmulator = useUniEmuStore((s) => s.subscribeRealtimeEmulator);
   const unsubscribeRealtimeEmulator = useUniEmuStore((s) => s.unsubscribeRealtimeEmulator);
+  const cncPrograms = useUniEmuStore((s) => s.cncPrograms);
 
   const emulator = useMemo(() => emulators.find((e) => e.id === id), [emulators, id]);
   const tags = useMemo(() => tagsByEmulator[id] ?? [], [tagsByEmulator, id]);
@@ -143,6 +162,7 @@ export function EmulatorDetailPage() {
   );
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [templateDownloading, setTemplateDownloading] = useState(false);
+  const [programPreviewPickerOpenId, setProgramPreviewPickerOpenId] = useState<string | null>(null);
   const deleteTag = useUniEmuStore((s) => s.deleteTag);
   const updateTag = useUniEmuStore((s) => s.updateTag);
   const deleteEmulator = useUniEmuStore((s) => s.deleteEmulator);
@@ -198,6 +218,22 @@ export function EmulatorDetailPage() {
   const visibleNumericTelemetryTags = useMemo(
     () => numericTelemetryTags.filter((t) => !hiddenTelemetryTagNames.has(t.name)),
     [hiddenTelemetryTagNames, numericTelemetryTags]
+  );
+  const visibleCncPrograms = useMemo(
+    () => [...cncPrograms
+      .filter((program) =>
+        program.scope === 'shared' ||
+        (program.scope === 'emulator' && program.emulatorId === id))]
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' })),
+    [cncPrograms, id]
+  );
+  const sharedCncPrograms = useMemo(
+    () => visibleCncPrograms.filter((program) => program.scope === 'shared'),
+    [visibleCncPrograms]
+  );
+  const emulatorCncPrograms = useMemo(
+    () => visibleCncPrograms.filter((program) => program.scope === 'emulator'),
+    [visibleCncPrograms]
   );
 
   useEffect(() => {
@@ -270,6 +306,128 @@ export function EmulatorDetailPage() {
       ? -1
       : Math.min(hoverIdx ?? telemetryPoints.length - 1, telemetryPoints.length - 1);
   const activePoint = telemetryPoints[activeIdx];
+
+  const isProgramNameTag = (t: EmulatorTag) =>
+    t.source === 'static' &&
+    t.type === 'string' &&
+    (t.specialParameter === 'PrgName' || t.specialParameter === 'Subprogram');
+
+  const renderProgramOption = (t: EmulatorTag, program: CncProgram) => (
+    <CommandItem
+      key={program.id}
+      value={`${program.scope}:${program.name}:${program.description}`}
+      onSelect={() => {
+        void updateTag(id, t.id, { ...t, preview: program.name });
+        setProgramPreviewPickerOpenId(null);
+      }}
+      className="items-start gap-2 py-2"
+    >
+      <FileText className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-mono text-xs">{program.name}</div>
+        {program.description && (
+          <div className="truncate text-[10px] text-muted-foreground">
+            {program.description}
+          </div>
+        )}
+      </div>
+      <Check
+        className={cn(
+          'mt-0.5 h-3.5 w-3.5',
+          t.preview === program.name ? 'opacity-100' : 'opacity-0'
+        )}
+      />
+    </CommandItem>
+  );
+
+  const renderProgramPreviewPicker = (t: EmulatorTag) => {
+    const selectedCncProgram = visibleCncPrograms.find(
+      (program) => program.name.localeCompare(t.preview, undefined, { sensitivity: 'accent' }) === 0
+    );
+
+    return (
+      <Popover
+        open={programPreviewPickerOpenId === t.id}
+        onOpenChange={(open) => setProgramPreviewPickerOpenId(open ? t.id : null)}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            className="h-7 w-48 max-w-[18rem] justify-between gap-2 px-2 py-1 font-mono text-xs"
+          >
+            <span className={cn('truncate', !t.preview && 'font-sans text-muted-foreground')}>
+              {t.preview || localization.routes.emulators.components.addTagDrawer.programPickerSelectPlaceholder}
+            </span>
+            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-0">
+          <Command>
+            <CommandInput
+              placeholder={localization.routes.emulators.components.addTagDrawer.programPickerSearchPlaceholder}
+            />
+            <CommandList
+              onWheel={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                event.currentTarget.scrollTop += event.deltaY;
+              }}
+            >
+              <CommandEmpty>
+                {localization.routes.emulators.components.addTagDrawer.programPickerEmpty}
+              </CommandEmpty>
+              {t.preview && !selectedCncProgram && (
+                <CommandGroup
+                  heading={localization.routes.emulators.components.addTagDrawer.programPickerCurrentGroup}
+                >
+                  <CommandItem
+                    value={`current:${t.preview}`}
+                    onSelect={() => setProgramPreviewPickerOpenId(null)}
+                    className="items-start gap-2 py-2"
+                  >
+                    <FileText className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-mono text-xs">{t.preview}</div>
+                      <div className="truncate text-[10px] text-muted-foreground">
+                        {localization.routes.emulators.components.addTagDrawer.programPickerCurrentMissing}
+                      </div>
+                    </div>
+                    <Check className="mt-0.5 h-3.5 w-3.5" />
+                  </CommandItem>
+                </CommandGroup>
+              )}
+              {sharedCncPrograms.length > 0 && (
+                <CommandGroup
+                  heading={(
+                    <span className="flex items-center gap-1.5">
+                      <Folder className="h-3 w-3" />
+                      {localization.routes.emulators.components.addTagDrawer.programPickerSharedGroup}
+                    </span>
+                  )}
+                >
+                  {sharedCncPrograms.map((program) => renderProgramOption(t, program))}
+                </CommandGroup>
+              )}
+              {emulatorCncPrograms.length > 0 && (
+                <CommandGroup
+                  heading={(
+                    <span className="flex items-center gap-1.5">
+                      <Folder className="h-3 w-3" />
+                      {localization.routes.emulators.components.addTagDrawer.programPickerEmulatorGroup}
+                    </span>
+                  )}
+                >
+                  {emulatorCncPrograms.map((program) => renderProgramOption(t, program))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
+  };
 
   if (!emulator) return null;
 
@@ -505,6 +663,8 @@ export function EmulatorDetailPage() {
                         void updateTag(id, t.id, { ...t, preview: v ? 'true' : 'false' })
                       }
                     />
+                  ) : isProgramNameTag(t) ? (
+                    renderProgramPreviewPicker(t)
                   ) : (
                     <Input
                       type="text"
