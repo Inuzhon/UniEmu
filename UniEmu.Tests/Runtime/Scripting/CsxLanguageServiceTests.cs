@@ -295,6 +295,26 @@ public sealed class CsxLanguageServiceTests
     }
 
     [Fact]
+    public async Task GetCompletionsAsync_ReturnsScriptingApiEnumMembers()
+    {
+        var service = new CsxLanguageService();
+
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "TagScriptValueType.",
+            19,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(completions, item => item.Label == "Bool");
+        Assert.Contains(completions, item => item.Label == "Int");
+        Assert.Contains(completions, item => item.Label == "Double");
+        Assert.Contains(completions, item => item.Label == "String");
+        Assert.All(completions.Where(item => item.Label is "Bool" or "Int" or "Double" or "String"),
+            item => Assert.Equal("enumMember", item.Kind));
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_AcceptsAwaitedRestOperationAndWorkerMembers()
     {
         var service = new CsxLanguageService();

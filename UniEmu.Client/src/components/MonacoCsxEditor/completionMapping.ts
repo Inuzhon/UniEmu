@@ -41,6 +41,8 @@ function mapCompletionKind(monacoApi: MonacoApi, kind?: string) {
       return monacoApi.languages.CompletionItemKind.Struct;
     case 'enum':
       return monacoApi.languages.CompletionItemKind.Enum;
+    case 'enummember':
+      return monacoApi.languages.CompletionItemKind.EnumMember;
     case 'field':
       return monacoApi.languages.CompletionItemKind.Field;
     case 'keyword':

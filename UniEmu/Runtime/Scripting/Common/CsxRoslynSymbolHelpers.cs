@@ -56,6 +56,7 @@ public static class CsxRoslynSymbolHelpers
             "class" => "class",
             "struct" => "struct",
             "enum" => "enum",
+            "enummember" => "enumMember",
             "field" => "field",
             "keyword" => "keyword",
             "local" => "variable",

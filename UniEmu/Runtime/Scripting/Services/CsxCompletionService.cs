@@ -10,6 +10,7 @@ namespace UniEmu.Runtime.Scripting.Services;
 public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
 {
     private const string ScriptingApiNamespace = "UniEmu.Scripting.Api";
+    private const string ScriptingApiNamespacePrefix = ScriptingApiNamespace + ".";
 
     private static readonly HashSet<string> s_allowedSystemTypeLabels = new(StringComparer.Ordinal)
     {
@@ -20,6 +21,23 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         "StringComparer",
         "TimeSpan",
     };
+
+    private static readonly HashSet<string> s_scriptSpecificCompletionTags = new(StringComparer.Ordinal)
+    {
+        "field",
+        "local",
+        "method",
+        "parameter",
+        "property",
+    };
+
+    private static readonly HashSet<string> s_additionalAllowedScriptCompletionTags = new(StringComparer.Ordinal)
+    {
+        "enummember",
+        "keyword",
+    };
+
+    private static readonly Type[] s_scriptingApiTypes = typeof(ScriptingApiAttribute).Assembly.GetTypes();
 
     public async Task<IReadOnlyList<CsxCompletionItem>> GetCompletionsAsync(
         string entryPath,
@@ -85,16 +103,12 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
             return HasScriptingApiAttribute(candidate);
         }
 
-        if (candidate.Tags.Any(tag => tag is "keyword" or "method" or "property" or "field" or "local" or "parameter"))
+        if (candidate.Tags.Any(IsAllowedScriptCompletionTag))
         {
             return true;
         }
 
-        if (s_allowedSystemTypeLabels.Contains(item.Label))
-        {
-            return true;
-        }
-        return false;
+        return s_allowedSystemTypeLabels.Contains(item.Label);
     }
 
     private static int GetCompletionPriority(CompletionCandidate candidate, IReadOnlySet<string> globalObjectLabels)
@@ -124,14 +138,24 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
 
     private static bool IsScriptSpecificCompletion(CompletionCandidate candidate)
     {
-        return candidate.Tags.Any(tag => tag is "method" or "property" or "field" or "local" or "parameter")
+        return candidate.Tags.Any(IsScriptSpecificCompletionTag)
             && !IsScriptingApiCompletion(candidate)
             && !IsSystemCompletion(candidate);
     }
 
+    private static bool IsAllowedScriptCompletionTag(string tag)
+    {
+        return IsScriptSpecificCompletionTag(tag) || s_additionalAllowedScriptCompletionTags.Contains(tag);
+    }
+
+    private static bool IsScriptSpecificCompletionTag(string tag)
+    {
+        return s_scriptSpecificCompletionTags.Contains(tag);
+    }
+
     private static bool IsScriptingApiCompletion(CompletionCandidate candidate)
     {
-        return candidate.Documentation?.Contains(ScriptingApiNamespace + ".", StringComparison.Ordinal) == true;
+        return candidate.Documentation?.Contains(ScriptingApiNamespacePrefix, StringComparison.Ordinal) == true;
     }
 
     private static bool IsSystemCompletion(CompletionCandidate candidate)
@@ -146,7 +170,7 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
             return false;
         }
 
-        foreach (var type in typeof(ScriptingApiAttribute).Assembly.GetTypes())
+        foreach (var type in s_scriptingApiTypes)
         {
             if (type.FullName is null || !documentation.Contains(type.FullName, StringComparison.Ordinal))
             {

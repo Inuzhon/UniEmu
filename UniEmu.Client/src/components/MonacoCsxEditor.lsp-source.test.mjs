@@ -114,3 +114,10 @@ test('csx completion keeps basic snippets in a dedicated snippet source', async 
   assert.match(snippetsSource, /label: '\/\/\/'/);
   assert.match(snippetsSource, /label: '\/\* \*\/'/);
 });
+
+test('csx completion maps server enum members to Monaco enum member kind', async () => {
+  const mappingSource = await readComponentFile('completionMapping.ts');
+
+  assert.match(mappingSource, /case 'enummember':/);
+  assert.match(mappingSource, /CompletionItemKind\.EnumMember/);
+});
