@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS client-build
+FROM node:22-bookworm-slim AS client-build
 WORKDIR /src/UniEmu.Client
 
 COPY ["UniEmu.Client/package.json", "UniEmu.Client/yarn.lock", "./"]
@@ -12,7 +12,6 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 COPY ["Directory.Build.props", "."]
-COPY ["NuGet.Config", "."]
 COPY ["UniEmu/UniEmu.csproj", "UniEmu/"]
 COPY ["UniEmu.Scripting.Api/UniEmu.Scripting.Api.csproj", "UniEmu.Scripting.Api/"]
 COPY ["UniEmu.Client/UniEmu.Client.esproj", "UniEmu.Client/"]
