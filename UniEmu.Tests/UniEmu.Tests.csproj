@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\UniEmu.DispatcherMock\UniEmu.DispatcherMock.csproj" />
     <ProjectReference Include="..\UniEmu.Scripting.Api\UniEmu.Scripting.Api.csproj" />
     <ProjectReference Include="..\UniEmu\UniEmu.csproj" />
   </ItemGroup>

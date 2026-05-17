@@ -1,4 +1,16 @@
 services:
+  dispatcher-mock:
+    image: ${UNIEMU_DISPATCHER_MOCK_IMAGE:-uniemu-dispatcher-mock:local}
+    build:
+      context: .
+      dockerfile: UniEmu.DispatcherMock/Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIGURATION:-Release}
+    container_name: ${UNIEMU_DISPATCHER_MOCK_CONTAINER_NAME:-uniemu-dispatcher-mock}
+    restart: unless-stopped
+    ports:
+      - "${UNIEMU_DISPATCHER_MOCK_PORT:-8080}:8080"
+
   uniemu:
     image: ${UNIEMU_IMAGE:-uniemu:local}
     build:

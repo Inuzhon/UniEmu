@@ -8,6 +8,7 @@
     <Build />
     <Deploy />
   </Project>
+  <Project Path="UniEmu.DispatcherMock/UniEmu.DispatcherMock.csproj" />
   <Project Path="UniEmu.Scripting.Api/UniEmu.Scripting.Api.csproj">
     <Build Solution="Debug|*" Project="false" />
   </Project>
