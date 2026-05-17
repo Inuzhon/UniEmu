@@ -32,15 +32,7 @@ export function DashboardPage() {
 
   const filtered = useMemo(
     () =>
-      emulators
-        .filter((e) => e.name.toLowerCase().includes(query.toLowerCase()))
-        .slice()
-        .sort((a, b) => {
-          const order: Record<string, number> = { Error: 0, Running: 1, Idle: 2, Stopped: 3 };
-          const aStatus = hasRuntimeError(a) ? 'Error' : a.status;
-          const bStatus = hasRuntimeError(b) ? 'Error' : b.status;
-          return (order[aStatus] ?? 9) - (order[bStatus] ?? 9);
-        }),
+      emulators.filter((e) => e.name.toLowerCase().includes(query.toLowerCase())),
     [emulators, query]
   );
 

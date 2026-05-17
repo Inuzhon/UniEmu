@@ -22,6 +22,38 @@ namespace UniEmu.Tests.Features.Emulators;
 public sealed class EmulatorServiceTests
 {
     [Fact]
+    public async Task ListAsync_ReturnsEmulatorsOrderedByIdThenStatus()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.Emulators.AddRange(
+            new EmulatorEntity
+            {
+                Id = "em-0",
+                Name = "Zulu emulator",
+                Status = nameof(EmulatorStatus.Stopped),
+                ProtocolId = 18,
+                TargetUrl = "http://localhost",
+                IntervalSec = 1,
+            },
+            new EmulatorEntity
+            {
+                Id = "em-2",
+                Name = "Alpha emulator",
+                Status = nameof(EmulatorStatus.Error),
+                ProtocolId = 18,
+                TargetUrl = "http://localhost",
+                IntervalSec = 1,
+            });
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var emulators = await service.ListAsync(CancellationToken.None);
+
+        Assert.Equal(["em-0", "em-1", "em-2"], emulators.Select(e => e.Id));
+    }
+
+    [Fact]
     public async Task DeleteAsync_RemovesEmulatorAndOwnedRows()
     {
         await using var fixture = await EmulatorServiceDbFixture.CreateAsync();

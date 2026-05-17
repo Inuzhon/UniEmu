@@ -13,6 +13,6 @@ test('dashboard treats emulators with runtime errors as errored in summary count
   assert.match(source, /const hasRuntimeError = \(e: Emulator\) => e\.status === 'Error' \|\| !!e\.lastError;/);
   assert.match(source, /const running = emulators\.filter\(\(e\) => e\.status === 'Running' && !hasRuntimeError\(e\)\)\.length;/);
   assert.match(source, /const errors = emulators\.filter\(hasRuntimeError\)\.length;/);
-  assert.match(source, /const order: Record<string, number> = \{ Error: 0, Running: 1, Idle: 2, Stopped: 3 \};/);
+  assert.doesNotMatch(source, /const order: Record<string, number> = \{ Error: 0, Running: 1, Idle: 2, Stopped: 3 \};/);
   assert.match(source, /status=\{hasRuntimeError\(e\) \? 'Error' : e\.status\}/);
 });

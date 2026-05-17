@@ -29,7 +29,8 @@ public sealed class EmulatorService(
     {
         var emulators = await db.Emulators
             .AsNoTracking()
-            .OrderBy(e => e.Name)
+            .OrderBy(e => e.Id)
+            .ThenBy(e => e.Status)
             .Select(e => new
             {
                 Entity = e,

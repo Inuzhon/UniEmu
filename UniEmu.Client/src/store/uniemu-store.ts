@@ -104,7 +104,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
         emulators.map(async (emulator) => [emulator.id, await uniEmuApi.tags.list(emulator.id)] as const),
       );
       set({
-        emulators,
+        emulators: sortEmulators(emulators),
         events,
         scripts,
         cncPrograms,
@@ -128,7 +128,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
       onTagValue: (update) => applyTagValueUpdate(set, update),
       onEmulatorUpdated: (emulator) => {
         set((s) => ({
-          emulators: upsertById(s.emulators, emulator),
+          emulators: upsertEmulator(s.emulators, emulator),
           online: true,
           apiError: null,
         }));
@@ -172,7 +172,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
         uniEmuApi.telemetry.list(emulatorId, 60),
       ]);
       set((s) => ({
-        emulators: upsertById(s.emulators, emulator),
+        emulators: upsertEmulator(s.emulators, emulator),
         tagsByEmulator: { ...s.tagsByEmulator, [emulatorId]: tags },
         telemetryByEmulator: { ...s.telemetryByEmulator, [emulatorId]: telemetry },
         online: true,
@@ -187,12 +187,12 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
     const current = get().emulators.find((e) => e.id === id);
     if (!current) return;
     const emulator = await uniEmuApi.emulators.setStatus(id, current.status === 'Running' ? 'Stopped' : 'Running');
-    set((s) => ({ emulators: upsertById(s.emulators, emulator), online: true, apiError: null }));
+    set((s) => ({ emulators: upsertEmulator(s.emulators, emulator), online: true, apiError: null }));
   },
   createEmulator: async (input) => {
     const emulator = await uniEmuApi.emulators.create(input);
     set((s) => ({
-      emulators: upsertById(s.emulators, emulator),
+      emulators: upsertEmulator(s.emulators, emulator),
       tagsByEmulator: { ...s.tagsByEmulator, [emulator.id]: [] },
       online: true,
       apiError: null,
@@ -201,7 +201,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
   },
   updateEmulator: async (id, patch) => {
     const emulator = await uniEmuApi.emulators.patch(id, patch);
-    set((s) => ({ emulators: upsertById(s.emulators, emulator), online: true, apiError: null }));
+    set((s) => ({ emulators: upsertEmulator(s.emulators, emulator), online: true, apiError: null }));
   },
   downloadDispatcherTemplate: async (emulatorId) => {
     try {
@@ -308,6 +308,19 @@ function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
   return items.some((existing) => existing.id === item.id)
     ? items.map((existing) => (existing.id === item.id ? item : existing))
     : [...items, item];
+}
+
+function upsertEmulator(items: Emulator[], item: Emulator): Emulator[] {
+  return sortEmulators(upsertById(items, item));
+}
+
+function sortEmulators(items: Emulator[]): Emulator[] {
+  return [...items].sort(compareEmulators);
+}
+
+function compareEmulators(a: Emulator, b: Emulator): number {
+  const byId = a.id.localeCompare(b.id, 'ru', { sensitivity: 'base' });
+  return byId || a.status.localeCompare(b.status, 'ru', { sensitivity: 'base' });
 }
 
 function upsertEvent(items: SystemEvent[]): SystemEvent[] {
