@@ -44,9 +44,14 @@ public sealed class CsxRoslynContextFactory
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type globalsType)
+        Type globalsType,
+        CancellationToken cancellationToken = default)
     {
-        var expanded = expander.Expand(entryPath, content, position, visibleScripts, globalsType);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var expanded = expander.Expand(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var workspace = new AdhocWorkspace(host);
         var projectId = ProjectId.CreateNewId("UniEmu.Csx");
         var documentId = DocumentId.CreateNewId(projectId, entryPath);

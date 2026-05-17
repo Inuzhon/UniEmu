@@ -12,7 +12,7 @@ public sealed class CsxFoldingService(CsxRoslynContextFactory contextFactory)
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, 0, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, 0, visibleScripts, globalsType, cancellationToken);
         var root = await context.Document.GetSyntaxRootAsync(cancellationToken);
         if (root is null)
         {

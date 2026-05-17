@@ -1,5 +1,5 @@
 import { MARKER_OWNER } from './constants';
-import { request } from './request';
+import { cancelRequestsForModel, request } from './request';
 import type { CsxDiagnostic, MonacoApi, MonacoEditor, MonacoMarkerData } from './types';
 
 export function bindCsxDiagnostics(editor: MonacoEditor, monacoApi: MonacoApi) {
@@ -36,6 +36,7 @@ export function bindCsxDiagnostics(editor: MonacoEditor, monacoApi: MonacoApi) {
     modelSubscription.dispose();
     const model = editor.getModel();
     if (model) {
+      cancelRequestsForModel(model);
       monacoApi.editor.setModelMarkers(model, MARKER_OWNER, []);
     }
   };

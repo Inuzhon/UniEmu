@@ -2,6 +2,7 @@ using UniEmu.Scripting.Api;
 using UniEmu.Runtime.Scripting;
 using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Runtime.Scripting.Environment;
+using UniEmu.Runtime.Scripting.Services;
 
 namespace UniEmu.Tests.Runtime.Scripting;
 
@@ -256,6 +257,20 @@ public sealed class CsxLanguageServiceTests
             visibleScripts);
 
         Assert.Equal(cacheCount, CsxLanguageService.MetadataReferenceCacheCount);
+    }
+
+    [Theory]
+    [InlineData("LoadedHelper", new[] { "method" }, false)]
+    [InlineData("Now", new[] { "property" }, true)]
+    [InlineData("DateTime", new[] { "class" }, false)]
+    [InlineData("TagScriptValue", new[] { "class" }, true)]
+    [InlineData("UniEmu.Scripting.Api", new[] { "namespace" }, true)]
+    public void RequiresDescriptionForVisibility_OnlyKeepsDocumentationGateWhereNeeded(
+        string label,
+        string[] tags,
+        bool expected)
+    {
+        Assert.Equal(expected, CsxCompletionService.RequiresDescriptionForVisibility(label, tags));
     }
 
     [Fact]

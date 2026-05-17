@@ -24,7 +24,7 @@ public sealed class CsxRenameService(CsxRoslynContextFactory contextFactory)
             return null;
         }
 
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await CsxNavigationService.ResolveSymbolAsync(context, cancellationToken);
         if (symbol is null)
         {

@@ -15,7 +15,7 @@ public sealed class CsxSignatureHelpService(CsxRoslynContextFactory contextFacto
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var document = context.Document;
         var sourceText = await document.GetTextAsync(cancellationToken);
         var root = await document.GetSyntaxRootAsync(cancellationToken);

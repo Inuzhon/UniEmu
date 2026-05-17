@@ -15,7 +15,7 @@ public sealed class CsxNavigationService(CsxRoslynContextFactory contextFactory)
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await ResolveSymbolAsync(context, cancellationToken);
 
         return symbol is null
@@ -31,7 +31,7 @@ public sealed class CsxNavigationService(CsxRoslynContextFactory contextFactory)
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await ResolveSymbolAsync(context, cancellationToken);
         var type = symbol switch
         {
@@ -58,7 +58,7 @@ public sealed class CsxNavigationService(CsxRoslynContextFactory contextFactory)
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await ResolveSymbolAsync(context, cancellationToken);
         if (symbol is null)
         {
@@ -101,7 +101,7 @@ public sealed class CsxNavigationService(CsxRoslynContextFactory contextFactory)
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await ResolveSymbolAsync(context, cancellationToken);
         if (symbol is null)
         {

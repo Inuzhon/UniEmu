@@ -15,8 +15,11 @@ public sealed class CsxLoadedScriptExpander
         string content,
         int position,
         IReadOnlyDictionary<string, string> visibleScripts,
-        Type globalsType)
+        Type globalsType,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var prefix = new List<string>();
         var globalsPrefix = BuildGlobalsPrefix(globalsType);
         if (!string.IsNullOrEmpty(globalsPrefix))
@@ -26,6 +29,8 @@ public sealed class CsxLoadedScriptExpander
 
         foreach (Match match in s_loadDirective.Matches(content))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var loadPath = ResolveLoadPath(match.Groups["path"].Value, entryPath, visibleScripts);
             if (loadPath is null || !visibleScripts.TryGetValue(loadPath, out var loadedContent))
             {

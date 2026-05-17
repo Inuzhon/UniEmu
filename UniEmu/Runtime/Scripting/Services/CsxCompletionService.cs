@@ -63,6 +63,12 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
     private static readonly Type[] s_scriptingApiTypes = typeof(ScriptingApiAttribute).Assembly.GetTypes();
 
     /// <summary>
+    /// Имена типов и членов скриптового API, для которых нужно оставить проверку документации,
+    /// чтобы не показывать непомеченные публичные символы из сборки API.
+    /// </summary>
+    private static readonly HashSet<string> s_scriptingApiLabels = CreateScriptingApiLabels();
+
+    /// <summary>
     /// Возвращает подсказки автодополнения для CSX-документа в указанной позиции исходного текста.
     /// </summary>
     /// <param name="entryPath">Путь или URI редактируемого входного CSX-документа.</param>
@@ -80,7 +86,7 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var document = context.Document;
         var service = RoslynCompletionService.GetService(document);
         if (service is null)
@@ -98,13 +104,23 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         var candidates = new List<CompletionCandidate>(completionList.ItemsList.Count);
         foreach (var item in completionList.ItemsList)
         {
-            var description = await service.GetDescriptionAsync(document, item, cancellationToken);
-            var documentation = description is null ? null : CsxDocumentationFormatter.FromTaggedParts(description.TaggedParts);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var tags = item.Tags.Select(tag => tag.ToLowerInvariant()).ToArray();
+            var itemLabel = item.DisplayText;
+            string? documentation = null;
+
+            if (RequiresDescriptionForVisibility(itemLabel, tags))
+            {
+                var description = await service.GetDescriptionAsync(document, item, cancellationToken);
+                documentation = description is null ? null : CsxDocumentationFormatter.FromTaggedParts(description.TaggedParts);
+            }
+
             candidates.Add(new CompletionCandidate(
-                item.Tags.Select(tag => tag.ToLowerInvariant()).ToArray(),
+                tags,
                 documentation,
                 new CsxCompletionItem(
-                    item.DisplayText,
+                    itemLabel,
                     item.SortText,
                     item.FilterText,
                     item.Properties.TryGetValue("SymbolName", out var symbolName) ? symbolName : item.DisplayText,
@@ -118,14 +134,30 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         return candidates
             .Where(IsAllowedCompletion)
             .DistinctBy(candidate => candidate.Item.Label, StringComparer.Ordinal)
-            .OrderBy(candidate => GetCompletionPriority(candidate, globalObjectLabels))
+            .Select(candidate => RankedCompletionCandidate.Create(candidate, globalObjectLabels))
+            .OrderBy(candidate => candidate.Priority)
             .ThenBy(candidate => candidate.Item.SortText, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Item.Label, StringComparer.Ordinal)
             .Select(candidate => candidate.Item with
             {
-                SortText = GetRankedSortText(candidate, globalObjectLabels),
+                SortText = candidate.RankedSortText,
             })
             .ToList();
+    }
+
+    internal static bool RequiresDescriptionForVisibility(string label, IReadOnlyList<string> tags)
+    {
+        if (s_scriptingApiLabels.Contains(label))
+        {
+            return true;
+        }
+
+        if (s_allowedSystemTypeLabels.Contains(label))
+        {
+            return false;
+        }
+
+        return !tags.Any(IsAllowedScriptCompletionTag);
     }
 
     /// <summary>
@@ -179,11 +211,11 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
     /// Добавляет ранг UniEmu к Roslyn sort text, чтобы Monaco сохранил серверный порядок подсказок.
     /// </summary>
     /// <param name="candidate">Кандидат автодополнения, для которого рассчитывается sort text.</param>
-    /// <param name="globalObjectLabels">Метки, напрямую доступные из графа globals-объекта.</param>
+    /// <param name="priority">Уже рассчитанный ранг кандидата в текущем запросе completion.</param>
     /// <returns>Sort text, объединяющий приоритет UniEmu, порядок Roslyn и fallback по метке.</returns>
-    private static string GetRankedSortText(CompletionCandidate candidate, IReadOnlySet<string> globalObjectLabels)
+    private static string GetRankedSortText(CompletionCandidate candidate, int priority)
     {
-        return $"{GetCompletionPriority(candidate, globalObjectLabels):D2}_{candidate.Item.SortText}_{candidate.Item.Label}";
+        return $"{priority:D2}_{candidate.Item.SortText}_{candidate.Item.Label}";
     }
 
     /// <summary>
@@ -273,6 +305,27 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         return false;
     }
 
+    private static HashSet<string> CreateScriptingApiLabels()
+    {
+        var labels = new HashSet<string>(StringComparer.Ordinal);
+        const BindingFlags memberFlags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        foreach (var type in s_scriptingApiTypes)
+        {
+            labels.Add(type.Name);
+
+            foreach (var member in type.GetMembers(memberFlags))
+            {
+                if (member is not ConstructorInfo)
+                {
+                    labels.Add(member.Name);
+                }
+            }
+        }
+
+        return labels;
+    }
+
     /// <summary>
     /// Собирает метки, доступные из globals-типа и вложенных контекстных объектов скриптового API UniEmu.
     /// </summary>
@@ -326,4 +379,26 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         IReadOnlyList<string> Tags,
         string? Documentation,
         CsxCompletionItem Item);
+
+    /// <summary>
+    /// Кандидат с рассчитанным один раз рангом и sort text для текущего запроса completion.
+    /// </summary>
+    private sealed record RankedCompletionCandidate(
+        CompletionCandidate Candidate,
+        int Priority,
+        string RankedSortText)
+    {
+        public CsxCompletionItem Item => Candidate.Item;
+
+        public static RankedCompletionCandidate Create(
+            CompletionCandidate candidate,
+            IReadOnlySet<string> globalObjectLabels)
+        {
+            var priority = GetCompletionPriority(candidate, globalObjectLabels);
+            return new RankedCompletionCandidate(
+                candidate,
+                priority,
+                GetRankedSortText(candidate, priority));
+        }
+    }
 }

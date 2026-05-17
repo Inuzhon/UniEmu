@@ -15,7 +15,7 @@ public sealed class CsxCallHierarchyService(CsxRoslynContextFactory contextFacto
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await CsxNavigationService.ResolveSymbolAsync(context, cancellationToken);
         var item = symbol is null ? null : ToItem(context, symbol);
         return item is null ? [] : [item];
@@ -29,7 +29,7 @@ public sealed class CsxCallHierarchyService(CsxRoslynContextFactory contextFacto
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await CsxNavigationService.ResolveSymbolAsync(context, cancellationToken);
         if (symbol is null)
         {
@@ -51,7 +51,7 @@ public sealed class CsxCallHierarchyService(CsxRoslynContextFactory contextFacto
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
         var symbol = await CsxNavigationService.ResolveSymbolAsync(context, cancellationToken);
         if (symbol is null)
         {

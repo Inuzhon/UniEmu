@@ -19,7 +19,7 @@ public sealed class CsxSemanticTokensService(CsxRoslynContextFactory contextFact
         Type globalsType,
         CancellationToken cancellationToken = default)
     {
-        using var context = contextFactory.CreateContext(entryPath, content, 0, visibleScripts, globalsType);
+        using var context = contextFactory.CreateContext(entryPath, content, 0, visibleScripts, globalsType, cancellationToken);
         var root = await context.Document.GetSyntaxRootAsync(cancellationToken);
         var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken);
         if (root is null || semanticModel is null)

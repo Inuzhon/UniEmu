@@ -5,6 +5,7 @@ import { bindCsxDiagnostics } from './diagnostics';
 import { MONACO_LANGUAGE_ID } from './constants';
 import { monaco } from './monacoEnvironment';
 import { registerCsxIntellisense } from './registerCsxIntellisense';
+import { cancelRequestsForModel } from './request';
 import { registerTheme } from './theme';
 import type { ITextModel, MonacoCsxEditorProps, MonacoEditor } from './types';
 
@@ -43,6 +44,10 @@ export function MonacoCsxEditor({
       model.setValue(nextValue);
     }
 
+    if (modelRef.current && modelRef.current !== model) {
+      cancelRequestsForModel(modelRef.current);
+    }
+
     modelRef.current = model;
     editorRef.current?.setModel(model);
   };
@@ -76,6 +81,9 @@ export function MonacoCsxEditor({
       observer.disconnect();
       diagnosticsRef.current?.();
       diagnosticsRef.current = null;
+      if (modelRef.current) {
+        cancelRequestsForModel(modelRef.current);
+      }
       modelRef.current?.dispose();
       modelRef.current = null;
       editorRef.current?.dispose();
