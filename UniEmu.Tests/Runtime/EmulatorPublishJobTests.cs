@@ -474,6 +474,63 @@ public sealed class EmulatorPublishJobTests
     }
 
     [Fact]
+    public async Task BuildValuesAsync_RecalculatesPublishIntervalScriptAfterGeneratorDependencies()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var scheduledAt = DateTimeOffset.Parse("2026-05-10T12:00:10Z");
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            Tags =
+            [
+                CreatePublishIntervalScriptTag(
+                    "tg-abs",
+                    "Abs",
+                    """
+                    if (!UniEmu.Tags.TryGetValue("NumverTag", out var numverTag))
+                        return 0;
+
+                    if (numverTag.Type != TagScriptValueType.Double)
+                        return 0;
+
+                    if (numverTag.Value is not double correctValue)
+                        return 0;
+
+                    return Math.Abs(correctValue);
+                    """),
+                CreatePublishIntervalGeneratorTag("tg-number", "NumverTag", "NumverTag"),
+            ],
+        };
+        stateStore.Set(emulator.Id, "tg-abs", "Abs", 1d, 1d, scheduledAt);
+        stateStore.Set(emulator.Id, "tg-number", "NumverTag", -5d, -5d, scheduledAt);
+        var job = new EmulatorPublishJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            CreateSender(),
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<EmulatorPublishJob>.Instance);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, scheduledAt);
+
+        Assert.Equal(-5d, values.Single(value => value.Name == "NumverTag").Value);
+        Assert.Equal(5d, values.Single(value => value.Name == "Abs").Value);
+    }
+
+    [Fact]
     public async Task BuildValuesAsync_DoesNotEvaluateCronScriptOnPublish_WhenRuntimeStateIsEmpty()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -597,6 +654,48 @@ public sealed class EmulatorPublishJobTests
                 Curvature: null,
                 Distortion: null)),
             Enabled = enabled,
+        };
+    }
+
+    private static EmulatorTagEntity CreatePublishIntervalGeneratorTag(string id, string name, string key)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = id,
+            EmulatorId = "emu-1",
+            Name = name,
+            Key = key,
+            Type = UniEmuJson.EnumString(TagType.Double),
+            Source = UniEmuJson.EnumString(TagSource.Generator),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
+            CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(
+                CalcType.Sequence,
+                Start: "[-5]",
+                Finish: null,
+                Duration: 1,
+                Amplitude: null,
+                Period: null,
+                Curvature: null,
+                Distortion: null)),
+            Enabled = true,
+        };
+    }
+
+    private static EmulatorTagEntity CreatePublishIntervalScriptTag(string id, string name, string script)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = id,
+            EmulatorId = "emu-1",
+            Name = name,
+            Key = name,
+            Type = UniEmuJson.EnumString(TagType.Double),
+            Source = UniEmuJson.EnumString(TagSource.Script),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
+            FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, script)),
+            Enabled = true,
         };
     }
 
