@@ -6,10 +6,18 @@ using UniEmu.Data;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Синхронизирует in-memory runtime-состояние тегов с сохраненными preview-значениями.
+/// </summary>
 public sealed class TagRuntimeStatePersistenceService(
     UniEmuDbContext db,
     TagRuntimeStateStore stateStore)
 {
+    /// <summary>
+    /// Восстанавливает runtime-состояние тегов из preview при запуске backend.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены запроса к базе данных.</param>
+    /// <returns>Задача восстановления runtime-состояния.</returns>
     public async Task HydrateFromTagPreviewsAsync(CancellationToken cancellationToken = default)
     {
         var tags = await db.EmulatorTags
@@ -40,6 +48,11 @@ public sealed class TagRuntimeStatePersistenceService(
         }
     }
 
+    /// <summary>
+    /// Сохраняет текущий снимок runtime-состояния тегов обратно в preview базы данных.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены операции сохранения.</param>
+    /// <returns>Задача сохранения preview-значений.</returns>
     public async Task PersistToTagPreviewsAsync(CancellationToken cancellationToken = default)
     {
         var snapshot = stateStore.Snapshot();

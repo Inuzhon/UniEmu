@@ -7,6 +7,14 @@ using UniEmu.Domain.Entities;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Результат расчета значения тега перед отправкой в Dispatcher и realtime-каналы.
+/// </summary>
+/// <param name="Key">Ключ тега во внешнем протоколе.</param>
+/// <param name="Name">Отображаемое имя тега.</param>
+/// <param name="Value">Типизированное значение тега.</param>
+/// <param name="NumericValue">Числовое представление значения, если оно доступно.</param>
+/// <param name="SpecialParameter">Специальный CNC-параметр, связанный с тегом.</param>
 public sealed record GeneratedTagValue(
     string Key,
     string Name,
@@ -14,8 +22,18 @@ public sealed record GeneratedTagValue(
     double? NumericValue,
     SpecialParameter? SpecialParameter);
 
+/// <summary>
+/// Генерирует значения тегов из статических preview-значений, формул и сценариев.
+/// </summary>
 public sealed class TelemetryValueGenerator
 {
+    /// <summary>
+    /// Генерирует только числовые значения тегов для legacy-пакета телеметрии.
+    /// </summary>
+    /// <param name="emulator">Эмулятор, для которого выполняется расчет.</param>
+    /// <param name="tags">Список тегов эмулятора.</param>
+    /// <param name="timestamp">Время расчета.</param>
+    /// <returns>Словарь значений по ключам тегов.</returns>
     public IReadOnlyDictionary<string, double> Generate(EmulatorEntity emulator, IReadOnlyList<EmulatorTagEntity> tags, DateTimeOffset timestamp)
     {
         return GenerateTagValues(emulator, tags, timestamp)
@@ -23,6 +41,13 @@ public sealed class TelemetryValueGenerator
             .ToDictionary(value => value.Key, value => value.NumericValue!.Value, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Генерирует типизированные значения всех переданных тегов.
+    /// </summary>
+    /// <param name="emulator">Эмулятор, для которого выполняется расчет.</param>
+    /// <param name="tags">Список тегов эмулятора.</param>
+    /// <param name="timestamp">Время расчета.</param>
+    /// <returns>Список рассчитанных значений тегов.</returns>
     public IReadOnlyList<GeneratedTagValue> GenerateTagValues(EmulatorEntity emulator, IReadOnlyList<EmulatorTagEntity> tags, DateTimeOffset timestamp)
     {
         return tags
@@ -30,6 +55,13 @@ public sealed class TelemetryValueGenerator
             .ToList();
     }
 
+    /// <summary>
+    /// Генерирует типизированное значение одного тега.
+    /// </summary>
+    /// <param name="emulator">Эмулятор, которому принадлежит тег.</param>
+    /// <param name="tag">Тег для расчета.</param>
+    /// <param name="timestamp">Время расчета.</param>
+    /// <returns>Результат расчета тега.</returns>
     public GeneratedTagValue GenerateTag(EmulatorEntity emulator, EmulatorTagEntity tag, DateTimeOffset timestamp)
     {
         var numericValue = GenerateNumericTag(emulator, tag, timestamp);
@@ -74,6 +106,11 @@ public sealed class TelemetryValueGenerator
         return numericValue.ToString(CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// Преобразует поддерживаемое типизированное значение тега в число.
+    /// </summary>
+    /// <param name="value">Исходное значение.</param>
+    /// <returns>Числовое представление или <see langword="null"/> для нечислового значения.</returns>
     public static double? ToNumericValue(object? value)
     {
         return value switch
@@ -88,6 +125,13 @@ public sealed class TelemetryValueGenerator
         };
     }
 
+    /// <summary>
+    /// Применяет округление к double-тегу по настройке тега.
+    /// </summary>
+    /// <param name="tagType">Тип значения тега.</param>
+    /// <param name="tag">Настройки тега.</param>
+    /// <param name="value">Исходное значение.</param>
+    /// <returns>Округленное значение или исходное значение, если округление не применяется.</returns>
     public static object? ApplyTagRounding(TagType tagType, EmulatorTagEntity tag, object? value)
     {
         if (tagType != TagType.Double || tag.RoundDigits is null || value is null)
@@ -100,6 +144,11 @@ public sealed class TelemetryValueGenerator
         return numericValue is null ? value : Math.Round(numericValue.Value, digits, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// Преобразует значение тега в строку preview для хранения и отображения.
+    /// </summary>
+    /// <param name="value">Типизированное значение.</param>
+    /// <returns>Строковое представление в инвариантной культуре.</returns>
     public static string ToPreview(object? value)
     {
         return value switch
@@ -113,6 +162,12 @@ public sealed class TelemetryValueGenerator
         };
     }
 
+    /// <summary>
+    /// Восстанавливает типизированное значение тега из preview-строки.
+    /// </summary>
+    /// <param name="tagType">Ожидаемый тип тега.</param>
+    /// <param name="preview">Строковое preview-значение.</param>
+    /// <returns>Типизированное значение тега.</returns>
     public static object? FromPreview(TagType tagType, string preview)
     {
         return tagType switch

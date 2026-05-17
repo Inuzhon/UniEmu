@@ -5,12 +5,20 @@ using UniEmu.Data;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Буферизует изменения preview тегов и пакетно записывает их в базу данных.
+/// </summary>
 public sealed class TagPreviewFlushService
 {
     private readonly ConcurrentDictionary<TagPreviewKey, string> dirtyPreviews = new();
     private readonly Func<DbContextLease> dbContextFactory;
     private readonly ILogger<TagPreviewFlushService> logger;
 
+    /// <summary>
+    /// Создает сервис с контекстом базы данных из DI-scope.
+    /// </summary>
+    /// <param name="scopeFactory">Фабрика DI-scope для фоновой записи.</param>
+    /// <param name="logger">Логгер ошибок отложенной записи.</param>
     public TagPreviewFlushService(
         IServiceScopeFactory scopeFactory,
         ILogger<TagPreviewFlushService> logger)
@@ -25,6 +33,11 @@ public sealed class TagPreviewFlushService
     {
     }
 
+    /// <summary>
+    /// Создает сервис с явной фабрикой контекста базы данных.
+    /// </summary>
+    /// <param name="dbContextFactory">Фабрика контекста базы данных.</param>
+    /// <param name="logger">Логгер ошибок отложенной записи.</param>
     public TagPreviewFlushService(
         Func<UniEmuDbContext> dbContextFactory,
         ILogger<TagPreviewFlushService> logger)
@@ -40,11 +53,22 @@ public sealed class TagPreviewFlushService
         this.logger = logger;
     }
 
+    /// <summary>
+    /// Помечает preview тега как измененный без немедленной записи в базу.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="tagId">Идентификатор тега.</param>
+    /// <param name="preview">Новое preview-значение.</param>
     public void MarkDirty(string emulatorId, string tagId, string preview)
     {
         dirtyPreviews[new TagPreviewKey(emulatorId, tagId)] = preview;
     }
 
+    /// <summary>
+    /// Выполняет отложенную запись всех накопленных preview и возвращает их в очередь при ошибке.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Задача записи накопленных preview.</returns>
     public async Task FlushAsync(CancellationToken cancellationToken = default)
     {
         var batch = dirtyPreviews.ToArray();

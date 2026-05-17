@@ -4,8 +4,17 @@ using Microsoft.CodeAnalysis;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Разрешает <c>#load</c>-ссылки CSX-скриптов из набора скриптов, загруженных из базы.
+/// </summary>
 public sealed class DbScriptSourceResolver(IReadOnlyDictionary<string, string> scripts) : SourceReferenceResolver
 {
+    /// <summary>
+    /// Нормализует путь скрипта и учитывает относительный путь базового файла.
+    /// </summary>
+    /// <param name="path">Путь из директивы <c>#load</c>.</param>
+    /// <param name="baseFilePath">Путь файла, из которого выполняется загрузка.</param>
+    /// <returns>Нормализованный путь скрипта.</returns>
     public override string? NormalizePath(string path, string? baseFilePath)
     {
         var normalized = TagScriptPath.Normalize(path);
@@ -30,6 +39,11 @@ public sealed class DbScriptSourceResolver(IReadOnlyDictionary<string, string> s
         return normalized;
     }
 
+    /// <summary>
+    /// Открывает содержимое скрипта как UTF-8 поток.
+    /// </summary>
+    /// <param name="resolvedPath">Разрешенный путь скрипта.</param>
+    /// <returns>Поток с содержимым скрипта.</returns>
     public override Stream OpenRead(string resolvedPath)
     {
         if (!scripts.TryGetValue(TagScriptPath.Normalize(resolvedPath), out var content))
@@ -40,6 +54,12 @@ public sealed class DbScriptSourceResolver(IReadOnlyDictionary<string, string> s
         return new MemoryStream(Encoding.UTF8.GetBytes(content));
     }
 
+    /// <summary>
+    /// Разрешает ссылку на скрипт только если он присутствует в видимом наборе.
+    /// </summary>
+    /// <param name="path">Путь из директивы <c>#load</c>.</param>
+    /// <param name="baseFilePath">Путь файла, из которого выполняется загрузка.</param>
+    /// <returns>Разрешенный путь или <see langword="null"/>.</returns>
     public override string? ResolveReference(string path, string? baseFilePath)
     {
         var normalized = NormalizePath(path, baseFilePath);
@@ -51,8 +71,16 @@ public sealed class DbScriptSourceResolver(IReadOnlyDictionary<string, string> s
     public override int GetHashCode() => RuntimeHelpers.GetHashCode(this);
 }
 
+/// <summary>
+/// Нормализует пути CSX-скриптов к единому slash-формату.
+/// </summary>
 public static class TagScriptPath
 {
+    /// <summary>
+    /// Убирает начальные <c>./</c> и приводит разделители пути к <c>/</c>.
+    /// </summary>
+    /// <param name="path">Исходный путь скрипта.</param>
+    /// <returns>Нормализованный путь скрипта.</returns>
     public static string Normalize(string path)
     {
         var normalized = path.Replace('\\', '/').Trim();

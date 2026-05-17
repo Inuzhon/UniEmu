@@ -5,8 +5,17 @@ using UniEmu.Domain.Entities;
 
 namespace UniEmu.Mapping;
 
+/// <summary>
+/// Преобразует доменные сущности UniEmu в DTO-контракты REST API и realtime-сообщений.
+/// </summary>
 public static class UniEmuMapping
 {
+    /// <summary>
+    /// Преобразует эмулятор в DTO со счетчиком тегов и рассчитанным uptime.
+    /// </summary>
+    /// <param name="entity">Сущность эмулятора.</param>
+    /// <param name="tagsCount">Количество тегов эмулятора.</param>
+    /// <returns>DTO эмулятора.</returns>
     public static EmulatorDto ToDto(this EmulatorEntity entity, int tagsCount)
     {
         var uptime = entity.Status == nameof(EmulatorStatus.Running) && entity.StartedAt is not null
@@ -28,6 +37,11 @@ public static class UniEmuMapping
             entity.TotalRequests);
     }
 
+    /// <summary>
+    /// Преобразует тег эмулятора в DTO с десериализованными настройками.
+    /// </summary>
+    /// <param name="entity">Сущность тега.</param>
+    /// <returns>DTO тега.</returns>
     public static EmulatorTagDto ToDto(this EmulatorTagEntity entity)
     {
         return new EmulatorTagDto(
@@ -47,6 +61,11 @@ public static class UniEmuMapping
             entity.Description);
     }
 
+    /// <summary>
+    /// Преобразует CSX-скрипт в DTO.
+    /// </summary>
+    /// <param name="entity">Сущность скрипта.</param>
+    /// <returns>DTO скрипта.</returns>
     public static ScriptFileDto ToDto(this ScriptFileEntity entity)
     {
         return new ScriptFileDto(
@@ -59,6 +78,11 @@ public static class UniEmuMapping
             entity.SizeBytes);
     }
 
+    /// <summary>
+    /// Преобразует CNC-программу в DTO.
+    /// </summary>
+    /// <param name="entity">Сущность CNC-программы.</param>
+    /// <returns>DTO CNC-программы.</returns>
     public static CncProgramDto ToDto(this CncProgramEntity entity)
     {
         return new CncProgramDto(
@@ -74,6 +98,11 @@ public static class UniEmuMapping
             entity.IsBinary);
     }
 
+    /// <summary>
+    /// Преобразует точку телеметрии в DTO с десериализованным словарем значений.
+    /// </summary>
+    /// <param name="entity">Сущность точки телеметрии.</param>
+    /// <returns>DTO точки телеметрии.</returns>
     public static TelemetryPointDto ToDto(this TelemetryPointEntity entity)
     {
         return new TelemetryPointDto(
@@ -81,6 +110,11 @@ public static class UniEmuMapping
             UniEmuJson.Deserialize<Dictionary<string, object?>>(entity.ValuesJson) ?? new Dictionary<string, object?>());
     }
 
+    /// <summary>
+    /// Преобразует системное событие в DTO.
+    /// </summary>
+    /// <param name="entity">Сущность события.</param>
+    /// <returns>DTO системного события.</returns>
     public static SystemEventDto ToDto(this SystemEventEntity entity)
     {
         return new SystemEventDto(

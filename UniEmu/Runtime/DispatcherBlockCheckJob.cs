@@ -9,6 +9,9 @@ using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Quartz-задача проверки блокировки мониторинга в Dispatcher.
+/// </summary>
 [DisallowConcurrentExecution]
 public sealed class DispatcherBlockCheckJob(
     UniEmuDbContext db,
@@ -16,6 +19,11 @@ public sealed class DispatcherBlockCheckJob(
     RuntimeUpdateService runtimeUpdateService,
     ILogger<DispatcherBlockCheckJob> logger) : IJob
 {
+    /// <summary>
+    /// Переводит эмулятор в ошибку, если Dispatcher сообщил о блокировке мониторинга.
+    /// </summary>
+    /// <param name="context">Контекст Quartz с идентификатором эмулятора.</param>
+    /// <returns>Задача проверки блокировки.</returns>
     public async Task Execute(IJobExecutionContext context)
     {
         var cancellationToken = context.CancellationToken;

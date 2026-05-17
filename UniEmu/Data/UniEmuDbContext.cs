@@ -3,22 +3,50 @@ using UniEmu.Domain.Entities;
 
 namespace UniEmu.Data;
 
+/// <summary>
+/// EF Core-контекст основной базы данных UniEmu.
+/// </summary>
 public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) : DbContext(options)
 {
+    /// <summary>
+    /// Эмуляторы и их runtime-настройки.
+    /// </summary>
     public DbSet<EmulatorEntity> Emulators => Set<EmulatorEntity>();
 
+    /// <summary>
+    /// Теги эмуляторов и их конфигурации расчета.
+    /// </summary>
     public DbSet<EmulatorTagEntity> EmulatorTags => Set<EmulatorTagEntity>();
 
+    /// <summary>
+    /// CSX-скрипты, доступные runtime и редактору.
+    /// </summary>
     public DbSet<ScriptFileEntity> ScriptFiles => Set<ScriptFileEntity>();
 
+    /// <summary>
+    /// Persistent state CSX-скриптов.
+    /// </summary>
     public DbSet<ScriptRuntimeStateEntity> ScriptRuntimeStates => Set<ScriptRuntimeStateEntity>();
 
+    /// <summary>
+    /// CNC-программы для передачи через Dispatcher.
+    /// </summary>
     public DbSet<CncProgramEntity> CncPrograms => Set<CncProgramEntity>();
 
+    /// <summary>
+    /// История точек телеметрии.
+    /// </summary>
     public DbSet<TelemetryPointEntity> TelemetryPoints => Set<TelemetryPointEntity>();
 
+    /// <summary>
+    /// Системные события эмуляторов.
+    /// </summary>
     public DbSet<SystemEventEntity> SystemEvents => Set<SystemEventEntity>();
 
+    /// <summary>
+    /// Настраивает ключи, индексы, ограничения строк и каскадное удаление доменных сущностей.
+    /// </summary>
+    /// <param name="modelBuilder">Построитель модели EF Core.</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<EmulatorEntity>(entity =>

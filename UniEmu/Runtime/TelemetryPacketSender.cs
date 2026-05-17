@@ -5,19 +5,62 @@ using System.Text.Json;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Legacy-пакет числовой телеметрии эмулятора.
+/// </summary>
+/// <param name="EmulatorId">Идентификатор эмулятора.</param>
+/// <param name="Timestamp">Время формирования пакета.</param>
+/// <param name="Values">Числовые значения по ключам тегов.</param>
 public sealed record TelemetryPacket(string EmulatorId, DateTimeOffset Timestamp, IReadOnlyDictionary<string, double> Values);
+
+/// <summary>
+/// Пара ключ-значение для универсального Dispatcher-протокола.
+/// </summary>
+/// <param name="Key">Имя параметра Dispatcher.</param>
+/// <param name="Value">Значение параметра.</param>
 public sealed record UniversalValue(string Key, object? Value);
+
+/// <summary>
+/// Тело запроса универсального мониторинга Dispatcher.
+/// </summary>
+/// <param name="MachineIntegrationId">Идентификатор станка в Dispatcher.</param>
+/// <param name="UseInnerId">Признак использования внутреннего идентификатора.</param>
+/// <param name="ListValues">Список публикуемых значений.</param>
 public sealed record UniversalPostRequest(object MachineIntegrationId, bool UseInnerId, List<UniversalValue> ListValues);
+
+/// <summary>
+/// CNC-программа, передаваемая через Dispatcher.
+/// </summary>
+/// <param name="Name">Имя файла программы.</param>
+/// <param name="Bytes">Байтовое содержимое программы.</param>
 public sealed record DispatcherProgram(string Name, byte[] Bytes);
+
+/// <summary>
+/// Ответ Dispatcher на публикацию мониторинга с признаками обмена CNC-файлами.
+/// </summary>
+/// <param name="FileType">Тип файла, который запрашивает Dispatcher.</param>
+/// <param name="GetFile">Признак необходимости получить файл из UniEmu.</param>
 public sealed record DispatcherMonitoringAnswer(int FileType, int GetFile);
 
+/// <summary>
+/// Ошибка формата или статуса ответа Dispatcher-протокола.
+/// </summary>
+/// <param name="message">Описание нарушения протокола.</param>
 public sealed class DispatcherProtocolException(string message) : Exception(message);
 
+/// <summary>
+/// Отправляет мониторинг и CNC-программы в Dispatcher и разбирает ответы Dispatcher-протокола.
+/// </summary>
 public sealed class TelemetryPacketSender
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<TelemetryPacketSender> _logger;
 
+    /// <summary>
+    /// Создает отправитель Dispatcher-запросов.
+    /// </summary>
+    /// <param name="httpClientFactory">Фабрика HTTP-клиентов.</param>
+    /// <param name="logger">Логгер runtime-обмена с Dispatcher.</param>
     public TelemetryPacketSender(IHttpClientFactory httpClientFactory, ILogger<TelemetryPacketSender> logger)
     {
         _httpClient = httpClientFactory.CreateClient(nameof(TelemetryPacketSender));
@@ -27,6 +70,13 @@ public sealed class TelemetryPacketSender
     private const int ProgramChunkSize = 4096;
     private static readonly JsonSerializerOptions s_dispatcherJsonOptions = new(JsonSerializerDefaults.General);
 
+    /// <summary>
+    /// Отправляет пакет универсального мониторинга в Dispatcher.
+    /// </summary>
+    /// <param name="targetUrl">Базовый URL Dispatcher или полный URL endpoint-а.</param>
+    /// <param name="request">Тело запроса мониторинга.</param>
+    /// <param name="cancellationToken">Токен отмены HTTP-запроса.</param>
+    /// <returns>Разобранный ответ Dispatcher.</returns>
     public async Task<DispatcherMonitoringAnswer> SendMonitoringAsync(
         string targetUrl,
         UniversalPostRequest request,
@@ -45,6 +95,15 @@ public sealed class TelemetryPacketSender
         return ParseMonitoringAnswer(answer);
     }
 
+    /// <summary>
+    /// Передает CNC-программу в Dispatcher блоками с hash-контролем и признаком EOF.
+    /// </summary>
+    /// <param name="targetUrl">Базовый URL Dispatcher или полный URL endpoint-а.</param>
+    /// <param name="machineIntegrationId">Идентификатор станка в Dispatcher.</param>
+    /// <param name="useInnerId">Признак использования внутреннего идентификатора.</param>
+    /// <param name="program">Программа для передачи; <see langword="null"/> пропускает отправку.</param>
+    /// <param name="cancellationToken">Токен отмены HTTP-запросов.</param>
+    /// <returns>Задача отправки программы.</returns>
     public async Task SendProgramAsync(
         string targetUrl,
         object machineIntegrationId,
@@ -97,6 +156,13 @@ public sealed class TelemetryPacketSender
         while (offset < program.Bytes.Length);
     }
 
+    /// <summary>
+    /// Получает CNC-программу из Dispatcher и проверяет целостность полученных блоков.
+    /// </summary>
+    /// <param name="targetUrl">Базовый URL Dispatcher или полный URL endpoint-а.</param>
+    /// <param name="machineIntegrationId">Идентификатор станка в Dispatcher.</param>
+    /// <param name="cancellationToken">Токен отмены HTTP-запросов.</param>
+    /// <returns>Полученная программа или <see langword="null"/>, если протокол не вернул содержимое.</returns>
     public async Task<DispatcherProgram?> ReceiveProgramAsync(
         string targetUrl,
         object machineIntegrationId,
@@ -136,6 +202,13 @@ public sealed class TelemetryPacketSender
         return new DispatcherProgram($"received_program_machine_id_{machineIntegrationId}.txt", receivedBytes);
     }
 
+    /// <summary>
+    /// Проверяет, заблокирован ли мониторинг для указанного протокола Dispatcher.
+    /// </summary>
+    /// <param name="targetUrl">Базовый URL Dispatcher или полный URL endpoint-а.</param>
+    /// <param name="protocolId">Идентификатор станка или протокола.</param>
+    /// <param name="cancellationToken">Токен отмены HTTP-запроса.</param>
+    /// <returns><see langword="true"/>, если Dispatcher сообщил о блокировке мониторинга.</returns>
     public async Task<bool> GetIsMonitoringBlockedAsync(
         string targetUrl,
         object protocolId,
@@ -158,6 +231,11 @@ public sealed class TelemetryPacketSender
         };
     }
 
+    /// <summary>
+    /// Разбирает ответ Dispatcher на публикацию мониторинга.
+    /// </summary>
+    /// <param name="answer">Текстовый ответ Dispatcher.</param>
+    /// <returns>Типизированный ответ с полями <c>FileType</c> и <c>GetFile</c>.</returns>
     public static DispatcherMonitoringAnswer ParseMonitoringAnswer(string? answer)
     {
         EnsureNotDispatcherError(answer, "PostUniversalMonitoringDataJson");
@@ -246,6 +324,12 @@ public sealed class TelemetryPacketSender
         return trimmed.Length <= 128 ? trimmed : trimmed[..128];
     }
 
+    /// <summary>
+    /// Создает Dispatcher-программу из UTF-8 текста.
+    /// </summary>
+    /// <param name="name">Имя файла программы.</param>
+    /// <param name="content">Текстовое содержимое программы.</param>
+    /// <returns>Программа с UTF-8 байтами.</returns>
     public static DispatcherProgram FromTextProgram(string name, string content)
     {
         return new DispatcherProgram(name, Encoding.UTF8.GetBytes(content));

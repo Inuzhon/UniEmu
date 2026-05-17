@@ -4,6 +4,9 @@ using UniEmu.Domain.Entities;
 
 namespace UniEmu.Data;
 
+/// <summary>
+/// Кэширует часто используемые данные эмулятора, видимые скрипты и CNC-программы для runtime-сервисов.
+/// </summary>
 public sealed class CachedUniEmuDataService(
     UniEmuDbContext db,
     IMemoryCache cache)
@@ -14,6 +17,12 @@ public sealed class CachedUniEmuDataService(
         SlidingExpiration = TimeSpan.FromSeconds(20),
     };
 
+    /// <summary>
+    /// Возвращает эмулятор вместе с тегами из кэша или базы данных.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены запроса к базе данных.</param>
+    /// <returns>Эмулятор с отсортированными тегами или <see langword="null"/>.</returns>
     public Task<EmulatorEntity?> GetEmulatorWithTagsAsync(string emulatorId, CancellationToken cancellationToken)
     {
         return cache.GetOrCreateAsync(
@@ -28,6 +37,12 @@ public sealed class CachedUniEmuDataService(
             });
     }
 
+    /// <summary>
+    /// Возвращает скрипты, доступные указанному эмулятору.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены запроса к базе данных.</param>
+    /// <returns>Общие скрипты и scoped-скрипты эмулятора.</returns>
     public async Task<IReadOnlyList<ScriptFileEntity>> GetVisibleScriptsAsync(
         string emulatorId,
         CancellationToken cancellationToken)
@@ -48,6 +63,12 @@ public sealed class CachedUniEmuDataService(
             }) ?? [];
     }
 
+    /// <summary>
+    /// Возвращает CNC-программы, доступные указанному эмулятору.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены запроса к базе данных.</param>
+    /// <returns>Общие программы и scoped-программы эмулятора.</returns>
     public async Task<IReadOnlyList<CncProgramEntity>> GetVisibleCncProgramsAsync(
         string emulatorId,
         CancellationToken cancellationToken)
@@ -68,6 +89,10 @@ public sealed class CachedUniEmuDataService(
             }) ?? [];
     }
 
+    /// <summary>
+    /// Сбрасывает кэш эмулятора и зависимые от него списки видимых ресурсов.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
     public void InvalidateEmulator(string emulatorId)
     {
         cache.Remove(EmulatorKey(emulatorId));
@@ -75,12 +100,18 @@ public sealed class CachedUniEmuDataService(
         cache.Remove(VisibleCncProgramsKey(emulatorId));
     }
 
+    /// <summary>
+    /// Инвалидирует все кэшированные списки видимых скриптов.
+    /// </summary>
     public void InvalidateScripts()
     {
         cache.Remove(ScriptCacheVersionKey);
         cache.Set(ScriptCacheVersionKey, Guid.NewGuid().ToString("N"), s_cacheOptions);
     }
 
+    /// <summary>
+    /// Инвалидирует все кэшированные списки видимых CNC-программ.
+    /// </summary>
     public void InvalidateCncPrograms()
     {
         cache.Remove(CncProgramCacheVersionKey);

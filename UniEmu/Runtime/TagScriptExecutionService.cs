@@ -15,8 +15,19 @@ using UniEmu.Scripting.Api;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Выполняет CSX-скрипты тегов с доступом к runtime-состоянию, тегам и разрешенным API.
+/// </summary>
 public sealed class TagScriptExecutionService
 {
+    /// <summary>
+    /// Создает сервис выполнения скриптов с настройками CSX по умолчанию.
+    /// </summary>
+    /// <param name="db">Контекст базы данных UniEmu.</param>
+    /// <param name="dataCache">Кэш данных эмуляторов и видимых скриптов.</param>
+    /// <param name="stateStore">Хранилище runtime-значений тегов.</param>
+    /// <param name="scriptCache">Кэш скомпилированных CSX-скриптов.</param>
+    /// <param name="previewFlushService">Сервис отложенной записи preview static-тегов.</param>
     public TagScriptExecutionService(
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
@@ -35,6 +46,17 @@ public sealed class TagScriptExecutionService
     {
     }
 
+    /// <summary>
+    /// Создает сервис выполнения скриптов с явно заданными компонентами CSX-окружения.
+    /// </summary>
+    /// <param name="db">Контекст базы данных UniEmu.</param>
+    /// <param name="dataCache">Кэш данных эмуляторов и видимых скриптов.</param>
+    /// <param name="stateStore">Хранилище runtime-значений тегов.</param>
+    /// <param name="scriptCache">Кэш скомпилированных CSX-скриптов.</param>
+    /// <param name="scriptEnvironment">Настройки Roslyn scripting.</param>
+    /// <param name="directiveValidator">Валидатор CSX-директив.</param>
+    /// <param name="securityValidator">Валидатор запрещенных API.</param>
+    /// <param name="previewFlushService">Сервис отложенной записи preview static-тегов.</param>
     public TagScriptExecutionService(
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
@@ -100,6 +122,15 @@ public sealed class TagScriptExecutionService
     private readonly ITagScriptRestOperations? restOperations;
     private readonly TagPreviewFlushService? previewFlushService;
 
+    /// <summary>
+    /// Компилирует и выполняет скрипт тега, обновляя persistent state при изменениях.
+    /// </summary>
+    /// <param name="emulator">Эмулятор, для которого выполняется скрипт.</param>
+    /// <param name="tag">Тег, связанный со скриптом.</param>
+    /// <param name="timestamp">Время расчета значения.</param>
+    /// <param name="cancellationToken">Токен отмены выполнения.</param>
+    /// <param name="currentValue">Текущее значение, переданное в formula-script после генератора.</param>
+    /// <returns>Рассчитанное значение тега.</returns>
     public async Task<GeneratedTagValue> GenerateScriptTagAsync(
         EmulatorEntity emulator,
         EmulatorTagEntity tag,

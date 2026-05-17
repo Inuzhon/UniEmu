@@ -5,8 +5,17 @@ using UniEmu.Domain.Entities;
 
 namespace UniEmu.Data;
 
+/// <summary>
+/// Создает демонстрационные данные в пустой базе UniEmu.
+/// </summary>
 public static class UniEmuSeeder
 {
+    /// <summary>
+    /// Заполняет пустую базу начальными эмуляторами, тегами, скриптами, CNC-программами и событием.
+    /// </summary>
+    /// <param name="db">Контекст базы данных UniEmu.</param>
+    /// <param name="cancellationToken">Токен отмены операции сохранения.</param>
+    /// <returns>Задача инициализации seed-данных.</returns>
     public static async Task SeedAsync(UniEmuDbContext db, CancellationToken cancellationToken = default)
     {
         if (db.Emulators.Any())

@@ -7,6 +7,9 @@ using Microsoft.CodeAnalysis.Scripting;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Кэширует скомпилированные CSX-скрипты по содержимому, зависимостям и опциям компиляции.
+/// </summary>
 public sealed class CompiledTagScriptCache
 {
     private readonly int _capacity;
@@ -14,11 +17,18 @@ public sealed class CompiledTagScriptCache
     private readonly Dictionary<string, CacheEntry> _entries = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lazy<Script<object?>>> _pendingCompilations = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Создает кэш с ограничением количества скомпилированных скриптов.
+    /// </summary>
+    /// <param name="capacity">Максимальное количество записей в кэше.</param>
     public CompiledTagScriptCache(int capacity = 256)
     {
         this._capacity = Math.Max(1, capacity);
     }
 
+    /// <summary>
+    /// Текущее количество скомпилированных скриптов в кэше.
+    /// </summary>
     public int Count
     {
         get
@@ -30,6 +40,15 @@ public sealed class CompiledTagScriptCache
         }
     }
 
+    /// <summary>
+    /// Возвращает скомпилированный скрипт из кэша или компилирует новую версию.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Содержимое входного CSX-файла.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="baseOptions">Базовые опции Roslyn scripting.</param>
+    /// <param name="globalsType">Тип globals-объекта.</param>
+    /// <returns>Скомпилированный Roslyn-скрипт.</returns>
     public Script<object?> GetOrAdd(
         string entryPath,
         string content,
@@ -59,6 +78,9 @@ public sealed class CompiledTagScriptCache
         }
     }
 
+    /// <summary>
+    /// Очищает кэш и незавершенные компиляции.
+    /// </summary>
     public void Clear()
     {
         var hadEntries = false;

@@ -13,6 +13,9 @@ using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Управляет расписанием Quartz-задач для запущенных эмуляторов и событийных тегов.
+/// </summary>
 public sealed class EmulatorScheduleService(
     UniEmuDbContext db,
     CachedUniEmuDataService dataCache,
@@ -25,6 +28,11 @@ public sealed class EmulatorScheduleService(
     TagScriptExecutionService scriptExecutionService,
     RuntimeUpdateService runtimeUpdateService)
 {
+    /// <summary>
+    /// Восстанавливает расписание всех эмуляторов, которые были запущены до старта backend.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены операций Quartz и базы данных.</param>
+    /// <returns>Задача восстановления расписаний.</returns>
     public async Task ScheduleRunningEmulatorsAsync(CancellationToken cancellationToken = default)
     {
         var emulatorIds = await db.Emulators
@@ -39,6 +47,12 @@ public sealed class EmulatorScheduleService(
         }
     }
 
+    /// <summary>
+    /// Пересоздает расписание эмулятора, если он находится в состоянии Running.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операций Quartz и базы данных.</param>
+    /// <returns>Задача проверки и пересоздания расписания.</returns>
     public async Task RescheduleIfRunningAsync(string emulatorId, CancellationToken cancellationToken = default)
     {
         var isRunning = await db.Emulators
@@ -51,6 +65,12 @@ public sealed class EmulatorScheduleService(
         }
     }
 
+    /// <summary>
+    /// Пересоздает Quartz-задачи тегов, публикации и проверки блокировки для одного эмулятора.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операций Quartz и базы данных.</param>
+    /// <returns>Задача создания расписания эмулятора.</returns>
     public async Task ScheduleEmulatorAsync(string emulatorId, CancellationToken cancellationToken = default)
     {
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
@@ -81,6 +101,12 @@ public sealed class EmulatorScheduleService(
         await ScheduleDispatcherBlockCheckJobAsync(scheduler, emulator, GetDispatcherBlockCheckInterval(options.Value), cancellationToken);
     }
 
+    /// <summary>
+    /// Удаляет Quartz-задачи эмулятора, очищает runtime-состояние и сбрасывает накопленные preview.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="cancellationToken">Токен отмены операций Quartz и базы данных.</param>
+    /// <returns>Задача удаления расписания эмулятора.</returns>
     public async Task UnscheduleEmulatorAsync(string emulatorId, CancellationToken cancellationToken = default)
     {
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
@@ -89,6 +115,13 @@ public sealed class EmulatorScheduleService(
         await previewFlushService.FlushAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Выполняет теги с событийным триггером без постановки отдельной Quartz-задачи.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="triggerEvent">Событие запуска тегов.</param>
+    /// <param name="cancellationToken">Токен отмены расчета.</param>
+    /// <returns>Задача выполнения событийных тегов.</returns>
     public async Task ExecuteEventTagsAsync(
         string emulatorId,
         TagTriggerEvent triggerEvent,

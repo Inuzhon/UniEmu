@@ -9,6 +9,9 @@ using UniEmu.Realtime;
 
 namespace UniEmu.Runtime;
 
+/// <summary>
+/// Quartz-задача расчета отдельного тега по его расписанию.
+/// </summary>
 [DisallowConcurrentExecution]
 public sealed class TagValueJob(
     UniEmuDbContext db,
@@ -20,6 +23,11 @@ public sealed class TagValueJob(
     RuntimeUpdateService runtimeUpdateService,
     ILogger<TagValueJob> logger) : IJob
 {
+    /// <summary>
+    /// Рассчитывает значение тега, обновляет runtime-состояние, preview и realtime-подписчиков.
+    /// </summary>
+    /// <param name="context">Контекст Quartz с идентификаторами эмулятора и тега.</param>
+    /// <returns>Задача выполнения расчета тега.</returns>
     public async Task Execute(IJobExecutionContext context)
     {
         var cancellationToken = context.CancellationToken;
