@@ -30,15 +30,6 @@ const vendorChunkGroups = [
     priority: 80,
   },
   {
-    name: "vendor-react",
-    test: (id: string) => matchesNodeModule(id, [
-      "react",
-      "react-dom",
-      "scheduler",
-    ]),
-    priority: 70,
-  },
-  {
     name: "vendor-tanstack",
     test: (id: string) => matchesNodeModule(id, [
       "@tanstack",
