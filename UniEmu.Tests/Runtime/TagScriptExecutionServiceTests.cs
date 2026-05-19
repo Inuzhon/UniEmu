@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -161,6 +162,45 @@ public sealed class TagScriptExecutionServiceTests
     }
 
     [Fact]
+    public async Task GenerateScriptTagAsync_ExecutesComplexSharedAndEmulatorScriptGraph_ForSavedAndInlineTags()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        await AddComplexScriptGraphAsync(db);
+        var service = CreateService(db, new TagRuntimeStateStore());
+        var (emulator, savedTag) = await LoadAsync(db, "tg-complex-catalog");
+        var inlineTag = emulator.Tags.Single(t => t.Id == "tg-complex-inline");
+
+        var savedValue = await GenerateScriptTagWithDiagnosticsAsync(
+            service,
+            emulator,
+            savedTag,
+            DateTimeOffset.Parse("2026-05-11T10:00:00Z"),
+            CancellationToken.None);
+        var firstInlineValue = await GenerateScriptTagWithDiagnosticsAsync(
+            service,
+            emulator,
+            inlineTag,
+            DateTimeOffset.Parse("2026-05-11T10:00:01Z"),
+            CancellationToken.None);
+        var secondInlineValue = await GenerateScriptTagWithDiagnosticsAsync(
+            service,
+            emulator,
+            inlineTag,
+            DateTimeOffset.Parse("2026-05-11T10:00:02Z"),
+            CancellationToken.None);
+
+        Assert.Equal(28.25d, savedValue.Value);
+        Assert.Equal(29d, firstInlineValue.Value);
+        Assert.Equal(30d, secondInlineValue.Value);
+
+        var savedState = await db.ScriptRuntimeStates.SingleAsync(s => s.ScriptKey == "script:scr-complex-entry");
+        var inlineState = await db.ScriptRuntimeStates.SingleAsync(s => s.ScriptKey == "inline:tg-complex-inline");
+        Assert.Contains("\"catalogRuns\":1", savedState.ValuesJson);
+        Assert.Contains("\"inlineRuns\":2", inlineState.ValuesJson);
+    }
+
+    [Fact]
     public async Task GenerateScriptTagAsync_RecomputesSavedScriptTag_WhenLoadedParentScriptChanges()
     {
         await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
@@ -281,6 +321,232 @@ public sealed class TagScriptExecutionServiceTests
             compiledCache ?? new CompiledTagScriptCache(),
             restOperations,
             previewFlushService);
+    }
+
+    private static async Task<GeneratedTagValue> GenerateScriptTagWithDiagnosticsAsync(
+        TagScriptExecutionService service,
+        EmulatorEntity emulator,
+        EmulatorTagEntity tag,
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await service.GenerateScriptTagAsync(emulator, tag, timestamp, cancellationToken);
+        }
+        catch (CompilationErrorException ex)
+        {
+            var diagnostics = string.Join(Environment.NewLine, ex.Diagnostics.Select(diagnostic => diagnostic.ToString()));
+            throw new InvalidOperationException(diagnostics, ex);
+        }
+    }
+
+    private static async Task AddComplexScriptGraphAsync(UniEmuDbContext db)
+    {
+        db.EmulatorTags.AddRange(
+            CreateComplexScriptTag("tg-complex-catalog", "Complex catalog", "complex-catalog", "scr-complex-entry"),
+            CreateComplexScriptTag(
+                "tg-complex-inline",
+                "Complex inline",
+                "complex-inline",
+                inlineScript:
+                """
+                #load "complex/shared/score.csx"
+                #load "complex/machine/offsets.csx"
+
+                public sealed class InlineNormalizer
+                {
+                    public double Normalize(double value) => value + 0.75;
+                }
+
+                UniEmu.Tags.TryGetValue("pressure", out var pressure);
+                UniEmu.Tags.TryGetValue("enabled", out var enabled);
+                UniEmu.Tags.TryGetValue("label", out var label);
+
+                var runs = UniEmu.State.Get<int>("inlineRuns", 0) + 1;
+                UniEmu.State.Set("inlineRuns", runs);
+
+                var score = SharedScoring.Score(
+                    (double)pressure!.Value!,
+                    (bool)enabled!.Value!,
+                    label!.Value!.ToString()!);
+                var adjusted = MachineOffset.CreateDefault().Apply(score);
+
+                return new InlineNormalizer().Normalize(adjusted) + runs;
+                """));
+
+        db.ScriptFiles.AddRange(
+            CreateComplexScriptFile(
+                "scr-complex-models",
+                "complex/shared/models.csx",
+                ScriptScope.Shared,
+                null,
+                """
+                public sealed class LoadWindow
+                {
+                    public LoadWindow(double minimum, double maximum, double weight)
+                    {
+                        Minimum = minimum;
+                        Maximum = maximum;
+                        Weight = weight;
+                    }
+
+                    public double Minimum { get; }
+
+                    public double Maximum { get; }
+
+                    public double Weight { get; }
+
+                    public bool Matches(double value) => value >= Minimum && value < Maximum;
+                }
+                """),
+            CreateComplexScriptFile(
+                "scr-complex-calibration",
+                "complex/shared/calibration.csx",
+                ScriptScope.Shared,
+                null,
+                """
+                #load "models.csx"
+
+                public sealed class CalibrationProfile
+                {
+                    private readonly IReadOnlyList<LoadWindow> windows = new List<LoadWindow>
+                    {
+                        new LoadWindow(0, 10, 1),
+                        new LoadWindow(10, 100, 1.6),
+                    };
+
+                    public double Apply(double raw)
+                    {
+                        var window = windows.FirstOrDefault(candidate => candidate.Matches(raw));
+                        return raw * (window?.Weight ?? 1);
+                    }
+
+                    public static double Trim(double value) => Math.Round(value, 2);
+                }
+                """),
+            CreateComplexScriptFile(
+                "scr-complex-score",
+                "complex/shared/score.csx",
+                ScriptScope.Shared,
+                null,
+                """
+                #load "calibration.csx"
+
+                public static class SharedScoring
+                {
+                    public static double Score(double raw, bool enabled, string label)
+                    {
+                        if (!enabled)
+                        {
+                            return -1;
+                        }
+
+                        var profile = new CalibrationProfile();
+                        return CalibrationProfile.Trim(profile.Apply(raw) + label.Length);
+                    }
+                }
+                """),
+            CreateComplexScriptFile(
+                "scr-complex-units",
+                "complex/machine/units.csx",
+                ScriptScope.Emulator,
+                "em-1",
+                """
+                public static class UnitConversion
+                {
+                    public static double Bias() => 0.25;
+                }
+                """),
+            CreateComplexScriptFile(
+                "scr-complex-offsets",
+                "complex/machine/offsets.csx",
+                ScriptScope.Emulator,
+                "em-1",
+                """
+                #load "units.csx"
+
+                public sealed class MachineOffset
+                {
+                    public MachineOffset(double baseOffset)
+                    {
+                        BaseOffset = baseOffset;
+                    }
+
+                    public double BaseOffset { get; }
+
+                    public double Apply(double value) => value + BaseOffset + UnitConversion.Bias();
+
+                    public static MachineOffset CreateDefault() => new MachineOffset(4);
+                }
+                """),
+            CreateComplexScriptFile(
+                "scr-complex-entry",
+                "complex/machine/catalog-entry.csx",
+                ScriptScope.Emulator,
+                "em-1",
+                """
+                #load "complex/shared/score.csx"
+                #load "offsets.csx"
+
+                public sealed class CatalogCalculator
+                {
+                    public double Calculate(double raw, bool enabled, string label) =>
+                        MachineOffset.CreateDefault().Apply(SharedScoring.Score(raw, enabled, label));
+                }
+
+                UniEmu.Tags.TryGetValue("pressure", out var pressure);
+                UniEmu.Tags.TryGetValue("enabled", out var enabled);
+                UniEmu.Tags.TryGetValue("label", out var label);
+
+                var runs = UniEmu.State.Get<int>("catalogRuns", 0) + 1;
+                UniEmu.State.Set("catalogRuns", runs);
+                var catalogResult = new CatalogCalculator().Calculate((double)pressure!.Value!, (bool)enabled!.Value!, label!.Value!.ToString()!);
+
+                return catalogResult + runs;
+                """));
+
+        await db.SaveChangesAsync();
+    }
+
+    private static EmulatorTagEntity CreateComplexScriptTag(
+        string id,
+        string name,
+        string key,
+        string? scriptId = null,
+        string? inlineScript = null)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = id,
+            EmulatorId = "em-1",
+            Name = name,
+            Key = key,
+            Type = UniEmuJson.EnumString(TagType.Double),
+            Source = UniEmuJson.EnumString(TagSource.Script),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+            FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(scriptId, inlineScript)),
+        };
+    }
+
+    private static ScriptFileEntity CreateComplexScriptFile(
+        string id,
+        string name,
+        ScriptScope scope,
+        string? emulatorId,
+        string content)
+    {
+        return new ScriptFileEntity
+        {
+            Id = id,
+            Name = name,
+            Scope = UniEmuJson.EnumString(scope),
+            EmulatorId = emulatorId,
+            Content = content,
+            SizeBytes = System.Text.Encoding.UTF8.GetByteCount(content),
+            UpdatedAt = DateTimeOffset.Parse("2026-05-11T09:30:00Z"),
+        };
     }
 
     private static async Task<(EmulatorEntity Emulator, EmulatorTagEntity Tag)> LoadAsync(UniEmuDbContext db, string tagId)

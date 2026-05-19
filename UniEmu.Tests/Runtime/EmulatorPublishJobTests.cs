@@ -574,6 +574,223 @@ public sealed class EmulatorPublishJobTests
     }
 
     [Fact]
+    public async Task BuildValuesAsync_CalculatesScriptFromGeneratorTagInSamePublishSnapshot()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var startedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var timestamp = startedAt.AddSeconds(4);
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            StartedAt = startedAt,
+            Tags =
+            [
+                CreateIntervalGeneratorTag(
+                    "tg-generator-load",
+                    "GeneratorLoad",
+                    "GeneratorLoad",
+                    intervalValue: 2,
+                    new TagCalcConfigDto(
+                        CalcType.Line,
+                        Start: "10",
+                        Finish: "30",
+                        Duration: 8,
+                        Amplitude: null,
+                        Period: null,
+                        Curvature: null,
+                        Distortion: null)),
+                CreatePublishIntervalScriptTag(
+                    "tg-generator-script",
+                    "GeneratorScript",
+                    """
+                    if (!UniEmu.Tags.TryGetValue("GeneratorLoad", out var generated) || generated?.Value is not double value)
+                        return 0;
+
+                    return value * 2 + 1;
+                    """),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+
+        Assert.Equal(20d, values.Single(value => value.Name == "GeneratorLoad").Value);
+        Assert.Equal(41d, values.Single(value => value.Name == "GeneratorScript").Value);
+        Assert.True(stateStore.TryGet(emulator.Id, "tg-generator-load", out var generatorState));
+        Assert.Equal(20d, generatorState.Value);
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_CalculatesScriptFromScenarioTagInSamePublishSnapshot()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var startedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var timestamp = startedAt.AddSeconds(4);
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            StartedAt = startedAt,
+            Tags =
+            [
+                CreateIntervalScenarioTag(
+                    "tg-scenario-pressure",
+                    "ScenarioPressure",
+                    "ScenarioPressure",
+                    intervalValue: 2,
+                    new TagScenarioConfigDto(
+                    [
+                        new TagScenarioSegmentDto(
+                            "ramp",
+                            Duration: 8,
+                            new TagCalcConfigDto(
+                                CalcType.Line,
+                                Start: "100",
+                                Finish: "140",
+                                Duration: 8,
+                                Amplitude: null,
+                                Period: null,
+                                Curvature: null,
+                                Distortion: null),
+                            Label: "Ramp"),
+                    ],
+                    ContinueOnFormulaEnd.Stretch,
+                    StartValue: null)),
+                CreatePublishIntervalScriptTag(
+                    "tg-scenario-script",
+                    "ScenarioScript",
+                    """
+                    if (!UniEmu.Tags.TryGetValue("ScenarioPressure", out var scenario) || scenario?.Value is not double value)
+                        return 0;
+
+                    return value / 4;
+                    """),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+
+        Assert.Equal(120d, values.Single(value => value.Name == "ScenarioPressure").Value);
+        Assert.Equal(30d, values.Single(value => value.Name == "ScenarioScript").Value);
+        Assert.True(stateStore.TryGet(emulator.Id, "tg-scenario-pressure", out var scenarioState));
+        Assert.Equal(120d, scenarioState.Value);
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_CalculatesGeneratorAndScenarioDependenciesBeforeScriptsInSameSnapshot()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var startedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var timestamp = startedAt.AddSeconds(4);
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            StartedAt = startedAt,
+            Tags =
+            [
+                CreatePublishIntervalScriptTag(
+                    "tg-generator-script",
+                    "GeneratorScript",
+                    """
+                    if (!UniEmu.Tags.TryGetValue("GeneratorLoad", out var generated) || generated?.Value is not double value)
+                        return 0;
+
+                    return value * 2;
+                    """),
+                CreateIntervalGeneratorTag(
+                    "tg-generator-load",
+                    "GeneratorLoad",
+                    "GeneratorLoad",
+                    intervalValue: 2,
+                    new TagCalcConfigDto(
+                        CalcType.Line,
+                        Start: "10",
+                        Finish: "30",
+                        Duration: 8,
+                        Amplitude: null,
+                        Period: null,
+                        Curvature: null,
+                        Distortion: null)),
+                CreatePublishIntervalScriptTag(
+                    "tg-scenario-script",
+                    "ScenarioScript",
+                    """
+                    if (!UniEmu.Tags.TryGetValue("ScenarioPressure", out var scenario) || scenario?.Value is not double value)
+                        return 0;
+
+                    return value / 4;
+                    """),
+                CreateIntervalScenarioTag(
+                    "tg-scenario-pressure",
+                    "ScenarioPressure",
+                    "ScenarioPressure",
+                    intervalValue: 2,
+                    new TagScenarioConfigDto(
+                    [
+                        new TagScenarioSegmentDto(
+                            "ramp",
+                            Duration: 8,
+                            new TagCalcConfigDto(
+                                CalcType.Line,
+                                Start: "100",
+                                Finish: "140",
+                                Duration: 8,
+                                Amplitude: null,
+                                Period: null,
+                                Curvature: null,
+                                Distortion: null),
+                            Label: "Ramp"),
+                    ],
+                    ContinueOnFormulaEnd.Stretch,
+                    StartValue: null)),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+
+        Assert.Collection(
+            values,
+            value => Assert.Equal(40d, value.Value),
+            value => Assert.Equal(20d, value.Value),
+            value => Assert.Equal(30d, value.Value),
+            value => Assert.Equal(120d, value.Value));
+    }
+
+    [Fact]
     public async Task BuildValuesAsync_DoesNotEvaluateCronScriptOnPublish_WhenRuntimeStateIsEmpty()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -702,6 +919,29 @@ public sealed class EmulatorPublishJobTests
 
     private static EmulatorTagEntity CreatePublishIntervalGeneratorTag(string id, string name, string key)
     {
+        return CreateIntervalGeneratorTag(
+            id,
+            name,
+            key,
+            intervalValue: 1,
+            new TagCalcConfigDto(
+                CalcType.Sequence,
+                Start: "[-5]",
+                Finish: null,
+                Duration: 1,
+                Amplitude: null,
+                Period: null,
+                Curvature: null,
+                Distortion: null));
+    }
+
+    private static EmulatorTagEntity CreateIntervalGeneratorTag(
+        string id,
+        string name,
+        string key,
+        int intervalValue,
+        TagCalcConfigDto calc)
+    {
         return new EmulatorTagEntity
         {
             Id = id,
@@ -711,16 +951,30 @@ public sealed class EmulatorPublishJobTests
             Type = UniEmuJson.EnumString(TagType.Double),
             Source = UniEmuJson.EnumString(TagSource.Generator),
             Preview = "0",
-            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
-            CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(
-                CalcType.Sequence,
-                Start: "[-5]",
-                Finish: null,
-                Duration: 1,
-                Amplitude: null,
-                Period: null,
-                Curvature: null,
-                Distortion: null)),
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, intervalValue, TagIntervalUnit.Sec)),
+            CalcJson = UniEmuJson.Serialize(calc),
+            Enabled = true,
+        };
+    }
+
+    private static EmulatorTagEntity CreateIntervalScenarioTag(
+        string id,
+        string name,
+        string key,
+        int intervalValue,
+        TagScenarioConfigDto scenario)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = id,
+            EmulatorId = "emu-1",
+            Name = name,
+            Key = key,
+            Type = UniEmuJson.EnumString(TagType.Double),
+            Source = UniEmuJson.EnumString(TagSource.Scenario),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, intervalValue, TagIntervalUnit.Sec)),
+            ScenarioJson = UniEmuJson.Serialize(scenario),
             Enabled = true,
         };
     }
