@@ -1,4 +1,4 @@
-# UniEmu Backend Agent Guide
+﻿# UniEmu Backend Agent Guide
 
 ## Документация
 
@@ -6,6 +6,11 @@
 - XML-комментарии C# (`summary`, `param`, `returns` и т.д.) пишите по-русски, включая комментарии для приватных методов и вспомогательных типов.
 
 Этот документ описывает нюансы работы с backend-проектом `UniEmu`.
+
+## Кодировка файлов
+
+- Backend-файлы хранятся в UTF-8 with BOM. При чтении через PowerShell указывайте кодировку явно, например `Get-Content -Raw -Encoding UTF8 UniEmu\Runtime\Scripting\CsxLanguageService.cs`, чтобы не получить mojibake.
+- При изменении существующих backend-файлов сохраняйте исходную кодировку UTF-8 with BOM и не переписывайте файл инструментами, которые удаляют BOM или интерпретируют UTF-8 как ANSI/OEM.
 
 ## Сборка и тесты
 
