@@ -5,11 +5,7 @@ import type {
   RuntimeTelemetryUpdate,
   SystemEvent,
 } from '@/types/uniemu';
-
-const API_BASE_URL =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_API_BASE_URL) ||
-  '';
+import { API_BASE_URL } from '@/lib/constants';
 
 type RuntimeUpdateHandlers = {
   onTelemetryPoint: (update: RuntimeTelemetryUpdate) => void;

@@ -1,9 +1,18 @@
 /**
- * Глобальные feature-флаги фронтенда.
+ * Global frontend feature flags.
  *
- * Меняются вручную в коде - это не пользовательские настройки,
- * а тумблеры для скрытия/включения целых блоков UI.
+ * These are code-level toggles for hiding or enabling whole UI blocks.
  */
 
-/** Показывать ли ленту системных событий на дашборде и связанных местах. */
+/** Show the system events feed on dashboard and related screens. */
 export const SHOW_EVENTS_FEED = false;
+
+/** Temporarily show scenario tag value preview charts on emulator details. */
+export const SHOW_TAG_SCENARIO_PREVIEWS = false;
+
+/** Enable Zustand store persistence in localStorage. */
+export const PERSIST_STORE: boolean =
+  (typeof import.meta !== 'undefined' &&
+    (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_PERSIST_STORE === 'true') ||
+  (typeof window !== 'undefined' &&
+    (window as unknown as { __UNIEMU_PERSIST__?: boolean }).__UNIEMU_PERSIST__ === true);

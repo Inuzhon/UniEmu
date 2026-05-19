@@ -69,6 +69,8 @@ import {
   getTagTypeLabel,
 } from './tag-scenario/calcLabels';
 import { formatDuration, totalDuration } from './tag-scenario/scenarioMath';
+import { TELEMETRY_LINE_COLORS } from '@/lib/constants';
+import { SHOW_TAG_SCENARIO_PREVIEWS } from '@/lib/feature-flags';
 import { cn } from '@/lib/utils';
 import type { CncProgram, EmulatorTag, TagSource, TagTrigger, TelemetryPoint } from '@/types/uniemu';
 import { localization } from '@/localization';
@@ -101,15 +103,6 @@ type TelemetryChartPoint = {
   time: string;
   values: Record<string, number>;
 } & Record<string, string | number | Record<string, number>>;
-
-const telemetryLineColors = [
-  'oklch(0.78 0.16 195)',
-  'oklch(0.82 0.16 80)',
-  'oklch(0.78 0.18 155)',
-  'oklch(0.75 0.18 25)',
-  'oklch(0.72 0.14 285)',
-  'oklch(0.8 0.12 120)',
-];
 
 const emptyTelemetry: TelemetryPoint[] = [];
 
@@ -922,7 +915,7 @@ export function EmulatorDetailPage() {
                           key={key}
                           type="linear"
                           dataKey={key}
-                          stroke={telemetryLineColors[tagIndex % telemetryLineColors.length]}
+                          stroke={TELEMETRY_LINE_COLORS[tagIndex % TELEMETRY_LINE_COLORS.length]}
                           strokeWidth={2}
                           dot={false}
                           isAnimationActive={false}
@@ -991,7 +984,7 @@ export function EmulatorDetailPage() {
           </div>
 
           {/* Сценарии тегов */}
-          {tags.some((t) => t.source === 'scenario' && t.scenario) && (
+          {SHOW_TAG_SCENARIO_PREVIEWS && tags.some((t) => t.source === 'scenario' && t.scenario) && (
             <div className="rounded-lg border border-border bg-card">
               <div className="border-b border-border p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">

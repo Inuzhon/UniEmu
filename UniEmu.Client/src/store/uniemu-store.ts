@@ -1,6 +1,7 @@
 import { create, type StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { uniEmuApi } from '@/api/uniemu-api';
+import { PERSIST_STORE } from '@/lib/feature-flags';
 import { RuntimeUpdatesClient } from '@/realtime/runtime-updates-client';
 import type {
   CncProgram,
@@ -66,17 +67,6 @@ interface UniEmuState {
   ) => Promise<void>;
   deleteCncProgram: (id: string) => Promise<void>;
 }
-
-/**
- * Глобальный флаг персиста стора в localStorage.
- * Включить: VITE_PERSIST_STORE=true (или через window.__UNIEMU_PERSIST__ = true до загрузки).
- * По умолчанию выключен — стор живёт только в памяти.
- */
-export const PERSIST_STORE: boolean =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_PERSIST_STORE === 'true') ||
-  (typeof window !== 'undefined' &&
-    (window as unknown as { __UNIEMU_PERSIST__?: boolean }).__UNIEMU_PERSIST__ === true);
 
 let runtimeUpdatesClient: RuntimeUpdatesClient | null = null;
 
