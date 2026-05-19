@@ -30,3 +30,12 @@ test('wave period uses the same minimum in scenario preview and editors as the b
   assert.match(drawerSource, /setCalcPeriod\(Math\.max\(1,\s*Number\(e\.target\.value\) \|\| 1\)\)/);
   assert.match(calcFieldsSource, /set\(\{ period: Math\.max\(1,\s*Number\(e\.target\.value\) \|\| 1\) \}\)/);
 });
+
+test('edit mode reuses one fallback scenario for form state and dirty snapshot', async () => {
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+
+  assert.match(drawerSource, /const nextScenario = tag\.scenario \?\? \{\s*segments: \[defaultSegment\(\)\],\s*continueOnFormulaEnd: 'Repeat'(?: as const)?,\s*\};/);
+  assert.match(drawerSource, /setScenario\(nextScenario\);/);
+  assert.match(drawerSource, /scenario: nextScenario,/);
+});

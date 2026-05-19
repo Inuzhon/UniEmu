@@ -264,6 +264,11 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   useEffect(() => {
     if (!open) return;
     if (tag) {
+      const nextScenario = tag.scenario ?? {
+        segments: [defaultSegment()],
+        continueOnFormulaEnd: 'Repeat' as const,
+      };
+
       setKey(tag.key);
       setSpecialParameter(tag.specialParameter ?? 'None');
       setName(tag.name);
@@ -293,7 +298,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
       }
       setScriptId(tag.formula?.scriptId ?? '');
       setInlineScript(tag.formula?.inlineScript ?? DEFAULT_INLINE);
-      setScenario(tag.scenario ?? { segments: [defaultSegment()], continueOnFormulaEnd: 'Repeat' });
+      setScenario(nextScenario);
       setInitialSnapshot(
         JSON.stringify({
           key: tag.key,
@@ -320,10 +325,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
           calcDistortion: tag.calc?.distortion ?? 0,
           scriptId: tag.formula?.scriptId ?? '',
           inlineScript: tag.formula?.inlineScript ?? DEFAULT_INLINE,
-          scenario: tag.scenario ?? {
-            segments: [defaultSegment()],
-            continueOnFormulaEnd: 'Repeat',
-          },
+          scenario: nextScenario,
         })
       );
     } else {
