@@ -36,6 +36,13 @@ export function EmulatorsListPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(DefaultEmulator);
 
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setForm(DefaultEmulator);
+    }
+  };
+
   const handleCreate = async () => {
     const name = form.name.trim();
     if (!name) return;
@@ -193,7 +200,7 @@ export function EmulatorsListPage() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -252,7 +259,7 @@ export function EmulatorsListPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
               {localization.routes.emulators.components.emulatorsListPage.cancelButtonLabel}
             </Button>
             <Button onClick={() => void handleCreate()} disabled={!form.name.trim()}>
