@@ -1,3 +1,5 @@
+import { formatCount, getRussianCountForm } from '@/utils/plural';
+
 export const localization = {
   components: {
     changelogDialog: {
@@ -120,7 +122,7 @@ export const localization = {
         cncStoragePage: {
           title: 'Хранилище УП',
           description: 'Управляющие программы для ЧПУ-станков',
-          filesCountSuffix: 'файлов ',
+          filesCountLabel: (p0: number) => formatCount(p0, ['файл', 'файла', 'файлов']),
           uploadButtonLabel: 'Загрузить',
           searchPlaceholder: 'Найти программу…',
           sharedProgramsTitle: 'Общие программы',
@@ -139,7 +141,7 @@ export const localization = {
           missingDescriptionText: '- описание не задано',
           binaryPreviewUnavailable: 'Бинарный файл - предпросмотр недоступен',
           downloadBinaryHint: 'Используйте «Скачать» для выгрузки',
-          lineCountSuffix: 'строк',
+          lineCountLabel: (p0: number) => formatCount(p0, ['строка', 'строки', 'строк']),
           loadedBadgeLabel: 'загружено',
         },
         dropZone: {
@@ -180,7 +182,7 @@ export const localization = {
         allEmulatorsButtonLabel: 'Все эмуляторы',
         newEmulatorButtonLabel: 'Новый эмулятор',
         fleetReadinessLabel: 'Готовность парка',
-        activeCountSuffix: 'активны',
+        activeCountLabel: (p0: number) => getRussianCountForm(p0, ['активен', 'активны', 'активны']),
         totalStatLabel: 'Всего',
         registeredHint: 'зарегистрировано',
         activeStatLabel: 'Активны',
@@ -189,9 +191,9 @@ export const localization = {
         requiresAttentionHint: 'требует внимания',
         noErrorsHint: 'нет ошибок',
         totalRequestsStatLabel: 'Запросов всего',
-        payloadTagsHint: (p0: number) => `${p0} тегов в payload`,
+        payloadTagsHint: (p0: number) => `${formatCount(p0, ['тег', 'тега', 'тегов'])} в payload`,
         statusDistributionTitle: 'Распределение по статусу',
-        devicesCountSuffix: 'устройств',
+        devicesCountLabel: (p0: number) => formatCount(p0, ['устройство', 'устройства', 'устройств']),
         emulatorsSectionTitle: 'Эмуляторы',
         emulatorsSectionDescription: 'Активные сверху · быстрый старт/стоп и переход в карточку',
         searchPlaceholder: 'Поиск по имени…',
@@ -199,7 +201,7 @@ export const localization = {
         emptySearchMessage: 'Ничего не найдено',
         eventsFeedTitle: 'Лента событий',
         latestEventsPrefix: 'Последние',
-        eventsCountSuffix: 'записей',
+        eventsCountLabel: (p0: number) => formatCount(p0, ['запись', 'записи', 'записей']),
         singleEmulatorRequiresLabel: 'эмулятор требует',
         multipleEmulatorsRequireLabel: 'эмуляторов требуют',
         running: 'Запущено',
@@ -376,8 +378,7 @@ export const localization = {
           previewColumnLabel: 'Предпросмотр',
           enabledTagsSectionTitle: 'Отправляемые теги',
           enabledTagsSectionDescription: 'Вычисляются и отправляются в систему',
-          singleTagCountLabel: 'тег',
-          multipleTagsCountLabel: 'тегов',
+          tagsCountLabel: (p0: number) => formatCount(p0, ['тег', 'тега', 'тегов']),
           addTagButtonLabel: 'Добавить тег',
           emptyEnabledTagsMessage: 'Нет отправляемых тегов',
           disabledTagsSectionTitle: 'Не отправляемые теги',
@@ -395,12 +396,11 @@ export const localization = {
           tagScenariosDescription: 'Профиль значений по таймлайну · красная линия - позиция курсора графика',
           segmentsSumLabel: 'сегм · Σ',
           packetHistoryTitle: 'История пакетов',
-          packetHistoryRetentionPrefix: 'Сохраняется последних',
-          packetHistoryShownSuffix: 'пакетов показано',
+          packetHistorySummary: (p0: number, p1: number) =>
+            `Сохраняется ${formatCount(p0, ['последний пакет', 'последних пакета', 'последних пакетов'])}, показано ${p1}`,
           latestPacketLabel: 'последний',
-          packetTagsSuffix: 'тегов',
           eventsLogTitle: 'Журнал событий',
-          eventsCountSuffix: 'записей',
+          eventsCountLabel: (p0: number) => formatCount(p0, ['запись', 'записи', 'записей']),
           emptyEventsMessage: 'Событий по этому эмулятору пока нет',
           secondsShortLabel: 'сек',
           protocolIdLabel: 'ID протокола',
@@ -436,8 +436,7 @@ export const localization = {
             distortionPercentLabel: 'Искажение (% шума)',
           },
           scenarioEditor: {
-            singleSegmentCountLabel: 'сегмент',
-            multipleSegmentsCountLabel: 'сегментов',
+            segmentsCountLabel: (p0: number) => formatCount(p0, ['сегмент', 'сегмента', 'сегментов']),
             endBehaviorLabel: 'По завершении',
             endBehaviorNoSignalLabel: 'Без сигнала',
             endBehaviorZeroLabel: 'Обнулить',
@@ -525,7 +524,7 @@ export const localization = {
         scriptsPage: {
           title: 'Скрипты',
           description: 'Хранилище C# скриптов (.csx)',
-          filesCountSuffix: 'файлов ',
+          filesCountLabel: (p0: number) => formatCount(p0, ['файл', 'файла', 'файлов']),
           kilobytesUnitLabel: 'КБ',
           newScriptButtonLabel: 'Новый скрипт',
           searchPlaceholder: 'Найти файл…',

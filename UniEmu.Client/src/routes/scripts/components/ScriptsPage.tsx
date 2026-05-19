@@ -113,7 +113,7 @@ export function ScriptsPage() {
         totalValue={formatNumber(totalCount)}
         totalCaption={
           <>
-            {localization.routes.scripts.components.scriptsPage.filesCountSuffix}
+            {localization.routes.scripts.components.scriptsPage.filesCountLabel(totalCount)} ·{' '}
             {(totalBytes / 1024).toFixed(1)}{' '}
             {localization.routes.scripts.components.scriptsPage.kilobytesUnitLabel}
           </>

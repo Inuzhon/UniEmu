@@ -140,10 +140,7 @@ export function ScenarioEditor({ value, onChange }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/10 px-3 py-2">
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
           <span>
-            <span className="font-mono text-foreground">{segments.length}</span>{' '}
-            {segments.length === 1
-              ? localization.routes.emulators.components.tagScenario.scenarioEditor.singleSegmentCountLabel
-              : localization.routes.emulators.components.tagScenario.scenarioEditor.multipleSegmentsCountLabel}
+            {localization.routes.emulators.components.tagScenario.scenarioEditor.segmentsCountLabel(segments.length)}
           </span>
           <span>·</span>
           <span>

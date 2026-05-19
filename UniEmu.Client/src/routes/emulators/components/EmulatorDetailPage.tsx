@@ -764,10 +764,7 @@ export function EmulatorDetailPage() {
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       {localization.routes.emulators.components.emulatorDetailPage.enabledTagsSectionDescription}{' '}
-                      {enabledTags.length}{' '}
-                      {enabledTags.length === 1
-                        ? localization.routes.emulators.components.emulatorDetailPage.singleTagCountLabel
-                        : localization.routes.emulators.components.emulatorDetailPage.multipleTagsCountLabel}
+                      {localization.routes.emulators.components.emulatorDetailPage.tagsCountLabel(enabledTags.length)}
                     </p>
                   </div>
                   <Button
@@ -796,9 +793,7 @@ export function EmulatorDetailPage() {
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       {localization.routes.emulators.components.emulatorDetailPage.disabledTagsSectionDescription}{' '}
-                      {disabledTags.length === 1
-                        ? localization.routes.emulators.components.emulatorDetailPage.singleTagCountLabel
-                        : localization.routes.emulators.components.emulatorDetailPage.multipleTagsCountLabel}
+                      {localization.routes.emulators.components.emulatorDetailPage.tagsCountLabel(disabledTags.length)}
                     </p>
                   </div>
                   {renderTable(
@@ -1042,10 +1037,10 @@ export function EmulatorDetailPage() {
                   {localization.routes.emulators.components.emulatorDetailPage.packetHistoryTitle}
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {localization.routes.emulators.components.emulatorDetailPage.packetHistoryRetentionPrefix}{' '}
-                  {packetRetention}{' '}
-                  {localization.routes.emulators.components.emulatorDetailPage.packetHistoryShownSuffix}{' '}
-                  {packets.length}
+                  {localization.routes.emulators.components.emulatorDetailPage.packetHistorySummary(
+                    packetRetention,
+                    packets.length
+                  )}
                 </p>
               </div>
             </div>
@@ -1089,8 +1084,7 @@ export function EmulatorDetailPage() {
                         )}
                       </div>
                       <span className="font-mono text-[11px] text-muted-foreground">
-                        {enabledTagsForDispatcher.length}{' '}
-                        {localization.routes.emulators.components.emulatorDetailPage.packetTagsSuffix}
+                        {localization.routes.emulators.components.emulatorDetailPage.tagsCountLabel(enabledTagsForDispatcher.length)}
                       </span>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -1113,7 +1107,7 @@ export function EmulatorDetailPage() {
               {localization.routes.emulators.components.emulatorDetailPage.eventsLogTitle}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {events.length} {localization.routes.emulators.components.emulatorDetailPage.eventsCountSuffix}
+              {localization.routes.emulators.components.emulatorDetailPage.eventsCountLabel(events.length)}
             </p>
           </div>
           <div className="divide-y divide-border/40">

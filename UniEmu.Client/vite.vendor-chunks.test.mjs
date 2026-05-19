@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { URL } from 'node:url';
 
 test('chart vendor chunk includes d3 scale runtime dependencies', async () => {
   const source = await readFile(new URL('./vite.config.ts', import.meta.url), 'utf8');

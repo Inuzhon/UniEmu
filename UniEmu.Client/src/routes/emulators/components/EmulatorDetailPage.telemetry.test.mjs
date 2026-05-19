@@ -107,9 +107,12 @@ test('monitoring chart renders straight line segments without smoothing', async 
 });
 
 test('monitoring chart title is localized to Russian', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const source = await readFile(join(componentDir, 'EmulatorDetailPage.tsx'), 'utf8');
+  const localization = await readFile(join(componentDir, '../../../localization.ts'), 'utf8');
 
-  assert.match(source, /Телеметрия - временной ряд/);
+  assert.match(source, /emulatorDetailPage\.telemetryTimeSeriesTitle/);
+  assert.match(localization, /telemetryTimeSeriesTitle: 'Телеметрия - временной ряд'/);
   assert.doesNotMatch(source, /Telemetry â€” Time Series/);
   assert.doesNotMatch(source, /Telemetry — Time Series/);
 });

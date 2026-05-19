@@ -135,7 +135,7 @@ export function CncStoragePage() {
         totalValue={formatNumber(totalCount)}
         totalCaption={
           <>
-            {localization.routes.cnc.components.cncStoragePage.filesCountSuffix}
+            {localization.routes.cnc.components.cncStoragePage.filesCountLabel(totalCount)} ·{' '}
             {fmtSize(totalBytes)}
           </>
         }

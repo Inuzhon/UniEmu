@@ -111,7 +111,7 @@ export function DashboardPage() {
                 {localization.routes.components.dashboardPage.fleetReadinessLabel}
               </span>
               <span className="font-mono">
-                {running} / {total} {localization.routes.components.dashboardPage.activeCountSuffix}
+                {running} / {total} {localization.routes.components.dashboardPage.activeCountLabel(running)}
               </span>
             </div>
             <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
@@ -171,7 +171,7 @@ export function DashboardPage() {
             </h2>
           </div>
           <span className="font-mono text-xs text-muted-foreground">
-            {total} {localization.routes.components.dashboardPage.devicesCountSuffix}
+            {localization.routes.components.dashboardPage.devicesCountLabel(total)}
           </span>
         </div>
         <DistributionBar
@@ -240,8 +240,8 @@ export function DashboardPage() {
                 {localization.routes.components.dashboardPage.eventsFeedTitle}
               </h2>
               <p className="text-xs text-muted-foreground">
-                {localization.routes.components.dashboardPage.latestEventsPrefix}
-                {events.length} {localization.routes.components.dashboardPage.eventsCountSuffix}
+                {localization.routes.components.dashboardPage.latestEventsPrefix}{' '}
+                {localization.routes.components.dashboardPage.eventsCountLabel(events.length)}
               </p>
             </div>
             <div className="max-h-[520px] overflow-y-auto">

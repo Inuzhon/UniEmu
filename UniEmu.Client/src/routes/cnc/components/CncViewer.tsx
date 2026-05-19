@@ -162,7 +162,7 @@ export function CncViewer({
           <span>UTF-8</span>
           {!file.isBinary && (
             <span>
-              {lineCount} {localization.routes.cnc.components.cncViewer.lineCountSuffix}
+              {localization.routes.cnc.components.cncViewer.lineCountLabel(lineCount)}
             </span>
           )}
         </div>
