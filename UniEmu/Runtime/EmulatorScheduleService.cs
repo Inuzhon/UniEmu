@@ -75,6 +75,7 @@ public sealed class EmulatorScheduleService(
     {
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
         await DeleteEmulatorJobsAsync(scheduler, emulatorId, cancellationToken);
+        await NormalizeStoredTriggersAsync(emulatorId, cancellationToken);
 
         var emulator = await dataCache.GetEmulatorWithTagsAsync(emulatorId, cancellationToken);
 
@@ -221,6 +222,37 @@ public sealed class EmulatorScheduleService(
         {
             await scheduler.DeleteJobs(tagJobs.ToList(), cancellationToken);
         }
+    }
+
+    private async Task NormalizeStoredTriggersAsync(string emulatorId, CancellationToken cancellationToken)
+    {
+        var tags = await db.EmulatorTags
+            .Where(tag => tag.EmulatorId == emulatorId)
+            .ToListAsync(cancellationToken);
+        var changed = false;
+
+        foreach (var tag in tags)
+        {
+            var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+            var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
+                ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
+            var normalized = TagTriggerNormalizer.Normalize(source, trigger);
+            if (normalized == trigger)
+            {
+                continue;
+            }
+
+            tag.TriggerJson = UniEmuJson.Serialize(normalized);
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        dataCache.InvalidateEmulator(emulatorId);
     }
 
     private static async Task SchedulePublishJobAsync(IScheduler scheduler, EmulatorEntity emulator, CancellationToken cancellationToken)

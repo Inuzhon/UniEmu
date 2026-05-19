@@ -19,7 +19,7 @@ function sampleCalcAt(calc: TagCalcConfig, u: number, durationSec: number, prevV
   const start = num(calc.start, 0);
   const finish = num(calc.finish, 0);
   const amp = calc.amplitude ?? 1;
-  const period = calc.period ?? 1;
+  const period = Math.max(calc.period ?? 1, 1);
   const distortion = (calc.distortion ?? 0) / 100;
   const tSec = u * durationSec;
 
@@ -49,18 +49,18 @@ function sampleCalcAt(calc: TagCalcConfig, u: number, durationSec: number, prevV
     }
     case "Sinusoid": {
       const center = num(calc.start, 0);
-      v = center + amp * Math.sin((2 * Math.PI * tSec) / Math.max(period, 0.0001));
+      v = center + amp * Math.sin((2 * Math.PI * tSec) / Math.max(period, 1));
       break;
     }
     case "Square": {
       const center = num(calc.start, 0);
-      const phase = (tSec / Math.max(period, 0.0001)) % 1;
+      const phase = (tSec / Math.max(period, 1)) % 1;
       v = center + (phase < 0.5 ? amp : -amp);
       break;
     }
     case "Sawtooth": {
       const center = num(calc.start, 0);
-      const phase = (tSec / Math.max(period, 0.0001)) % 1;
+      const phase = (tSec / Math.max(period, 1)) % 1;
       v = center + amp * (2 * phase - 1);
       break;
     }

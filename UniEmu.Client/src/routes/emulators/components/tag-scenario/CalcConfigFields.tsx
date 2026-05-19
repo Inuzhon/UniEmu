@@ -137,8 +137,9 @@ export function CalcConfigFields({ value, onChange, hideDuration, compact }: Pro
             </Label>
             <Input
               type="number"
+              min={1}
               value={numField(value.period)}
-              onChange={(e) => set({ period: Number(e.target.value) || 0 })}
+              onChange={(e) => set({ period: Math.max(1, Number(e.target.value) || 1) })}
               className={inputCls}
             />
           </div>

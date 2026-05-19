@@ -262,7 +262,7 @@ export const localization = {
           sendTagLabel: 'Отправлять тег',
           sendTagHint: 'Если выключено - тег не отправляется, но вычисляется',
           scenarioTimelineTitle: 'Сценарий - таймлайн',
-          scenarioTimelineTriggerHint: 'Триггер: при старте эмулятора · по таймингу сегментов',
+          scenarioTimelineTriggerHint: 'Триггер: каждую секунду · по таймингу сегментов',
           triggerSectionTitle: 'Триггер вычисления',
           triggerModeOnceLabel: 'Единоразово (по событию)',
           triggerModeCronLabel: 'По CRON-выражению',

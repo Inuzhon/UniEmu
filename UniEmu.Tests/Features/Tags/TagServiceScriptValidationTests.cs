@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
+using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
@@ -48,6 +49,47 @@ public sealed class TagServiceScriptValidationTests
         Assert.Empty(await db.EmulatorTags.ToListAsync());
     }
 
+    [Fact]
+    public async Task CreateAsync_NormalizesScenarioOnceTrigger_ToInterval()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var created = await service.CreateAsync("em-1", CreateScenarioRequest(), CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.Equal(TagTriggerMode.Interval, created.Trigger.Mode);
+        Assert.Equal(1, created.Trigger.IntervalValue);
+        Assert.Equal(TagIntervalUnit.Sec, created.Trigger.IntervalUnit);
+        Assert.Null(created.Trigger.Event);
+
+        var entity = await db.EmulatorTags.SingleAsync();
+        var storedTrigger = UniEmuJson.Deserialize<TagTriggerDto>(entity.TriggerJson);
+        Assert.NotNull(storedTrigger);
+        Assert.Equal(TagTriggerMode.Interval, storedTrigger.Mode);
+        Assert.Equal(1, storedTrigger.IntervalValue);
+        Assert.Equal(TagIntervalUnit.Sec, storedTrigger.IntervalUnit);
+        Assert.Null(storedTrigger.Event);
+    }
+
+    [Fact]
+    public async Task CreateAsync_PreservesScenarioOnStopTrigger()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var created = await service.CreateAsync(
+            "em-1",
+            CreateScenarioRequest(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStop, null, null, null)),
+            CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.Equal(TagTriggerMode.Once, created.Trigger.Mode);
+        Assert.Equal(TagTriggerEvent.OnStop, created.Trigger.Event);
+    }
+
     private static TagService CreateService(UniEmuDbContext db)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
@@ -78,6 +120,30 @@ public sealed class TagServiceScriptValidationTests
         null,
         new TagFormulaConfigDto(null, inlineScript),
         null,
+        true,
+        null,
+        null,
+        null);
+
+    private static CreateTagRequest CreateScenarioRequest(TagTriggerDto? trigger = null) => new(
+        "Scenario tag",
+        "scenario_tag",
+        TagType.Double,
+        TagSource.Scenario,
+        "(scenario)",
+        trigger ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null),
+        null,
+        null,
+        new TagScenarioConfigDto(
+            [
+                new TagScenarioSegmentDto(
+                    "line-up",
+                    10,
+                    new TagCalcConfigDto(CalcType.Line, "0", "100", 10, null, null, null, null),
+                    "Line up"),
+            ],
+            ContinueOnFormulaEnd.Repeat,
+            StartValue: null),
         true,
         null,
         null,

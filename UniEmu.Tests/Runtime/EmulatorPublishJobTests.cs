@@ -428,6 +428,49 @@ public sealed class EmulatorPublishJobTests
     }
 
     [Fact]
+    public async Task BuildValuesAsync_RecalculatesScenarioTimelineOnPublish_WhenScenarioTriggerMatchesPublishInterval()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var startedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            StartedAt = startedAt,
+            Tags =
+            [
+                CreatePublishIntervalScenarioTag(),
+            ],
+        };
+        var job = new EmulatorPublishJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            CreateSender(),
+            new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()),
+            NullLogger<EmulatorPublishJob>.Instance);
+
+        var atStart = await InvokeBuildValuesAsync(job, emulator, startedAt);
+        var afterFiveSeconds = await InvokeBuildValuesAsync(job, emulator, startedAt.AddSeconds(5));
+
+        Assert.Equal(0d, atStart.Single().Value);
+        Assert.Equal(50d, afterFiveSeconds.Single().Value);
+        Assert.Equal("50", emulator.Tags.Single().Preview);
+    }
+
+    [Fact]
     public async Task BuildValuesAsync_UsesRuntimeStateForCronTags_WhenCronJobAlreadyCalculatedValue()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -678,6 +721,42 @@ public sealed class EmulatorPublishJobTests
                 Period: null,
                 Curvature: null,
                 Distortion: null)),
+            Enabled = true,
+        };
+    }
+
+    private static EmulatorTagEntity CreatePublishIntervalScenarioTag()
+    {
+        return new EmulatorTagEntity
+        {
+            Id = "tg-scenario",
+            EmulatorId = "emu-1",
+            Name = "Load",
+            Key = "Load",
+            Type = UniEmuJson.EnumString(TagType.Double),
+            Source = UniEmuJson.EnumString(TagSource.Scenario),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
+            ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+                [
+                    new TagScenarioSegmentDto(
+                        "line-up",
+                        10,
+                        new TagCalcConfigDto(CalcType.Line, "0", "100", 10, null, null, null, null),
+                        "Line up"),
+                    new TagScenarioSegmentDto(
+                        "sine",
+                        10,
+                        new TagCalcConfigDto(CalcType.Sinusoid, "100", null, 10, 10, 0, null, null),
+                        "Sine"),
+                    new TagScenarioSegmentDto(
+                        "line-down",
+                        10,
+                        new TagCalcConfigDto(CalcType.Line, "100", "0", 10, null, null, null, null),
+                        "Line down"),
+                ],
+                ContinueOnFormulaEnd.Repeat,
+                StartValue: null)),
             Enabled = true,
         };
     }

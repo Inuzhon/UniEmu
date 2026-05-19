@@ -131,6 +131,63 @@ public sealed class EmulatorScheduleServiceTests
     }
 
     [Fact]
+    public async Task ScheduleEmulatorAsync_NormalizesLegacyScenarioOnceTrigger_ToIntervalJob()
+    {
+        await using var fixture = await ScheduleDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(ScheduleDbFixture.CreateScenarioOnceTag("tg-scenario", "Scenario"));
+        await db.SaveChangesAsync();
+
+        var scheduler = new Mock<IScheduler>();
+        scheduler
+            .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTimeOffset.UtcNow);
+        scheduler
+            .Setup(s => s.GetJobKeys(It.IsAny<GroupMatcher<JobKey>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<JobKey>());
+
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduler.Object);
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var service = new EmulatorScheduleService(
+            db,
+            dataCache,
+            schedulerFactory.Object,
+            stateStore,
+            flushService,
+            NullLogger<EmulatorScheduleService>.Instance,
+            Options.Create(new UniEmuOptions()),
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
+
+        await service.ScheduleEmulatorAsync("em-1", CancellationToken.None);
+
+        db.ChangeTracker.Clear();
+        var storedTrigger = await db.EmulatorTags
+            .Where(tag => tag.Id == "tg-scenario")
+            .Select(tag => UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson))
+            .SingleAsync();
+        Assert.NotNull(storedTrigger);
+        Assert.Equal(TagTriggerMode.Interval, storedTrigger.Mode);
+        Assert.Equal(1, storedTrigger.IntervalValue);
+        Assert.Equal(TagIntervalUnit.Sec, storedTrigger.IntervalUnit);
+        Assert.Null(storedTrigger.Event);
+
+        var scheduledScenarioJob = scheduler.Invocations
+            .Where(invocation => invocation.Method.Name == nameof(IScheduler.ScheduleJob))
+            .Select(invocation => (IJobDetail)invocation.Arguments[0])
+            .Single(job => job.JobType == typeof(TagValueJob)
+                           && job.JobDataMap.GetString(RuntimeJobKeys.TagId) == "tg-scenario");
+        Assert.Equal("tg-scenario", scheduledScenarioJob.JobDataMap.GetString(RuntimeJobKeys.TagId));
+    }
+
+    [Fact]
     public async Task ExecuteEventTagsAsync_EvaluatesOnStopScriptTag()
     {
         await using var fixture = await ScheduleDbFixture.CreateAsync();
@@ -408,6 +465,31 @@ public sealed class EmulatorScheduleServiceTests
                 Preview = "0",
                 TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Cron, null, cron, null, null)),
                 FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, "return 11;")),
+            };
+        }
+
+        public static EmulatorTagEntity CreateScenarioOnceTag(string id, string name)
+        {
+            return new EmulatorTagEntity
+            {
+                Id = id,
+                EmulatorId = "em-1",
+                Name = name,
+                Key = id,
+                Type = UniEmuJson.EnumString(TagType.Double),
+                Source = UniEmuJson.EnumString(TagSource.Scenario),
+                Preview = "0",
+                TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+                ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+                    [
+                        new TagScenarioSegmentDto(
+                            "line-up",
+                            10,
+                            new TagCalcConfigDto(CalcType.Line, "0", "100", 10, null, null, null, null),
+                            "Line up"),
+                    ],
+                    ContinueOnFormulaEnd.Repeat,
+                    StartValue: null)),
             };
         }
     }

@@ -394,9 +394,9 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   const handleSubmit = async () => {
     if (!canSubmit) return;
 
-    // Для сценария триггер фиксируем как onStart - проигрывание по таймлайну.
+    // Сценарий - time-based источник, поэтому сохраняем его как частый интервальный расчет.
     const trigger: TagTrigger = isScenario
-      ? { mode: 'once', event: 'onStart' }
+      ? { mode: 'interval', intervalValue: 1, intervalUnit: 'sec' }
       : { mode: triggerMode };
     if (!isScenario) {
       if (triggerMode === 'once') trigger.event = triggerEvent;
@@ -1066,8 +1066,9 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                       </Label>
                       <Input
                         type="number"
+                        min={1}
                         value={calcPeriod}
-                        onChange={(e) => setCalcPeriod(Number(e.target.value) || 0)}
+                        onChange={(e) => setCalcPeriod(Math.max(1, Number(e.target.value) || 1))}
                         className="font-mono"
                       />
                     </div>

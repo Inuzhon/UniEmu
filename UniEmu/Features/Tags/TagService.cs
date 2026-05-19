@@ -59,6 +59,7 @@ public sealed class TagService(
 
         await ValidateInlineScriptAsync(emulatorId, $"inline/{request.Name.Trim()}.csx", request.Formula?.InlineScript, request.Type, cancellationToken);
 
+        var trigger = TagTriggerNormalizer.Normalize(request.Source, request.Trigger);
         var entity = new EmulatorTagEntity
         {
             Id = $"tg-{Guid.NewGuid():N}"[..12],
@@ -68,7 +69,7 @@ public sealed class TagService(
             Type = UniEmuJson.EnumString(request.Type),
             Source = UniEmuJson.EnumString(request.Source),
             Preview = request.Preview,
-            TriggerJson = UniEmuJson.Serialize(request.Trigger),
+            TriggerJson = UniEmuJson.Serialize(trigger),
             CalcJson = request.Calc is null ? null : UniEmuJson.Serialize(request.Calc),
             FormulaJson = request.Formula is null ? null : UniEmuJson.Serialize(request.Formula),
             ScenarioJson = request.Scenario is null ? null : UniEmuJson.Serialize(request.Scenario),
@@ -105,12 +106,13 @@ public sealed class TagService(
 
         await ValidateInlineScriptAsync(emulatorId, $"inline/{entity.Id}.csx", request.Formula?.InlineScript, request.Type, cancellationToken);
 
+        var trigger = TagTriggerNormalizer.Normalize(request.Source, request.Trigger);
         entity.Name = request.Name.Trim();
         entity.Key = request.Key.Trim();
         entity.Type = UniEmuJson.EnumString(request.Type);
         entity.Source = UniEmuJson.EnumString(request.Source);
         entity.Preview = request.Preview;
-        entity.TriggerJson = UniEmuJson.Serialize(request.Trigger);
+        entity.TriggerJson = UniEmuJson.Serialize(trigger);
         entity.CalcJson = request.Calc is null ? null : UniEmuJson.Serialize(request.Calc);
         entity.FormulaJson = request.Formula is null ? null : UniEmuJson.Serialize(request.Formula);
         entity.ScenarioJson = request.Scenario is null ? null : UniEmuJson.Serialize(request.Scenario);
