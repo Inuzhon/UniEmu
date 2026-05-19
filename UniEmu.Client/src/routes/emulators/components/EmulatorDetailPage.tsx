@@ -916,7 +916,7 @@ export function EmulatorDetailPage() {
                       itemStyle={{ color: 'var(--popover-foreground)' }}
                     />
                     {telemetryKeys.map((key) => {
-                      const tagIndex = visibleNumericTelemetryTags.findIndex((t) => t.name === key);
+                      const tagIndex = numericTelemetryTags.findIndex((t) => t.name === key);
                       return (
                         <Line
                           key={key}

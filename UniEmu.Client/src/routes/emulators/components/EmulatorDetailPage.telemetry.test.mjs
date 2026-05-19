@@ -124,3 +124,10 @@ test('monitoring chart lets users choose visible numeric tags locally', async ()
   assert.match(source, /checked=\{!hiddenTelemetryTagNames\.has\(t\.name\)\}/);
   assert.match(source, /telemetryKeys\.map\(\(key\) => \{/);
 });
+
+test('monitoring chart keeps tag colors stable when visible tags are toggled', async () => {
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+
+  assert.match(source, /const tagIndex = numericTelemetryTags\.findIndex\(\(t\) => t\.name === key\)/);
+  assert.doesNotMatch(source, /const tagIndex = visibleNumericTelemetryTags\.findIndex\(\(t\) => t\.name === key\)/);
+});
