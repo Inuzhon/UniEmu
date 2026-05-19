@@ -133,7 +133,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   const [key, setKey] = useState<string>('');
   const [specialParameter, setSpecialParameter] = useState<SpecialParameter>('None');
   const [name, setName] = useState('');
-  const [type, setType] = useState<TagType>('string');
+  const [type, setType] = useState<TagType>('int');
   const [source, setSource] = useState<TagSource>('static');
   const [staticValue, setStaticValue] = useState('');
   const [description, setDescription] = useState('');
@@ -696,7 +696,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="MyTag"
+                    placeholder={localization.routes.emulators.components.addTagDrawer.tagNamePlaceholder}
                     className="font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground">
@@ -705,13 +705,13 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.parameterKeyLabel}
+                    {localization.routes.emulators.components.addTagDrawer.tagKeyLabel}
                   </Label>
                   <Input
                     value={key}
                     spellCheck={false}
                     onChange={(e) => setKey(e.target.value)}
-                    placeholder="my_param"
+                    placeholder={localization.routes.emulators.components.addTagDrawer.tagKeyPlaceholder}
                     className="font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground">

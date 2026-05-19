@@ -145,7 +145,7 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
                 id="em-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="CNC_Mill_01"
+                placeholder={localization.routes.emulators.components.editEmulatorDrawer.namePlaceholder}
                 className="font-mono"
               />
             </div>
@@ -177,7 +177,7 @@ export function EditEmulatorDrawer({ emulator, open, onOpenChange }: Props) {
                 type="url"
                 value={targetUrl}
                 onChange={(e) => setTargetUrl(e.target.value)}
-                placeholder="https://scada.local/api/ingest"
+                placeholder={localization.routes.emulators.components.editEmulatorDrawer.targetUrlPlaceholder}
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
