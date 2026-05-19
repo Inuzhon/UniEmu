@@ -33,6 +33,33 @@ public sealed class CompiledTagScriptCacheTests
     }
 
     [Fact]
+    public void GetOrAdd_RunsCompiledScriptValidationOnlyWhenScriptIsCompiled()
+    {
+        var cache = new CompiledTagScriptCache(capacity: 8);
+        var options = CSharpScript.Create<object?>("return 0;").Options;
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var validationCalls = 0;
+
+        var first = cache.GetOrAdd(
+            "inline/tag-1.csx",
+            "return 1;",
+            visibleScripts,
+            options,
+            typeof(object),
+            _ => validationCalls++);
+        var second = cache.GetOrAdd(
+            "inline/tag-1.csx",
+            "return 1;",
+            visibleScripts,
+            options,
+            typeof(object),
+            _ => validationCalls++);
+
+        Assert.Same(first, second);
+        Assert.Equal(1, validationCalls);
+    }
+
+    [Fact]
     public void GetOrAdd_RecompilesScript_WhenLoadedDependencyContentChanges()
     {
         var cache = new CompiledTagScriptCache(capacity: 8);

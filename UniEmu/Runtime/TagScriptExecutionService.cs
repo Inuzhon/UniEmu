@@ -1,6 +1,4 @@
 ﻿using System.Globalization;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
@@ -70,6 +68,15 @@ public sealed class TagScriptExecutionService
     {
     }
 
+    /// <summary>
+    /// Создает сервис выполнения скриптов с тестовой или альтернативной реализацией REST-операций.
+    /// </summary>
+    /// <param name="db">Контекст базы данных UniEmu.</param>
+    /// <param name="dataCache">Кэш данных эмуляторов и видимых скриптов.</param>
+    /// <param name="stateStore">Хранилище последних runtime-значений тегов.</param>
+    /// <param name="scriptCache">Кэш скомпилированных CSX-скриптов.</param>
+    /// <param name="restOperations">REST API, доступный пользовательским скриптам.</param>
+    /// <param name="previewFlushService">Сервис отложенной записи preview static-тегов.</param>
     internal TagScriptExecutionService(
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
@@ -90,6 +97,18 @@ public sealed class TagScriptExecutionService
     {
     }
 
+    /// <summary>
+    /// Создает сервис выполнения скриптов со всеми явно заданными зависимостями CSX-runtime.
+    /// </summary>
+    /// <param name="db">Контекст базы данных UniEmu.</param>
+    /// <param name="dataCache">Кэш данных эмуляторов и видимых скриптов.</param>
+    /// <param name="stateStore">Хранилище последних runtime-значений тегов.</param>
+    /// <param name="scriptCache">Кэш скомпилированных CSX-скриптов.</param>
+    /// <param name="scriptEnvironment">Фабрика parse options, metadata references и imports для Roslyn scripting.</param>
+    /// <param name="directiveValidator">Валидатор поддерживаемых директив и циклов <c>#load</c>.</param>
+    /// <param name="securityValidator">Валидатор запрещенных типов и вызовов в пользовательских скриптах.</param>
+    /// <param name="restOperations">REST API, доступный пользовательским скриптам, или <see langword="null"/> для отключенного REST-контекста.</param>
+    /// <param name="previewFlushService">Сервис отложенной записи preview static-тегов.</param>
     internal TagScriptExecutionService(
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
@@ -112,14 +131,49 @@ public sealed class TagScriptExecutionService
         this.previewFlushService = previewFlushService;
     }
 
+    /// <summary>
+    /// EF Core-контекст текущего scope, используемый для чтения и сохранения persistent state скриптов.
+    /// </summary>
     private readonly UniEmuDbContext db;
+
+    /// <summary>
+    /// Кэш конфигурации эмуляторов, видимых скриптов и CNC-программ, разделяемый runtime-сервисами.
+    /// </summary>
     private readonly CachedUniEmuDataService dataCache;
+
+    /// <summary>
+    /// In-memory хранилище последних рассчитанных значений тегов.
+    /// </summary>
     private readonly TagRuntimeStateStore stateStore;
+
+    /// <summary>
+    /// Кэш скомпилированных Roslyn-скриптов, уменьшающий повторные компиляции одинакового CSX-кода.
+    /// </summary>
     private readonly CompiledTagScriptCache scriptCache;
+
+    /// <summary>
+    /// Окружение Roslyn scripting: imports, metadata references, parse и compilation options.
+    /// </summary>
     private readonly CsxScriptEnvironment scriptEnvironment;
+
+    /// <summary>
+    /// Проверяет допустимость директив CSX и графа подключенных скриптов.
+    /// </summary>
     private readonly CsxScriptDirectiveValidator directiveValidator;
+
+    /// <summary>
+    /// Проверяет скомпилированный скрипт на запрещенные API перед попаданием в кэш выполнения.
+    /// </summary>
     private readonly CsxScriptSecurityValidator securityValidator;
+
+    /// <summary>
+    /// REST-операции, доступные скриптам через <c>UniEmu.Rest</c>; при отсутствии REST-контекст создается отключенным.
+    /// </summary>
     private readonly ITagScriptRestOperations? restOperations;
+
+    /// <summary>
+    /// Буфер отложенной записи preview для static-тегов, измененных из пользовательского скрипта.
+    /// </summary>
     private readonly TagPreviewFlushService? previewFlushService;
 
     /// <summary>
@@ -151,8 +205,13 @@ public sealed class TagScriptExecutionService
             ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var globals = BuildGlobals(emulator, tag, timestamp, stateValues, cancellationToken, currentValue);
         var scriptOptions = scriptEnvironment.CreateScriptOptions(script.Path, scripts, typeof(TagScriptGlobals));
-        ValidateSecurity(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals), cancellationToken);
-        var compiledScript = scriptCache.GetOrAdd(script.Path, entryContent, scripts, scriptOptions, typeof(TagScriptGlobals));
+        var compiledScript = scriptCache.GetOrAdd(
+            script.Path,
+            entryContent,
+            scripts,
+            scriptOptions,
+            typeof(TagScriptGlobals),
+            compiled => ValidateSecurity(compiled, cancellationToken));
         var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
         var result = scriptState.ReturnValue;
 
@@ -172,6 +231,13 @@ public sealed class TagScriptExecutionService
         return new GeneratedTagValue(tag.Key, tag.Name, value, TelemetryValueGenerator.ToNumericValue(value), specialParameter);
     }
 
+    /// <summary>
+    /// Определяет входной CSX-скрипт для тега: inline-код, выбранный файл скрипта или безопасную пустую заглушку.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора, задающий область видимости скриптов.</param>
+    /// <param name="tag">Тег с formula-конфигурацией источника скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены запроса к кэшу и базе данных.</param>
+    /// <returns>Содержимое входного скрипта, его путь и ключ persistent state.</returns>
     private async Task<ScriptContent> ResolveEntryScriptAsync(
         string emulatorId,
         EmulatorTagEntity tag,
@@ -194,6 +260,12 @@ public sealed class TagScriptExecutionService
         return new ScriptContent(TagScriptPath.Normalize(script.Name), script.Content, $"script:{script.Id}");
     }
 
+    /// <summary>
+    /// Загружает все скрипты, доступные эмулятору для директив <c>#load</c>, и нормализует их пути.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора, для которого выбираются shared и scoped-скрипты.</param>
+    /// <param name="cancellationToken">Токен отмены чтения данных.</param>
+    /// <returns>Словарь содержимого скриптов по нормализованному пути.</returns>
     private async Task<Dictionary<string, string>> LoadVisibleScriptsAsync(string emulatorId, CancellationToken cancellationToken)
     {
         var scripts = await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken);
@@ -209,24 +281,14 @@ public sealed class TagScriptExecutionService
         return result;
     }
 
-    private void ValidateSecurity(
-        string entryPath,
-        string content,
-        IReadOnlyDictionary<string, string> visibleScripts,
-        ScriptOptions options,
-        Type globalsType,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Проверяет compilation скомпилированного скрипта на запрещенные конструкции и прерывает выполнение при нарушениях.
+    /// </summary>
+    /// <param name="script">Скомпилированный Roslyn-скрипт, который еще не добавлен в runtime-кэш.</param>
+    /// <param name="cancellationToken">Токен отмены проверки.</param>
+    private void ValidateSecurity(Script<object?> script, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        var script = CSharpScript.Create<object?>(
-            content,
-            options
-                .WithFilePath(TagScriptPath.Normalize(entryPath))
-                .WithSourceResolver(new DbScriptSourceResolver(visibleScripts)),
-            globalsType);
-
-        _ = script.Compile(cancellationToken);
 
         var diagnostics = securityValidator.Validate(script.GetCompilation());
         if (diagnostics.Count > 0)
@@ -235,6 +297,13 @@ public sealed class TagScriptExecutionService
         }
     }
 
+    /// <summary>
+    /// Возвращает persistent state для пары эмулятор-скрипт или создает новую пустую запись в текущем контексте.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора, которому принадлежит state.</param>
+    /// <param name="scriptKey">Стабильный ключ state для inline-скрипта или файла скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены запроса к базе данных.</param>
+    /// <returns>Сущность persistent state, отслеживаемая текущим DbContext.</returns>
     private async Task<ScriptRuntimeStateEntity> GetOrCreateStateAsync(
         string emulatorId,
         string scriptKey,
@@ -259,6 +328,16 @@ public sealed class TagScriptExecutionService
         return state;
     }
 
+    /// <summary>
+    /// Собирает globals-объект, через который пользовательский скрипт получает текущее время, теги, state, эмулятор и REST API.
+    /// </summary>
+    /// <param name="emulator">Эмулятор с конфигурацией всех тегов.</param>
+    /// <param name="tag">Тег, для которого выполняется скрипт.</param>
+    /// <param name="timestamp">Время расчета значения.</param>
+    /// <param name="stateValues">Десериализованный persistent state текущего скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операций, доступных из REST-контекста.</param>
+    /// <param name="currentValue">Текущее значение формулы, переданное в formula-script, или <see langword="null"/>.</param>
+    /// <returns>Globals-объект для запуска Roslyn-скрипта.</returns>
     private TagScriptGlobals BuildGlobals(
         EmulatorEntity emulator,
         EmulatorTagEntity tag,
@@ -309,6 +388,11 @@ public sealed class TagScriptExecutionService
         );
     }
 
+    /// <summary>
+    /// Преобразует raw persistent state в типизированные значения, доступные через скриптовый API.
+    /// </summary>
+    /// <param name="stateValues">Десериализованный словарь значений state.</param>
+    /// <returns>Словарь значений state в формате <see cref="TagScriptValue"/>.</returns>
     private static Dictionary<string, TagScriptValue> ToScriptStateValues(Dictionary<string, object?> stateValues)
     {
         return stateValues.ToDictionary(
@@ -317,6 +401,11 @@ public sealed class TagScriptExecutionService
             StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Определяет скриптовый тип значения по фактическому CLR-значению.
+    /// </summary>
+    /// <param name="value">Значение тега или state.</param>
+    /// <returns>Тип значения для публичного скриптового API.</returns>
     private static TagScriptValueType ToScriptValueType(object? value) => value switch
     {
         bool => TagScriptValueType.Bool,
@@ -325,6 +414,11 @@ public sealed class TagScriptExecutionService
         _ => TagScriptValueType.String,
     };
 
+    /// <summary>
+    /// Преобразует доменный тип тега в тип значения, отдаваемый скриптовому API.
+    /// </summary>
+    /// <param name="type">Тип тега из конфигурации UniEmu.</param>
+    /// <returns>Тип значения для публичного скриптового API.</returns>
     private static TagScriptValueType ToScriptValueType(TagType type) => type switch
     {
         TagType.Bool => TagScriptValueType.Bool,
@@ -334,6 +428,14 @@ public sealed class TagScriptExecutionService
         _ => TagScriptValueType.String,
     };
 
+    /// <summary>
+    /// Обновляет static-тег из пользовательского скрипта, синхронизируя preview, runtime state и отложенную запись в базу.
+    /// </summary>
+    /// <param name="emulator">Эмулятор, в котором ищется изменяемый тег.</param>
+    /// <param name="tagName">Имя или ключ static-тега.</param>
+    /// <param name="value">Новое значение, переданное из скрипта.</param>
+    /// <param name="timestamp">Время изменения значения.</param>
+    /// <returns>Типизированное и округленное значение, фактически записанное в тег.</returns>
     private object? SetStaticTag(EmulatorEntity emulator, string tagName, object? value, DateTimeOffset timestamp)
     {
         var tag = emulator.Tags.FirstOrDefault(t =>
@@ -358,6 +460,13 @@ public sealed class TagScriptExecutionService
         return typedValue;
     }
 
+    /// <summary>
+    /// Приводит результат выполнения скрипта к типу тега, используя preview как fallback для пустого или некорректного результата.
+    /// </summary>
+    /// <param name="tagType">Ожидаемый тип тега.</param>
+    /// <param name="result">Значение, возвращенное пользовательским скриптом.</param>
+    /// <param name="preview">Последнее preview-значение тега для fallback-преобразований.</param>
+    /// <returns>Значение, приведенное к доменному типу тега.</returns>
     private static object? CastResult(TagType tagType, object? result, string preview)
     {
         if (result is null)
@@ -373,6 +482,12 @@ public sealed class TagScriptExecutionService
         };
     }
 
+    /// <summary>
+    /// Преобразует строковое preview-значение в CLR-значение указанного типа тега.
+    /// </summary>
+    /// <param name="tagType">Тип тега, к которому приводится preview.</param>
+    /// <param name="preview">Строковое preview-значение из базы или формы.</param>
+    /// <returns>Типизированное значение preview.</returns>
     private static object? CastPreview(TagType tagType, string preview) => tagType switch
     {
         TagType.Bool => ToBool(preview, "false"),
@@ -382,12 +497,23 @@ public sealed class TagScriptExecutionService
         _ => null,
     };
 
+    /// <summary>
+    /// Возвращает типизированное значение тега из его сохраненного preview.
+    /// </summary>
+    /// <param name="tag">Тег, из которого берутся тип и preview.</param>
+    /// <returns>Preview, приведенное к типу тега.</returns>
     private static object? ConvertPreview(EmulatorTagEntity tag)
     {
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
         return CastPreview(tagType, tag.Preview);
     }
 
+    /// <summary>
+    /// Приводит значение к булевому типу, интерпретируя числа и числовые строки как <c>false</c> для нуля и <c>true</c> иначе.
+    /// </summary>
+    /// <param name="value">Исходное значение скрипта или preview.</param>
+    /// <param name="preview">Fallback preview для случаев, когда исходное значение нельзя разобрать напрямую.</param>
+    /// <returns>Булево представление значения.</returns>
     private static bool ToBool(object value, string preview) => value switch
     {
         bool boolValue => boolValue,
@@ -396,6 +522,12 @@ public sealed class TagScriptExecutionService
         _ => ToDouble(value, preview) != 0,
     };
 
+    /// <summary>
+    /// Приводит значение к <see cref="double"/> с invariant culture и fallback на preview при нечисловой строке.
+    /// </summary>
+    /// <param name="value">Исходное значение скрипта или preview.</param>
+    /// <param name="preview">Fallback preview для случаев, когда исходное значение нельзя разобрать напрямую.</param>
+    /// <returns>Числовое представление значения или ноль, если разобрать не удалось.</returns>
     private static double ToDouble(object value, string preview) => value switch
     {
         byte byteValue => byteValue,
@@ -413,5 +545,11 @@ public sealed class TagScriptExecutionService
         _ => double.TryParse(preview, NumberStyles.Float, CultureInfo.InvariantCulture, out var fallback) ? fallback : 0,
     };
 
+    /// <summary>
+    /// Описывает входной скрипт тега и ключ, под которым хранится его persistent state.
+    /// </summary>
+    /// <param name="Path">Нормализованный путь скрипта для Roslyn и <c>#load</c>.</param>
+    /// <param name="Content">Исходное содержимое входного скрипта.</param>
+    /// <param name="StateKey">Стабильный ключ persistent state для этого скрипта.</param>
     private sealed record ScriptContent(string Path, string Content, string StateKey);
 }
