@@ -9,16 +9,21 @@ public sealed class CsxDiagnosticsService
 {
     private readonly CsxScriptEnvironment environment;
     private readonly CsxScriptSecurityValidator securityValidator;
+    private readonly CsxScriptDirectiveValidator directiveValidator;
 
     public CsxDiagnosticsService(CsxScriptEnvironment environment)
-        : this(environment, new CsxScriptSecurityValidator())
+        : this(environment, new CsxScriptSecurityValidator(), new CsxScriptDirectiveValidator())
     {
     }
 
-    public CsxDiagnosticsService(CsxScriptEnvironment environment, CsxScriptSecurityValidator securityValidator)
+    public CsxDiagnosticsService(
+        CsxScriptEnvironment environment,
+        CsxScriptSecurityValidator securityValidator,
+        CsxScriptDirectiveValidator directiveValidator)
     {
         this.environment = environment;
         this.securityValidator = securityValidator;
+        this.directiveValidator = directiveValidator;
     }
 
     public Task<IReadOnlyList<CsxDiagnostic>> AnalyzeAsync(
@@ -32,6 +37,12 @@ public sealed class CsxDiagnosticsService
         cancellationToken.ThrowIfCancellationRequested();
 
         var normalizedContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(content);
+        var directiveDiagnostics = directiveValidator.GetUnsupportedDirectiveDiagnostics(entryPath, normalizedContent, visibleScripts);
+        if (directiveDiagnostics.Count > 0)
+        {
+            return Task.FromResult(directiveDiagnostics);
+        }
+
         var options = environment.CreateScriptOptions(entryPath, visibleScripts, globalsType);
         var script = CreateScript(normalizedContent, options, globalsType, expectedReturnType);
 

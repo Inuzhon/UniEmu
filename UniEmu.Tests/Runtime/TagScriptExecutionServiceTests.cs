@@ -271,6 +271,20 @@ public sealed class TagScriptExecutionServiceTests
     }
 
     [Fact]
+    public async Task GenerateScriptTagAsync_ExecutesScriptWithUsingDirectiveImport()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db, new TagRuntimeStateStore());
+        var (emulator, tag) = await LoadAsync(db, "tg-using-system-text");
+
+        var value = await service.GenerateScriptTagAsync(emulator, tag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None);
+
+        Assert.Equal("UniEmu:Main emulator", value.Value);
+        Assert.Null(value.NumericValue);
+    }
+
+    [Fact]
     public async Task GenerateScriptTagAsync_BlocksForbiddenRuntimeApi()
     {
         await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
@@ -696,6 +710,21 @@ public sealed class TagScriptExecutionServiceTests
                 CreateSavedScriptTag("tg-shared-helper", "Shared helper", "shared-helper", TagType.Double, "scr-shared-entry"),
                 CreateSavedScriptTag("tg-shared-state", "Shared state", "shared-state", TagType.Int, "scr-state-entry"),
                 CreateSavedScriptTag("tg-relative-load", "Relative load", "relative-load", TagType.Int, "scr-relative-entry"),
+                CreateScriptTag(
+                    "tg-using-system-text",
+                    "Using System.Text",
+                    "using-system-text",
+                    TagType.String,
+                    """
+                    using System.Text;
+
+                    var builder = new StringBuilder();
+                    builder.Append("Uni");
+                    builder.Append("Emu");
+                    builder.Append(":");
+                    builder.Append(UniEmu.Emulator.Name);
+                    return builder.ToString();
+                    """),
                 CreateTag("tg-pressure", "Pressure", "pressure", TagType.Double, TagSource.Static, "12.5"),
                 CreateTag("tg-enabled", "Enabled", "enabled", TagType.Bool, TagSource.Static, "true"),
                 CreateTag("tg-label", "Label", "label", TagType.String, TagSource.Static, "abc"),

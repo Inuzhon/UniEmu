@@ -26,6 +26,8 @@ public sealed class CsxScriptEnvironment
         "System.Private.Uri.dll",
         "System.Runtime.dll",
         "System.Runtime.Extensions.dll",
+        "System.Text.Encoding.dll",
+        "System.Text.Encoding.Extensions.dll",
         "System.Threading.dll",
         "System.Threading.Tasks.dll",
         "UniEmu.Scripting.Api.dll",

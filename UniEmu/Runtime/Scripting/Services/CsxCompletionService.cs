@@ -25,7 +25,9 @@ public sealed class CsxCompletionService(CsxRoslynContextFactory contextFactory)
         "Convert",
         "DateTime",
         "DateTimeOffset",
+        "Encoding",
         "Math",
+        "StringBuilder",
         "StringComparer",
         "TimeSpan",
     };

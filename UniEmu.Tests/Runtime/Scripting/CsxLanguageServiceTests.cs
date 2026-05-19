@@ -70,6 +70,42 @@ public sealed class CsxLanguageServiceTests(ITestOutputHelper output)
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
     }
 
+    [Theory]
+    [InlineData("#r \"System.Text.Json.dll\"\nreturn 0;")]
+    [InlineData("#r \"nuget: Newtonsoft.Json, 13.0.3\"\nreturn 0;")]
+    public async Task AnalyzeAsync_ReturnsDirectiveErrorDiagnostic_WhenScriptUsesReferenceDirective(string content)
+    {
+        var service = new CsxLanguageService();
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "CSX001");
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsDirectiveErrorDiagnostic_WhenLoadedScriptUsesReferenceDirective()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["shared/references.csx"] = "#r \"System.Text.Json.dll\"\nint LoadedValue() => 1;",
+        };
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "#load \"shared/references.csx\"\nreturn LoadedValue();",
+            visibleScripts,
+            typeof(TagScriptGlobals));
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "CSX001");
+    }
+
     [Fact]
     public async Task AnalyzeAsync_AcceptsScriptGlobalsFromScriptingApi()
     {
@@ -274,6 +310,53 @@ public sealed class CsxLanguageServiceTests(ITestOutputHelper output)
             visibleScripts);
 
         Assert.Equal(cacheCount, CsxLanguageService.MetadataReferenceCacheCount);
+    }
+
+    [Fact]
+    public async Task LanguageFeatures_WorkWithUsingDirectiveImports()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            using System.Text;
+
+            var builder = new StringBuilder();
+            builder.Append("Uni");
+            builder.Append("Emu");
+            var timestamp = Now;
+            return $"{builder}:{timestamp.Offset.TotalHours}";
+            """;
+
+        var analysis = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals),
+            typeof(string));
+        var completions = await service.GetCompletionsAsync(
+            "inline/tag-1.csx",
+            "using System.Text;\n\nvar builder = new StringBuil",
+            "using System.Text;\n\nvar builder = new StringBuil".Length,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+        var hover = await service.GetHoverAsync(
+            "inline/tag-1.csx",
+            content,
+            content.IndexOf("Now", StringComparison.Ordinal) + 1,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+        var signatureHelp = await service.GetSignatureHelpAsync(
+            "inline/tag-1.csx",
+            "using System.Text;\n\nvar value = Math.Round(",
+            "using System.Text;\n\nvar value = Math.Round(".Length,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            typeof(TagScriptGlobals));
+
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == CsxDiagnosticSeverity.Error);
+        Assert.Contains(completions, item => item.Label == "StringBuilder");
+        Assert.NotNull(hover);
+        Assert.Contains("DateTimeOffset", hover.Signature, StringComparison.Ordinal);
+        Assert.NotNull(signatureHelp);
+        Assert.Contains(signatureHelp.Signatures, signature => signature.Label.Contains("Round", StringComparison.Ordinal));
     }
 
     [Theory]

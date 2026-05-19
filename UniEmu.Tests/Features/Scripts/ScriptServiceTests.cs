@@ -47,6 +47,25 @@ public sealed class ScriptServiceTests
         Assert.Equal("#load \"common.csx\"\nreturn Add(1, 2);", script.Content);
     }
 
+    [Theory]
+    [InlineData("#r \"System.Text.Json.dll\"\nreturn 1;")]
+    [InlineData("#r \"nuget: Newtonsoft.Json, 13.0.3\"\nreturn 1;")]
+    public async Task PatchAsync_RejectsReferenceDirective_AndKeepsExistingContent(string content)
+    {
+        await using var fixture = await ScriptDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<CsxScriptValidationException>(() =>
+            service.PatchAsync("scr-machine", new PatchScriptRequest(null, content), CancellationToken.None));
+
+        Assert.Contains(exception.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "CSX001");
+
+        var stored = await db.ScriptFiles.SingleAsync(script => script.Id == "scr-machine");
+        Assert.Equal("return 1;", stored.Content);
+    }
+
     [Fact]
     public async Task PatchAsync_ClearsCompiledScriptCache_WhenScriptChanges()
     {
