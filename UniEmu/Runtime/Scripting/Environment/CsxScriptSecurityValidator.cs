@@ -4,8 +4,14 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace UniEmu.Runtime.Scripting.Environment;
 
+/// <summary>
+/// Проверяет скомпилированный CSX-скрипт на использование API, которые недоступны пользовательскому коду.
+/// </summary>
 public sealed class CsxScriptSecurityValidator
 {
+    /// <summary>
+    /// Префиксы типов и пространств имен, доступ к которым запрещен из пользовательских скриптов.
+    /// </summary>
     private static readonly string[] s_forbiddenTypePrefixes =
     [
         "System.IO.",
@@ -23,6 +29,11 @@ public sealed class CsxScriptSecurityValidator
         "System.Console",
     ];
 
+    /// <summary>
+    /// Анализирует все syntax tree компиляции и возвращает диагностики нарушений безопасности.
+    /// </summary>
+    /// <param name="compilation">Компиляция Roslyn, созданная для пользовательского скрипта.</param>
+    /// <returns>Список ошибок безопасности, найденных в коде скрипта.</returns>
     public IReadOnlyList<CsxDiagnostic> Validate(Compilation compilation)
     {
         var issues = new List<CsxDiagnostic>();
@@ -72,6 +83,11 @@ public sealed class CsxScriptSecurityValidator
         return issues;
     }
 
+    /// <summary>
+    /// Проверяет, принадлежит ли символ типа запрещенному пространству имен или системному типу.
+    /// </summary>
+    /// <param name="typeSymbol">Символ типа, полученный из semantic model.</param>
+    /// <returns><see langword="true"/>, если тип запрещен для пользовательского скрипта.</returns>
     private static bool IsForbidden(ITypeSymbol? typeSymbol)
     {
         if (typeSymbol is null)
@@ -85,12 +101,22 @@ public sealed class CsxScriptSecurityValidator
         return s_forbiddenTypePrefixes.Any(prefix => fullName.StartsWith(prefix, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Проверяет вызов по исходному синтаксису на случай, если semantic model не смог разрешить символ.
+    /// </summary>
+    /// <param name="invocation">Синтаксический узел вызова метода или функции.</param>
+    /// <returns><see langword="true"/>, если выражение вызова указывает на запрещенный API.</returns>
     private static bool IsForbiddenInvocationSyntax(InvocationExpressionSyntax invocation)
     {
         return invocation.Expression is MemberAccessExpressionSyntax memberAccess
             && IsForbiddenSyntax(memberAccess.Expression);
     }
 
+    /// <summary>
+    /// Проверяет текстовое имя синтаксического узла на совпадение с запрещенными префиксами.
+    /// </summary>
+    /// <param name="syntax">Синтаксический узел, содержащий имя типа или выражения.</param>
+    /// <returns><see langword="true"/>, если имя указывает на запрещенный API.</returns>
     private static bool IsForbiddenSyntax(SyntaxNode syntax)
     {
         var name = syntax.ToString().Replace("global::", string.Empty, StringComparison.Ordinal);
@@ -99,6 +125,14 @@ public sealed class CsxScriptSecurityValidator
             name.StartsWith(prefix, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Создает диагностическое сообщение безопасности по позиции синтаксического узла.
+    /// </summary>
+    /// <param name="code">Код диагностики безопасности.</param>
+    /// <param name="message">Текст сообщения для пользователя.</param>
+    /// <param name="node">Узел, на котором обнаружено нарушение.</param>
+    /// <param name="syntaxTree">Syntax tree, которому принадлежит узел.</param>
+    /// <returns>Диагностика CSX с координатами проблемного участка.</returns>
     private static CsxDiagnostic CreateIssue(string code, string message, SyntaxNode node, SyntaxTree syntaxTree)
     {
         var span = syntaxTree.GetLineSpan(node.Span);

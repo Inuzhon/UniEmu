@@ -4,12 +4,28 @@ using System.Text.RegularExpressions;
 
 namespace UniEmu.Runtime.Scripting.Environment;
 
+/// <summary>
+/// Подготавливает CSX-документ для Roslyn workspace: подставляет загруженные скрипты и скрытый globals-префикс.
+/// </summary>
 public sealed class CsxLoadedScriptExpander
 {
+    /// <summary>
+    /// Регулярное выражение для поиска директив <c>#load "path"</c> в CSX-документе.
+    /// </summary>
     private static readonly Regex s_loadDirective = new(
         @"^\s*#\s*load\s+""(?<path>[^""]+)""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
+    /// <summary>
+    /// Разворачивает входной документ в один текст для language features, сохраняя позицию курсора в исходном документе.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Исходный текст входного файла.</param>
+    /// <param name="position">Позиция курсора в исходном тексте.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для директив <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта, свойства которого должны быть видимы как top-level переменные.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Развернутый CSX-текст и скорректированная позиция курсора.</returns>
     public ExpandedCsxScript Expand(
         string entryPath,
         string content,
@@ -55,6 +71,13 @@ public sealed class CsxLoadedScriptExpander
             prefixText.Length);
     }
 
+    /// <summary>
+    /// Разрешает путь из директивы <c>#load</c> относительно входного файла и словаря видимых скриптов.
+    /// </summary>
+    /// <param name="path">Путь из директивы <c>#load</c>.</param>
+    /// <param name="baseFilePath">Путь файла, в котором находится директива.</param>
+    /// <param name="scripts">Словарь доступных скриптов по нормализованному пути.</param>
+    /// <returns>Нормализованный путь найденного скрипта или <see langword="null"/>.</returns>
     public string? ResolveLoadPath(
         string path,
         string baseFilePath,
@@ -76,6 +99,11 @@ public sealed class CsxLoadedScriptExpander
         return scripts.ContainsKey(relative) ? relative : null;
     }
 
+    /// <summary>
+    /// Возвращает пути всех директив <c>#load</c>, найденных в тексте скрипта.
+    /// </summary>
+    /// <param name="content">Текст CSX-скрипта.</param>
+    /// <returns>Последовательность путей, указанных в директивах загрузки.</returns>
     public IEnumerable<string> GetLoadDirectivePaths(string content)
     {
         foreach (Match match in s_loadDirective.Matches(content))
@@ -84,6 +112,11 @@ public sealed class CsxLoadedScriptExpander
         }
     }
 
+    /// <summary>
+    /// Создает скрытый префикс с top-level объявлениями свойств globals-типа для корректной работы language features.
+    /// </summary>
+    /// <param name="globalsType">Тип globals-объекта пользовательского скрипта.</param>
+    /// <returns>Текст скрытого префикса или пустая строка.</returns>
     private static string BuildGlobalsPrefix(Type globalsType)
     {
         var properties = globalsType
@@ -110,11 +143,21 @@ public sealed class CsxLoadedScriptExpander
         return builder.ToString();
     }
 
+    /// <summary>
+    /// Заменяет директивы <c>#load</c> пробелами, чтобы сохранить координаты остального входного текста.
+    /// </summary>
+    /// <param name="content">Исходный CSX-текст.</param>
+    /// <returns>Текст без активных директив <c>#load</c>.</returns>
     private static string RemoveLoadDirectives(string content)
     {
         return s_loadDirective.Replace(content, match => new string(' ', match.Length));
     }
 
+    /// <summary>
+    /// Возвращает имя CLR-типа в форме, пригодной для вставки в C#-код скрытого префикса.
+    /// </summary>
+    /// <param name="type">Тип свойства globals-объекта.</param>
+    /// <returns>Полное имя типа с generic-аргументами.</returns>
     private static string GetTypeName(Type type)
     {
         if (!type.IsGenericType)
@@ -134,4 +177,10 @@ public sealed class CsxLoadedScriptExpander
     }
 }
 
+/// <summary>
+/// Результат разворачивания CSX-документа для Roslyn language features.
+/// </summary>
+/// <param name="Content">Развернутый текст с загруженными скриптами и скрытым globals-префиксом.</param>
+/// <param name="Position">Позиция курсора в развернутом тексте.</param>
+/// <param name="EntryContentStart">Offset, с которого начинается исходный входной документ в развернутом тексте.</param>
 public sealed record ExpandedCsxScript(string Content, int Position, int EntryContentStart);

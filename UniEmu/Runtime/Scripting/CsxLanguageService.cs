@@ -4,26 +4,69 @@ using UniEmu.Runtime.Scripting.Workspace;
 
 namespace UniEmu.Runtime.Scripting;
 
+/// <summary>
+/// Фасад language features для CSX-редактора: диагностика, completion, hover, навигация, форматирование и semantic tokens.
+/// </summary>
 public sealed class CsxLanguageService
 {
+    /// <summary>
+    /// Общее окружение Roslyn, переиспользуемое между экземплярами сервиса для кэша metadata reference.
+    /// </summary>
     private static readonly CsxScriptEnvironment s_defaultEnvironment = new();
 
+    /// <summary>
+    /// Сервис компиляционных и security-диагностик CSX-документа.
+    /// </summary>
     private readonly CsxDiagnosticsService diagnostics;
+    /// <summary>
+    /// Сервис автодополнения CSX-документа.
+    /// </summary>
     private readonly CsxCompletionService completion;
+    /// <summary>
+    /// Сервис hover-информации по символам CSX-документа.
+    /// </summary>
     private readonly CsxHoverService hover;
+    /// <summary>
+    /// Сервис подсказок сигнатур методов и конструкторов.
+    /// </summary>
     private readonly CsxSignatureHelpService signatureHelp;
+    /// <summary>
+    /// Сервис переходов к определениям, type definitions, references и implementations.
+    /// </summary>
     private readonly CsxNavigationService navigation;
+    /// <summary>
+    /// Сервис rename-операций по текущему CSX-документу.
+    /// </summary>
     private readonly CsxRenameService rename;
+    /// <summary>
+    /// Сервис форматирования всего документа или выбранного диапазона.
+    /// </summary>
     private readonly CsxFormattingService formatting;
+    /// <summary>
+    /// Сервис диапазонов сворачивания кода.
+    /// </summary>
     private readonly CsxFoldingService folding;
+    /// <summary>
+    /// Сервис semantic tokens для подсветки редактора.
+    /// </summary>
     private readonly CsxSemanticTokensService semanticTokens;
+    /// <summary>
+    /// Сервис call hierarchy для функций и методов скрипта.
+    /// </summary>
     private readonly CsxCallHierarchyService callHierarchy;
 
+    /// <summary>
+    /// Создает language service с окружением и Roslyn context factory по умолчанию.
+    /// </summary>
     public CsxLanguageService()
         : this(CreateDefaultContextFactory())
     {
     }
 
+    /// <summary>
+    /// Создает language service с указанной фабрикой Roslyn-контекста и стандартными feature-сервисами.
+    /// </summary>
+    /// <param name="contextFactory">Фабрика Roslyn workspace для CSX-документов.</param>
     private CsxLanguageService(CsxRoslynContextFactory contextFactory)
         : this(
             new CsxDiagnosticsService(s_defaultEnvironment),
@@ -39,6 +82,19 @@ public sealed class CsxLanguageService
     {
     }
 
+    /// <summary>
+    /// Создает language service с явно заданными feature-сервисами.
+    /// </summary>
+    /// <param name="diagnostics">Сервис диагностики CSX-документа.</param>
+    /// <param name="completion">Сервис автодополнения.</param>
+    /// <param name="hover">Сервис hover-информации.</param>
+    /// <param name="signatureHelp">Сервис подсказок сигнатур.</param>
+    /// <param name="navigation">Сервис навигации по символам.</param>
+    /// <param name="rename">Сервис переименования символов.</param>
+    /// <param name="formatting">Сервис форматирования.</param>
+    /// <param name="folding">Сервис диапазонов сворачивания.</param>
+    /// <param name="semanticTokens">Сервис semantic tokens.</param>
+    /// <param name="callHierarchy">Сервис call hierarchy.</param>
     public CsxLanguageService(
         CsxDiagnosticsService diagnostics,
         CsxCompletionService completion,
@@ -63,18 +119,38 @@ public sealed class CsxLanguageService
         this.callHierarchy = callHierarchy;
     }
 
+    /// <summary>
+    /// Возвращает количество закэшированных наборов metadata reference в окружении по умолчанию.
+    /// </summary>
     internal static int MetadataReferenceCacheCount => s_defaultEnvironment.MetadataReferenceCacheCount;
 
+    /// <summary>
+    /// Очищает кэш metadata reference окружения по умолчанию для изолированных тестов.
+    /// </summary>
     internal static void ClearMetadataReferenceCacheForTests()
     {
         s_defaultEnvironment.ClearMetadataReferenceCacheForTests();
     }
 
+    /// <summary>
+    /// Создает набор metadata reference окружения по умолчанию для проверок в тестах.
+    /// </summary>
+    /// <param name="globalsType">Тип globals-объекта, сборка которого должна быть доступна скрипту.</param>
+    /// <returns>Список metadata reference.</returns>
     internal static IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference> CreateMetadataReferencesForTests(Type globalsType)
     {
         return s_defaultEnvironment.CreateMetadataReferences(globalsType);
     }
 
+    /// <summary>
+    /// Анализирует CSX-документ без проверки ожидаемого типа возвращаемого значения.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены анализа.</param>
+    /// <returns>Результат анализа с диагностическими сообщениями.</returns>
     public async Task<CsxAnalysisResult> AnalyzeAsync(
         string entryPath,
         string content,
@@ -91,6 +167,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Анализирует CSX-документ с учетом ожидаемого типа возвращаемого значения.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="expectedReturnType">Ожидаемый тип результата скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены анализа.</param>
+    /// <returns>Результат анализа с диагностическими сообщениями.</returns>
     public async Task<CsxAnalysisResult> AnalyzeAsync(
         string entryPath,
         string content,
@@ -110,6 +196,16 @@ public sealed class CsxLanguageService
                 cancellationToken));
     }
 
+    /// <summary>
+    /// Возвращает элементы автодополнения для позиции в CSX-документе.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset курсора в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список элементов автодополнения.</returns>
     public Task<IReadOnlyList<CsxCompletionItem>> GetCompletionsAsync(
         string entryPath,
         string content,
@@ -127,6 +223,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает hover-информацию для символа под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Hover-информация или <see langword="null"/>, если символ не найден.</returns>
     public Task<CsxHover?> GetHoverAsync(
         string entryPath,
         string content,
@@ -144,6 +250,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает подсказки сигнатур для вызова метода или конструктора.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Подсказки сигнатур или <see langword="null"/>.</returns>
     public Task<CsxSignatureHelp?> GetSignatureHelpAsync(
         string entryPath,
         string content,
@@ -161,6 +277,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает расположения определений символа под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список расположений определений.</returns>
     public Task<IReadOnlyList<CsxLocation>> GetDefinitionsAsync(
         string entryPath,
         string content,
@@ -178,6 +304,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает расположения определений типов для символа под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список расположений определений типов.</returns>
     public Task<IReadOnlyList<CsxLocation>> GetTypeDefinitionsAsync(
         string entryPath,
         string content,
@@ -195,6 +331,17 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает ссылки на символ под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="includeDeclaration">Включать ли объявление символа в результат.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список расположений ссылок на символ.</returns>
     public Task<IReadOnlyList<CsxLocation>> GetReferencesAsync(
         string entryPath,
         string content,
@@ -214,6 +361,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает расположения реализаций символа под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список расположений реализаций.</returns>
     public Task<IReadOnlyList<CsxLocation>> GetImplementationsAsync(
         string entryPath,
         string content,
@@ -231,6 +388,17 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Подготавливает правки для переименования символа в текущем CSX-документе.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="newName">Новое имя символа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Набор правок workspace или <see langword="null"/>, если символ нельзя переименовать.</returns>
     public Task<CsxWorkspaceEdit?> RenameAsync(
         string entryPath,
         string content,
@@ -250,6 +418,15 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Форматирует весь CSX-документ.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список текстовых правок форматирования.</returns>
     public Task<IReadOnlyList<CsxTextEdit>> FormatDocumentAsync(
         string entryPath,
         string content,
@@ -260,6 +437,16 @@ public sealed class CsxLanguageService
         return formatting.FormatDocumentAsync(content, cancellationToken);
     }
 
+    /// <summary>
+    /// Форматирует выбранный диапазон CSX-документа.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="range">Диапазон форматирования.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список текстовых правок форматирования.</returns>
     public Task<IReadOnlyList<CsxTextEdit>> FormatRangeAsync(
         string entryPath,
         string content,
@@ -271,6 +458,15 @@ public sealed class CsxLanguageService
         return formatting.FormatRangeAsync(content, range, cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает диапазоны сворачивания для CSX-документа.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список диапазонов сворачивания.</returns>
     public Task<IReadOnlyList<CsxFoldingRange>> GetFoldingRangesAsync(
         string entryPath,
         string content,
@@ -286,6 +482,15 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает semantic tokens для подсветки CSX-документа.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Semantic tokens и легенда токенов.</returns>
     public Task<CsxSemanticTokens> GetSemanticTokensAsync(
         string entryPath,
         string content,
@@ -301,6 +506,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Подготавливает элементы call hierarchy для символа под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список элементов call hierarchy.</returns>
     public Task<IReadOnlyList<CsxCallHierarchyItem>> PrepareCallHierarchyAsync(
         string entryPath,
         string content,
@@ -318,6 +533,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает входящие вызовы для элемента call hierarchy под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список входящих вызовов.</returns>
     public Task<IReadOnlyList<CsxCallHierarchyIncomingCall>> GetIncomingCallsAsync(
         string entryPath,
         string content,
@@ -335,6 +560,16 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает исходящие вызовы для элемента call hierarchy под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список исходящих вызовов.</returns>
     public Task<IReadOnlyList<CsxCallHierarchyOutgoingCall>> GetOutgoingCallsAsync(
         string entryPath,
         string content,
@@ -352,6 +587,10 @@ public sealed class CsxLanguageService
             cancellationToken);
     }
 
+    /// <summary>
+    /// Создает фабрику Roslyn-контекста для стандартного окружения CSX.
+    /// </summary>
+    /// <returns>Фабрика контекстов для language features.</returns>
     private static CsxRoslynContextFactory CreateDefaultContextFactory()
     {
         return new CsxRoslynContextFactory(s_defaultEnvironment, new CsxLoadedScriptExpander());
