@@ -53,6 +53,20 @@ Scope:
 - компилирует через `Microsoft.CodeAnalysis.CSharp.Scripting`;
 - кеширует compiled script.
 
+`#r` запрещен во всех формах, включая ссылку на локальную сборку и NuGet-пакет:
+
+```csharp
+#r "System.Text.Json.dll"
+#r "nuget: Newtonsoft.Json, 13.0.3"
+```
+
+Запрет применяется в двух местах:
+
+- при backend-анализе и сохранении скрипта через `CsxLanguageService`/`ScriptService`;
+- при runtime-выполнении входного скрипта и всех видимых скриптов, которые могут быть загружены через `#load`.
+
+Для IntelliSense и сохранения неподдерживаемые директивы возвращаются как ошибка `CSX001` до компиляции Roslyn. Это важно: backend не пытается резолвить DLL или NuGet-пакет, а сразу останавливает сценарий.
+
 Кэш учитывает entry path, content, visible scripts, imports/references и globals type. При изменении скрипта `ScriptService` очищает кэш.
 
 ## Глобальный API скрипта
@@ -96,6 +110,8 @@ REST API скрипта не является свободным HTTP-клиен
 
 ## Безопасность
 
+На уровне директив разрешен только `#load`. `#r`, включая `#r "System.Text.Json.dll"` и `#r "nuget: ..."` запрещен, потому что пользовательский скрипт не должен расширять набор сборок за пределы controlled reference set.
+
 Validator блокирует unsafe/pointers и опасные namespaces/API:
 
 - `System.IO`;
@@ -137,6 +153,8 @@ Backend предоставляет endpoints:
 - позиция курсора clamp до 10 000.
 
 Frontend Monaco providers вызывают эти endpoints через fetch. Если provider получает ошибку, он обычно возвращает пустой результат, чтобы редактор не ломался.
+
+Diagnostics использует тот же `CsxScriptDirectiveValidator`, что и runtime: неподдерживаемые директивы во входном документе или в загруженном видимом скрипте возвращаются как `CSX001`. Остальные ошибки идут из Roslyn compiler diagnostics и `CsxScriptSecurityValidator`.
 
 ## Практический пример идеи
 
