@@ -7,7 +7,6 @@ import type {
   TagTrigger,
   TagType,
 } from '@/types/uniemu';
-import { defaultSegment } from '../tag-scenario/scenarioMath';
 import { DEFAULT_INLINE_SCRIPT } from './constants';
 import type { TagEditorFormState } from './types';
 
@@ -37,7 +36,7 @@ export const clampRoundDigits = (value: number) =>
   Math.max(0, Math.min(15, Math.round(value)));
 
 export const createDefaultScenario = (): TagScenarioConfig => ({
-  segments: [defaultSegment()],
+  segments: [],
   continueOnFormulaEnd: 'Repeat',
 });
 

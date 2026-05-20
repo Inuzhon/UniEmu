@@ -51,6 +51,15 @@ function cloneSegment(seg: TagScenarioSegment): TagScenarioSegment {
   };
 }
 
+const nextSegmentLabel = (segments: TagScenarioSegment[]) => {
+  const maxAutoIndex = segments.reduce((max, segment) => {
+    const match = /^Сегмент (\d+)$/.exec(segment.label ?? '');
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+
+  return maxAutoIndex + 1;
+};
+
 export function ScenarioEditor({ value, onChange, tagType }: Props) {
   const segments = value.segments;
 
@@ -92,7 +101,10 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
     update({ segments: next });
   };
   const add = () => {
-    const seg = defaultSegment();
+    const seg = {
+      ...defaultSegment(),
+      label: `Сегмент ${nextSegmentLabel(segments)}`,
+    };
     update({ segments: [...segments, seg] });
     setSelectedId(seg.id);
   };

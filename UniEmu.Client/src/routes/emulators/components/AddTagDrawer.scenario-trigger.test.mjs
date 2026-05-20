@@ -40,6 +40,25 @@ test('edit mode reuses one fallback scenario for form state and dirty snapshot',
   assert.match(utilsSource, /scenario: form\.scenario,/);
 });
 
+test('new tag scenarios start without a default segment', async () => {
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const utilsSource = await readFile(join(componentDir, 'tag-editor/tagEditorUtils.ts'), 'utf8');
+
+  assert.match(utilsSource, /segments:\s*\[\]/);
+  assert.doesNotMatch(utilsSource, /segments:\s*\[defaultSegment\(\)\]/);
+});
+
+test('adding scenario segments assigns an automatic Russian label', async () => {
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const scenarioEditorSource = await readFile(
+    join(componentDir, 'tag-scenario/ScenarioEditor.tsx'),
+    'utf8'
+  );
+
+  assert.match(scenarioEditorSource, /const nextSegmentLabel = /);
+  assert.match(scenarioEditorSource, /label:\s*`Сегмент \$\{nextSegmentLabel\(segments\)\}`/);
+});
+
 test('tag drawer duplicate validation ignores realtime preview-only tag updates', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
   const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
