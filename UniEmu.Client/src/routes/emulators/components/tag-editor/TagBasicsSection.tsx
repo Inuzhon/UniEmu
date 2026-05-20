@@ -28,6 +28,7 @@ import type { CncProgram, SpecialParameter, TagSource, TagType } from '@/types/u
 import { getTagTypeLabel } from '../tag-scenario/calcLabels';
 import { TAG_EDITOR_SOURCES, TAG_EDITOR_TYPES } from './constants';
 import { clampRoundDigits, sanitizeStaticValue } from './tagEditorUtils';
+import { getAllowedTagSources, getAllowedTagTypes } from './tagValidation';
 import type { SetTagEditorField } from './types';
 
 interface Props {
@@ -69,6 +70,14 @@ export const TagBasicsSection = memo(function TagBasicsSection({
 }: Props) {
   const [programPickerOpen, setProgramPickerOpen] = useState(false);
   const isProgramNameParameter = specialParameter === 'PrgName' || specialParameter === 'Subprogram';
+  const allowedTagTypes = useMemo(
+    () => TAG_EDITOR_TYPES.filter((tagType) => getAllowedTagTypes(specialParameter).includes(tagType)),
+    [specialParameter],
+  );
+  const allowedTagSources = useMemo(
+    () => TAG_EDITOR_SOURCES.filter((sourceOption) => getAllowedTagSources(type).includes(sourceOption.id)),
+    [type],
+  );
   const selectedCncProgram = useMemo(
     () =>
       visibleCncPrograms.find(
@@ -291,7 +300,7 @@ export const TagBasicsSection = memo(function TagBasicsSection({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {TAG_EDITOR_TYPES.map((tagType) => (
+            {allowedTagTypes.map((tagType) => (
               <SelectItem key={tagType} value={tagType}>
                 {getTagTypeLabel(tagType)}
               </SelectItem>
@@ -333,7 +342,7 @@ export const TagBasicsSection = memo(function TagBasicsSection({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {TAG_EDITOR_SOURCES.map((sourceOption) => (
+            {allowedTagSources.map((sourceOption) => (
               <SelectItem key={sourceOption.id} value={sourceOption.id}>
                 {sourceOption.label}
               </SelectItem>

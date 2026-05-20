@@ -10,6 +10,7 @@ test('generator and scenario editors use separate calc type option lists', async
   const calcSectionSource = await readFile(join(componentDir, 'tag-editor/TagCalcSection.tsx'), 'utf8');
   const scenarioEditorSource = await readFile(join(componentDir, 'tag-scenario/ScenarioEditor.tsx'), 'utf8');
   const calcFieldsSource = await readFile(join(componentDir, 'tag-scenario/CalcConfigFields.tsx'), 'utf8');
+  const validationSource = await readFile(join(componentDir, 'tag-editor/tagValidation.ts'), 'utf8');
 
   assert.match(optionsSource, /export const GENERATOR_CALC_TYPES/);
   assert.match(optionsSource, /export const SCENARIO_CALC_TYPES/);
@@ -31,8 +32,9 @@ test('generator and scenario editors use separate calc type option lists', async
   assert.match(calcSectionSource, /calcTypes=\{GENERATOR_CALC_TYPES\}/);
   assert.doesNotMatch(calcSectionSource, /const CALC_TYPES: CalcType\[\]/);
 
-  assert.match(scenarioEditorSource, /SCENARIO_CALC_TYPES/);
-  assert.match(scenarioEditorSource, /calcTypes=\{SCENARIO_CALC_TYPES\}/);
+  assert.match(validationSource, /SCENARIO_CALC_TYPES/);
+  assert.match(scenarioEditorSource, /getScenarioCalcTypes/);
+  assert.match(scenarioEditorSource, /calcTypes=\{scenarioCalcTypes\}/);
   assert.match(calcFieldsSource, /calcTypes: readonly CalcType\[\]/);
   assert.match(calcFieldsSource, /calcTypes\.map\(\(c\) =>/);
   assert.doesNotMatch(calcFieldsSource, /const CALC_TYPES: CalcType\[\]/);

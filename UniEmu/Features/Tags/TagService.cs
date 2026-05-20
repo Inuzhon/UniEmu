@@ -57,6 +57,7 @@ public sealed class TagService(
             return null;
         }
 
+        TagRequestValidator.Validate(request);
         var name = request.Name.Trim();
         var key = request.Key.Trim();
         await ValidateUniqueTagIdentityAsync(emulatorId, excludedTagId: null, name, key, cancellationToken);
@@ -107,6 +108,7 @@ public sealed class TagService(
             return null;
         }
 
+        TagRequestValidator.Validate(request);
         var name = request.Name.Trim();
         var key = request.Key.Trim();
         await ValidateUniqueTagIdentityAsync(emulatorId, entity.Id, name, key, cancellationToken);

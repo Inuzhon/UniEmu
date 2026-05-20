@@ -59,7 +59,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new ApiError(`API request failed: ${response.status} ${response.statusText}`, response.status, body);
+    throw new ApiError(extractApiErrorMessage(body, response.status, response.statusText), response.status, body);
   }
 
   if (response.status === 204) {
@@ -78,7 +78,7 @@ async function requestFile(path: string, fallbackFileName: string): Promise<Down
 
   if (!response.ok) {
     const body = await response.text();
-    throw new ApiError(`API request failed: ${response.status} ${response.statusText}`, response.status, body);
+    throw new ApiError(extractApiErrorMessage(body, response.status, response.statusText), response.status, body);
   }
 
   const contentDisposition = response.headers.get('content-disposition');
@@ -96,6 +96,28 @@ function getDownloadFileName(contentDisposition: string | null): string | null {
 
   const plainMatch = /filename="?([^";]+)"?/i.exec(contentDisposition);
   return plainMatch?.[1]?.trim() || null;
+}
+
+function extractApiErrorMessage(body: string, status: number, statusText: string): string {
+  const fallback = `API request failed: ${status} ${statusText}`;
+  const trimmed = body.trim();
+  if (!trimmed) return fallback;
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (typeof parsed === 'string' && parsed.trim()) return parsed;
+    if (parsed && typeof parsed === 'object') {
+      const message = 'message' in parsed ? parsed.message : undefined;
+      if (typeof message === 'string' && message.trim()) return message;
+
+      const title = 'title' in parsed ? parsed.title : undefined;
+      if (typeof title === 'string' && title.trim()) return title;
+    }
+  } catch {
+    return trimmed;
+  }
+
+  return trimmed || fallback;
 }
 
 const query = (params: Record<string, string | number | undefined>) => {

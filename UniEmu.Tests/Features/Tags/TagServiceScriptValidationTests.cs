@@ -116,6 +116,46 @@ public sealed class TagServiceScriptValidationTests
     }
 
     [Fact]
+    public async Task CreateAsync_RejectsInvalidTagCompatibility_BeforeSaving()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateAsync(
+                "em-1",
+                CreateStaticRequest(TagType.String, SpecialParameter.FrameNum),
+                CancellationToken.None));
+
+        Assert.Contains("целочисленный тип данных", exception.Message);
+        Assert.Empty(await db.EmulatorTags.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_RejectsInvalidTagCompatibility_BeforeSavingChanges()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(CreateExistingTag("tg-current", "Current", "current_key"));
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReplaceAsync(
+                "em-1",
+                "tg-current",
+                CreateInvalidGeneratorReplaceRequest(),
+                CancellationToken.None));
+
+        Assert.Contains("только для числовых типов", exception.Message);
+
+        var entity = await db.EmulatorTags.SingleAsync();
+        Assert.Equal(UniEmuJson.EnumString(TagSource.Static), entity.Source);
+        Assert.Equal(UniEmuJson.EnumString(TagType.Double), entity.Type);
+    }
+
+    [Fact]
     public async Task CreateAsync_NormalizesScenarioOnceTrigger_ToInterval()
     {
         await using var fixture = await TagDbFixture.CreateAsync();
@@ -195,6 +235,21 @@ public sealed class TagServiceScriptValidationTests
         null,
         null);
 
+    private static CreateTagRequest CreateStaticRequest(TagType type, SpecialParameter? specialParameter) => new(
+        "Static tag",
+        "static_tag",
+        type,
+        TagSource.Static,
+        "0",
+        new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null),
+        null,
+        null,
+        null,
+        true,
+        null,
+        specialParameter,
+        null);
+
     private static ReplaceTagRequest CreateReplaceRequest(string name, string key) => new(
         name,
         key,
@@ -204,6 +259,21 @@ public sealed class TagServiceScriptValidationTests
         new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null),
         null,
         new TagFormulaConfigDto(null, "return 1;"),
+        null,
+        true,
+        null,
+        null,
+        null);
+
+    private static ReplaceTagRequest CreateInvalidGeneratorReplaceRequest() => new(
+        "Current",
+        "current_key",
+        TagType.Bool,
+        TagSource.Generator,
+        "false",
+        new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec),
+        new TagCalcConfigDto(CalcType.Sinusoid, "0", null, null, 1, 10, null, null),
+        null,
         null,
         true,
         null,

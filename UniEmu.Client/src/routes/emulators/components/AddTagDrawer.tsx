@@ -41,6 +41,7 @@ import {
   hasScenarioDuration,
   normalizeTagIdentity,
 } from './tag-editor/tagEditorUtils';
+import { getTagValidationErrors, normalizeTagEditorForm } from './tag-editor/tagValidation';
 import type { TagEditorFormState } from './tag-editor/types';
 
 interface Props {
@@ -69,21 +70,27 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
   const isEdit = !!tag;
   const initialSnapshotRef = useRef('');
-  const [form, setForm] = useState<TagEditorFormState>(() => createEmptyTagEditorFormState());
+  const [form, setForm] = useState<TagEditorFormState>(() =>
+    normalizeTagEditorForm(createEmptyTagEditorFormState()),
+  );
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDraft, setEditorDraft] = useState(DEFAULT_INLINE_SCRIPT);
   const [editorConfirmCloseOpen, setEditorConfirmCloseOpen] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
 
-    const nextForm = tag ? createTagEditorFormState(tag) : createEmptyTagEditorFormState();
+    const nextForm = normalizeTagEditorForm(
+      tag ? createTagEditorFormState(tag) : createEmptyTagEditorFormState(),
+    );
     setForm(nextForm);
     setEditorDraft(nextForm.inlineScript);
     setConfirmCloseOpen(false);
     setEditorOpen(false);
     setEditorConfirmCloseOpen(false);
+    setSubmitError(null);
     initialSnapshotRef.current = buildTagFormSnapshot(nextForm);
   }, [open, tag]);
 
@@ -91,7 +98,12 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
     field: K,
     value: TagEditorFormState[K],
   ) => {
-    setForm((current) => (Object.is(current[field], value) ? current : { ...current, [field]: value }));
+    setSubmitError(null);
+    setForm((current) =>
+      Object.is(current[field], value)
+        ? current
+        : normalizeTagEditorForm({ ...current, [field]: value }),
+    );
   }, []);
 
   const setCalc = useCallback((next: TagCalcConfig) => {
@@ -103,9 +115,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   }, [setField]);
 
   const resetForm = useCallback(() => {
-    const nextForm = createEmptyTagEditorFormState();
+    const nextForm = normalizeTagEditorForm(createEmptyTagEditorFormState());
     setForm(nextForm);
     setEditorDraft(nextForm.inlineScript);
+    setSubmitError(null);
     initialSnapshotRef.current = buildTagFormSnapshot(nextForm);
   }, []);
 
@@ -158,6 +171,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   }, [tagIdentityRows, form.key, tag?.id]);
 
   const isScenario = form.source === 'scenario';
+  const validationErrors = useMemo(() => getTagValidationErrors(form), [form]);
   const showCalc =
     form.source === 'generator' || form.source === 'formula' || form.source === 'formulaScript';
   const showScript =
@@ -169,8 +183,9 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
       form.key.trim().length > 0 &&
       !duplicateNameError &&
       !duplicateKeyError &&
+      validationErrors.length === 0 &&
       (!isScenario || hasScenarioDuration(form.scenario)),
-    [duplicateKeyError, duplicateNameError, form.key, form.name, form.scenario, isScenario],
+    [duplicateKeyError, duplicateNameError, form.key, form.name, form.scenario, isScenario, validationErrors.length],
   );
 
   const hasDirtyChanges = useCallback(
@@ -211,13 +226,21 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
     if (!canSubmit) return;
 
     const payload = buildTagPayload(form);
-    if (isEdit && tag) {
-      await updateTag(emulatorId, tag.id, payload);
-    } else {
-      await addTag(emulatorId, payload);
+    setSubmitError(null);
+    try {
+      if (isEdit && tag) {
+        await updateTag(emulatorId, tag.id, payload);
+      } else {
+        await addTag(emulatorId, payload);
+      }
+      resetForm();
+      onOpenChange(false);
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : localization.routes.emulators.components.addTagDrawer.saveTagError;
+      setSubmitError(message);
     }
-    resetForm();
-    onOpenChange(false);
   }, [addTag, canSubmit, emulatorId, form, isEdit, onOpenChange, resetForm, tag, updateTag]);
 
   const inlineDocumentUri = useMemo(
@@ -343,6 +366,15 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                 onFieldChange={setField}
                 onOpenEditor={openEditor}
               />
+            )}
+
+            {(validationErrors.length > 0 || submitError) && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {validationErrors.map((error) => (
+                  <p key={error}>{error}</p>
+                ))}
+                {submitError && <p>{submitError}</p>}
+              </div>
             )}
           </div>
 

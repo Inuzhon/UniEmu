@@ -24,11 +24,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { TagScenarioConfig, TagScenarioSegment, TagType } from '@/types/uniemu';
+import { getScenarioCalcTypes } from '../tag-editor/tagValidation';
 import { CalcConfigFields } from './CalcConfigFields';
-import { SCENARIO_CALC_TYPES } from './calcTypeOptions';
 import { ScenarioPreviewChart, ScenarioSparkline } from './ScenarioPreviewChart';
 import { defaultSegment, formatDuration, totalDuration, valueAt } from './scenarioMath';
 import { localization } from '@/localization';
+import { getCalcTypeLabel } from './calcLabels';
 
 interface Props {
   value: TagScenarioConfig;
@@ -103,7 +104,9 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
   const add = () => {
     const seg = {
       ...defaultSegment(),
-      label: `Сегмент ${nextSegmentLabel(segments)}`,
+      label: localization.routes.emulators.components.tagScenario.scenarioEditor.defaultSegmentLabel(
+        nextSegmentLabel(segments),
+      ),
     };
     update({ segments: [...segments, seg] });
     setSelectedId(seg.id);
@@ -147,6 +150,7 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
   };
 
   const cursorValue = cursorSec !== null && segments.length > 0 ? valueAt(value, cursorSec) : null;
+  const scenarioCalcTypes = useMemo(() => getScenarioCalcTypes(tagType), [tagType]);
 
   return (
     <div className="space-y-3">
@@ -352,7 +356,7 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                       </div>
                       <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
                         <span className="font-mono">
-                          {seg.calc.type} · {formatDuration(seg.duration)}
+                          {getCalcTypeLabel(seg.calc.type)} · {formatDuration(seg.duration)}
                         </span>
                         <span className="font-mono">t₀ {formatDuration(startAt)}</span>
                       </div>
@@ -393,7 +397,7 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                     #{selectedIdx + 1}
                   </span>
                   <span className="font-mono text-xs text-muted-foreground">
-                    {selected.calc.type} · {formatDuration(selected.duration)}
+                    {getCalcTypeLabel(selected.calc.type)} · {formatDuration(selected.duration)}
                   </span>
                 </div>
                 <div className="flex gap-0.5">
@@ -506,7 +510,7 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                 value={selected.calc}
                 onChange={(calc) => updateSeg(selectedIdx, { calc })}
                 tagType={tagType}
-                calcTypes={SCENARIO_CALC_TYPES}
+                calcTypes={scenarioCalcTypes}
                 hideDuration
                 compact
               />

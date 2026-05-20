@@ -56,7 +56,8 @@ test('adding scenario segments assigns an automatic Russian label', async () => 
   );
 
   assert.match(scenarioEditorSource, /const nextSegmentLabel = /);
-  assert.match(scenarioEditorSource, /label:\s*`Сегмент \$\{nextSegmentLabel\(segments\)\}`/);
+  assert.match(scenarioEditorSource, /defaultSegmentLabel/);
+  assert.match(scenarioEditorSource, /nextSegmentLabel\(segments\)/);
 });
 
 test('tag drawer duplicate validation ignores realtime preview-only tag updates', async () => {
