@@ -5,7 +5,11 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 test('monitoring chart is built from all numeric telemetry values instead of fixed tags', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const source = [
+    await readFile(join(componentDir, 'EmulatorMonitoringTab.tsx'), 'utf8'),
+    await readFile(join(componentDir, 'emulator-detail/telemetry.ts'), 'utf8'),
+  ].join('\n');
 
   assert.match(source, /const telemetryKeys = useMemo/);
   assert.match(source, /Object\.entries\(p\.values \?\? \{\}\)/);
@@ -16,21 +20,27 @@ test('monitoring chart is built from all numeric telemetry values instead of fix
 });
 
 test('monitoring values and packet history use actual telemetry packet values', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const source = [
+    await readFile(join(componentDir, 'EmulatorMonitoringTab.tsx'), 'utf8'),
+    await readFile(join(componentDir, 'emulator-detail/telemetry.ts'), 'utf8'),
+  ].join('\n');
 
   assert.match(source, /const activePoint = telemetryPoints\[activeIdx\]/);
   assert.match(source, /formatTelemetryValue\(activePoint\?\.values\?\.\\?\[t\.name\\?\]\)/);
   assert.match(source, /enabledTagsForDispatcher\.reduce<Record<string, string>>/);
   assert.match(source, /formatTelemetryValue\(p\.values\?\.\\?\[t\.name\\?\]\)/);
-  assert.match(source, /const packets = useMemo\(\(\) => \{\s*const arr = telemetryPoints\.map/s);
+  assert.match(source, /const packets = useMemo/);
+  assert.match(source, /function buildPacketHistory/);
+  assert.match(source, /const arr = telemetryPoints\.map/);
   assert.doesNotMatch(source, /tagSeries\[t\.id\]\?\.\[activeIdx\]/);
   assert.doesNotMatch(source, /tagSeries\[t\.id\]\?\.\[i\]/);
 });
 
 test('packet history preview uses dispatcher monitoring JSON shape without useInnerId', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
-  assert.match(source, /MachineIntegrationId: emulator\.protocolId/);
+  assert.match(source, /MachineIntegrationId: protocolId/);
   assert.match(source, /ListValues: enabledTagsForDispatcher\.map\(\(t\) => \(\{/);
   assert.match(source, /Key: t\.key/);
   assert.match(source, /Value: pkt\.values\[t\.name\]/);
@@ -39,7 +49,11 @@ test('packet history preview uses dispatcher monitoring JSON shape without useIn
 });
 
 test('monitoring chart only plots int and double tags while packets keep all values', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const source = [
+    await readFile(join(componentDir, 'EmulatorMonitoringTab.tsx'), 'utf8'),
+    await readFile(join(componentDir, 'emulator-detail/telemetry.ts'), 'utf8'),
+  ].join('\n');
 
   assert.match(source, /const numericTelemetryTags = useMemo/);
   assert.match(source, /t\.type === 'int' \|\| t\.type === 'double'/);
@@ -59,7 +73,11 @@ test('telemetry detail page uses REST for initial history and realtime for subse
 });
 
 test('monitoring subscribes to telemetry state so realtime points rerender chart and packets', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const source = [
+    await readFile(join(componentDir, 'EmulatorMonitoringTab.tsx'), 'utf8'),
+    await readFile(join(componentDir, 'emulator-detail/telemetry.ts'), 'utf8'),
+  ].join('\n');
 
   assert.match(source, /const liveTelemetry = useUniEmuStore\(\(s\) => s\.telemetryByEmulator\[id\] \?\? emptyTelemetry\)/);
   assert.match(source, /const visibleTelemetry = telemetryPaused \? pausedTelemetrySnapshot : liveTelemetry/);
@@ -72,7 +90,7 @@ test('monitoring subscribes to telemetry state so realtime points rerender chart
 });
 
 test('monitoring has a pause toggle that freezes and resumes visible telemetry', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
   assert.match(source, /const \[telemetryPaused, setTelemetryPaused\] = useState\(false\)/);
   assert.match(source, /const \[pausedTelemetrySnapshot, setPausedTelemetrySnapshot\]/);
@@ -83,7 +101,7 @@ test('monitoring has a pause toggle that freezes and resumes visible telemetry',
 });
 
 test('monitoring pause toggle is embedded into the telemetry chart header', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
   assert.doesNotMatch(source, /<div className="flex items-center justify-end">\s*<Button[\s\S]*?handleTelemetryPauseToggle/);
   assert.match(
@@ -93,7 +111,7 @@ test('monitoring pause toggle is embedded into the telemetry chart header', asyn
 });
 
 test('monitoring recharts tooltip follows the active theme colors', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
   assert.match(source, /background: 'var\(--popover\)'/);
   assert.match(source, /border: '1px solid var\(--border\)'/);
@@ -104,7 +122,7 @@ test('monitoring recharts tooltip follows the active theme colors', async () => 
 });
 
 test('monitoring recharts lines do not animate on telemetry updates', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
   assert.match(
     source,
@@ -113,7 +131,7 @@ test('monitoring recharts lines do not animate on telemetry updates', async () =
 });
 
 test('monitoring chart renders straight line segments without smoothing', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
   assert.match(source, /<Line[\s\S]*?type="linear"[\s\S]*?dataKey=\{key\}/);
   assert.doesNotMatch(source, /type="monotone"/);
@@ -121,7 +139,7 @@ test('monitoring chart renders straight line segments without smoothing', async 
 
 test('monitoring chart title is localized to Russian', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
-  const source = await readFile(join(componentDir, 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(componentDir, 'EmulatorMonitoringTab.tsx'), 'utf8');
   const localization = await readFile(join(componentDir, '../../../localization.ts'), 'utf8');
 
   assert.match(source, /emulatorDetailPage\.telemetryTimeSeriesTitle/);
@@ -131,7 +149,7 @@ test('monitoring chart title is localized to Russian', async () => {
 });
 
 test('monitoring chart lets users choose visible numeric tags locally', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
   assert.match(source, /const \[hiddenTelemetryTagNames, setHiddenTelemetryTagNames\] = useState<Set<string>>/);
   assert.match(source, /const visibleNumericTelemetryTags = useMemo/);
@@ -142,7 +160,7 @@ test('monitoring chart lets users choose visible numeric tags locally', async ()
 });
 
 test('monitoring chart keeps tag colors stable when visible tags are toggled', async () => {
-  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorMonitoringTab.tsx'), 'utf8');
 
   assert.match(source, /const tagIndex = numericTelemetryTags\.findIndex\(\(t\) => t\.name === key\)/);
   assert.doesNotMatch(source, /const tagIndex = visibleNumericTelemetryTags\.findIndex\(\(t\) => t\.name === key\)/);

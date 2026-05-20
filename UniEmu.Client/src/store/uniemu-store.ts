@@ -4,6 +4,7 @@ import { uniEmuApi } from '@/api/uniemu-api';
 import {
   TELEMETRY_CHART_VISIBLE_PACKET_COUNT,
   TELEMETRY_PACKET_RETENTION_LIMIT,
+  REALTIME_STORE_FLUSH_INTERVAL_MS,
 } from '@/lib/constants';
 import { PERSIST_STORE } from '@/lib/feature-flags';
 import { RuntimeUpdatesClient } from '@/realtime/runtime-updates-client';
@@ -72,7 +73,13 @@ interface UniEmuState {
   deleteCncProgram: (id: string) => Promise<void>;
 }
 
+type StoreSet = Parameters<StateCreator<UniEmuState>>[0];
+
 let runtimeUpdatesClient: RuntimeUpdatesClient | null = null;
+let realtimeFlushTimer: ReturnType<typeof setTimeout> | null = null;
+let realtimeFlushSet: StoreSet | null = null;
+const pendingTelemetryUpdates = new Map<string, RuntimeTelemetryUpdate[]>();
+const pendingTagValueUpdates = new Map<string, RuntimeTagValueUpdate>();
 
 const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
   emulators: [],
@@ -118,7 +125,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
     if (typeof window === 'undefined') return;
 
     runtimeUpdatesClient ??= new RuntimeUpdatesClient({
-      onTelemetryPoint: (update) => applyTelemetryUpdate(set, get, update),
+      onTelemetryPoint: (update) => applyTelemetryUpdate(set, update),
       onTagValue: (update) => applyTagValueUpdate(set, update),
       onEmulatorUpdated: (emulator) => {
         set((s) => ({
@@ -339,51 +346,115 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-function applyTelemetryUpdate(
-  set: Parameters<StateCreator<UniEmuState>>[0],
-  get: Parameters<StateCreator<UniEmuState>>[1],
-  update: RuntimeTelemetryUpdate,
-) {
+function applyTelemetryUpdate(set: StoreSet, update: RuntimeTelemetryUpdate) {
+  const updates = pendingTelemetryUpdates.get(update.emulatorId) ?? [];
+  updates.push(update);
+  pendingTelemetryUpdates.set(update.emulatorId, updates);
+  scheduleRealtimeStoreFlush(set);
+}
+
+function applyTagValueUpdate(set: StoreSet, update: RuntimeTagValueUpdate) {
+  pendingTagValueUpdates.set(`${update.emulatorId}:${update.tagId}`, update);
+  scheduleRealtimeStoreFlush(set);
+}
+
+function scheduleRealtimeStoreFlush(set: StoreSet) {
+  realtimeFlushSet = set;
+  if (realtimeFlushTimer !== null) return;
+
+  realtimeFlushTimer = setTimeout(flushRealtimeStoreUpdates, REALTIME_STORE_FLUSH_INTERVAL_MS);
+}
+
+function flushRealtimeStoreUpdates() {
+  const set = realtimeFlushSet;
+  realtimeFlushSet = null;
+  realtimeFlushTimer = null;
+
+  if (!set) return;
+
+  const telemetryUpdates = new Map(pendingTelemetryUpdates);
+  const tagValueUpdates = [...pendingTagValueUpdates.values()];
+  pendingTelemetryUpdates.clear();
+  pendingTagValueUpdates.clear();
+
   set((s) => {
-    const current = s.telemetryByEmulator[update.emulatorId] ?? [];
-    const list = current.some((point) => point.timestamp === update.point.timestamp)
-      ? current.map((point) => (point.timestamp === update.point.timestamp ? update.point : point))
-      : [...current, update.point];
+    let telemetryByEmulator = s.telemetryByEmulator;
+    let tagsByEmulator = s.tagsByEmulator;
+    let telemetryChanged = false;
+    let tagsChanged = false;
+
+    for (const [emulatorId, updates] of telemetryUpdates) {
+      const current = telemetryByEmulator[emulatorId] ?? [];
+      let next = current;
+
+      for (const update of updates) {
+        next = upsertTelemetryPoint(next, update.point, s.packetRetention);
+      }
+
+      if (next !== current) {
+        if (!telemetryChanged) telemetryByEmulator = { ...telemetryByEmulator };
+        telemetryByEmulator[emulatorId] = next;
+        telemetryChanged = true;
+      }
+    }
+
+    for (const update of tagValueUpdates) {
+      const tags = tagsByEmulator[update.emulatorId];
+      if (!tags) continue;
+
+      const preview = formatRuntimeTagValue(update.value);
+      let tagChanged = false;
+      const nextTags = tags.map((tag) => {
+        if (tag.id !== update.tagId || tag.preview === preview) return tag;
+
+        tagChanged = true;
+        return { ...tag, preview };
+      });
+
+      if (tagChanged) {
+        if (!tagsChanged) tagsByEmulator = { ...tagsByEmulator };
+        tagsByEmulator[update.emulatorId] = nextTags;
+        tagsChanged = true;
+      }
+    }
+
+    if (!telemetryChanged && !tagsChanged) return s;
 
     return {
-      telemetryByEmulator: {
-        ...s.telemetryByEmulator,
-        [update.emulatorId]: list.slice(-get().packetRetention),
-      },
+      ...(telemetryChanged ? { telemetryByEmulator } : {}),
+      ...(tagsChanged ? { tagsByEmulator } : {}),
       online: true,
       apiError: null,
     };
   });
 }
 
-function applyTagValueUpdate(
-  set: Parameters<StateCreator<UniEmuState>>[0],
-  update: RuntimeTagValueUpdate,
-) {
-  set((s) => {
-    const tags = s.tagsByEmulator[update.emulatorId];
-    if (!tags) {
-      return { online: true, apiError: null };
-    }
+function upsertTelemetryPoint(
+  points: TelemetryPoint[],
+  nextPoint: TelemetryPoint,
+  retention: number,
+): TelemetryPoint[] {
+  const existingIndex = points.findIndex((point) => point.timestamp === nextPoint.timestamp);
+  if (existingIndex >= 0) {
+    if (areTelemetryPointsEqual(points[existingIndex], nextPoint)) return points;
 
-    return {
-      tagsByEmulator: {
-        ...s.tagsByEmulator,
-        [update.emulatorId]: tags.map((tag) => (
-          tag.id === update.tagId
-            ? { ...tag, preview: formatRuntimeTagValue(update.value) }
-            : tag
-        )),
-      },
-      online: true,
-      apiError: null,
-    };
-  });
+    const next = [...points];
+    next[existingIndex] = nextPoint;
+    return next;
+  }
+
+  const next = [...points, nextPoint];
+  return next.length > retention ? next.slice(-retention) : next;
+}
+
+function areTelemetryPointsEqual(a: TelemetryPoint, b: TelemetryPoint): boolean {
+  if (a.timestamp !== b.timestamp) return false;
+
+  const aEntries = Object.entries(a.values ?? {});
+  const bValues = b.values ?? {};
+  if (aEntries.length !== Object.keys(bValues).length) return false;
+
+  return aEntries.every(([key, value]) => Object.is(value, bValues[key]));
 }
 
 function formatRuntimeTagValue(value: unknown): string {

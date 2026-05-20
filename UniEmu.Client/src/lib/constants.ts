@@ -3,9 +3,11 @@ export const API_BASE_URL =
     (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_API_BASE_URL) ||
   '';
 
-export const TELEMETRY_PACKET_RETENTION_LIMIT = 3000;
+export const TELEMETRY_PACKET_RETENTION_LIMIT = 240;
 
-export const TELEMETRY_CHART_VISIBLE_PACKET_COUNT = 60;
+export const TELEMETRY_CHART_VISIBLE_PACKET_COUNT = 120;
+
+export const REALTIME_STORE_FLUSH_INTERVAL_MS = 100;
 
 export const TELEMETRY_LINE_COLORS = [
   'oklch(0.78 0.16 195)',

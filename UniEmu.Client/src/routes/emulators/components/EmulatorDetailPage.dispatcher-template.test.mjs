@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 test('emulator detail can download dispatcher XML template through store action', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
   const detailSource = await readFile(join(componentDir, 'EmulatorDetailPage.tsx'), 'utf8');
+  const headerSource = await readFile(join(componentDir, 'EmulatorDetailHeader.tsx'), 'utf8');
   const storeSource = await readFile(join(componentDir, '../../../store/uniemu-store.ts'), 'utf8');
   const apiSource = await readFile(join(componentDir, '../../../api/uniemu-api.ts'), 'utf8');
   const localizationSource = await readFile(join(componentDir, '../../../localization.ts'), 'utf8');
@@ -22,11 +23,11 @@ test('emulator detail can download dispatcher XML template through store action'
   assert.match(storeSource, /a\.download = fileName/);
   assert.match(storeSource, /URL\.revokeObjectURL\(url\)/);
 
-  assert.match(detailSource, /Download,/);
+  assert.match(headerSource, /Download,/);
   assert.match(detailSource, /const downloadDispatcherTemplate = useUniEmuStore/);
   assert.match(detailSource, /handleDownloadDispatcherTemplate/);
-  assert.match(detailSource, /emulatorDetailPage\.downloadDispatcherTemplate/);
-  assert.match(detailSource, /<Download className="h-3\.5 w-3\.5" \/>/);
+  assert.match(headerSource, /emulatorDetailPage\.downloadDispatcherTemplate/);
+  assert.match(headerSource, /<Download className="h-3\.5 w-3\.5" \/>/);
 
   assert.match(localizationSource, /downloadDispatcherTemplate:/);
 });
