@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 test('generator and scenario editors use separate calc type option lists', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
   const optionsSource = await readFile(join(componentDir, 'tag-scenario/calcTypeOptions.ts'), 'utf8');
-  const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+  const calcSectionSource = await readFile(join(componentDir, 'tag-editor/TagCalcSection.tsx'), 'utf8');
   const scenarioEditorSource = await readFile(join(componentDir, 'tag-scenario/ScenarioEditor.tsx'), 'utf8');
   const calcFieldsSource = await readFile(join(componentDir, 'tag-scenario/CalcConfigFields.tsx'), 'utf8');
 
@@ -27,9 +27,9 @@ test('generator and scenario editors use separate calc type option lists', async
   assert.match(scenarioList, /'Line'/);
   assert.match(scenarioList, /'SquircleLate'/);
 
-  assert.match(drawerSource, /GENERATOR_CALC_TYPES/);
-  assert.match(drawerSource, /GENERATOR_CALC_TYPES\.map\(\(c\) =>/);
-  assert.doesNotMatch(drawerSource, /const CALC_TYPES: CalcType\[\]/);
+  assert.match(calcSectionSource, /GENERATOR_CALC_TYPES/);
+  assert.match(calcSectionSource, /calcTypes=\{GENERATOR_CALC_TYPES\}/);
+  assert.doesNotMatch(calcSectionSource, /const CALC_TYPES: CalcType\[\]/);
 
   assert.match(scenarioEditorSource, /SCENARIO_CALC_TYPES/);
   assert.match(scenarioEditorSource, /calcTypes=\{SCENARIO_CALC_TYPES\}/);

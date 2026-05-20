@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 test('special parameter select renders human-readable labels', async () => {
-  const componentSource = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'AddTagDrawer.tsx'), 'utf8');
+  const componentSource = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'tag-editor/TagBasicsSection.tsx'), 'utf8');
   const typesSource = await readFile(join(dirname(fileURLToPath(import.meta.url)), '../../../types/uniemu.ts'), 'utf8');
   const optionsSource = typesSource.match(/export const SPECIAL_PARAMETER_OPTIONS[\s\S]*?\n\];/)?.[0] ?? '';
 
@@ -21,7 +21,7 @@ test('special parameter select renders human-readable labels', async () => {
 });
 
 test('tag trigger select hides cron option from drawer', async () => {
-  const componentSource = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'AddTagDrawer.tsx'), 'utf8');
+  const componentSource = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'tag-editor/TagTriggerSection.tsx'), 'utf8');
 
   assert.match(componentSource, /<SelectItem value="once">/);
   assert.match(componentSource, /<SelectItem value="interval">/);

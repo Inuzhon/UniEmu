@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 test('tag edit drawer displays localized formula and base-card labels', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
   const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+  const basicsSource = await readFile(join(componentDir, 'tag-editor/TagBasicsSection.tsx'), 'utf8');
+  const constantsSource = await readFile(join(componentDir, 'tag-editor/constants.ts'), 'utf8');
+  const utilsSource = await readFile(join(componentDir, 'tag-editor/tagEditorUtils.ts'), 'utf8');
   const calcFieldsSource = await readFile(
     join(componentDir, 'tag-scenario/CalcConfigFields.tsx'),
     'utf8'
@@ -14,11 +17,10 @@ test('tag edit drawer displays localized formula and base-card labels', async ()
   const calcLabelsSource = await readFile(join(componentDir, 'tag-scenario/calcLabels.ts'), 'utf8');
   const localizationSource = await readFile(join(componentDir, '../../../localization.ts'), 'utf8');
 
-  assert.match(drawerSource, /getCalcTypeLabel\(c\)/);
   assert.match(calcFieldsSource, /getCalcTypeLabel\(c\)/);
-  assert.match(drawerSource, /getTagTypeLabel\(tagType\)/);
-  assert.match(drawerSource, /id: 'formulaScript'/);
-  assert.match(drawerSource, /source === 'formulaScript'/);
+  assert.match(basicsSource, /getTagTypeLabel\(tagType\)/);
+  assert.match(constantsSource, /id: 'formulaScript'/);
+  assert.match(utilsSource, /source === 'formulaScript'/);
   assert.match(drawerSource, /tagsByEmulator/);
   assert.match(drawerSource, /duplicateNameError/);
   assert.match(drawerSource, /duplicateKeyError/);

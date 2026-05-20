@@ -6,17 +6,17 @@ import { fileURLToPath } from 'node:url';
 
 test('scenario tags are saved with an interval trigger for continuous timeline calculation', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
-  const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+  const utilsSource = await readFile(join(componentDir, 'tag-editor/tagEditorUtils.ts'), 'utf8');
   const localizationSource = await readFile(join(componentDir, '../../../localization.ts'), 'utf8');
 
-  assert.doesNotMatch(drawerSource, /isScenario\s*\?\s*\{\s*mode:\s*'once'/);
-  assert.match(drawerSource, /isScenario\s*\?\s*\{\s*mode:\s*'interval',\s*intervalValue:\s*1,\s*intervalUnit:\s*'sec'\s*\}/);
+  assert.doesNotMatch(utilsSource, /isScenario\s*\?\s*\{\s*mode:\s*'once'/);
+  assert.match(utilsSource, /isScenario\s*\?\s*\{\s*mode:\s*'interval',\s*intervalValue:\s*1,\s*intervalUnit:\s*'sec'\s*\}/);
   assert.doesNotMatch(localizationSource, /scenarioTimelineTriggerHint: '.*при старте/);
 });
 
 test('wave period uses the same minimum in scenario preview and editors as the backend', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
-  const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+  const calcSectionSource = await readFile(join(componentDir, 'tag-editor/TagCalcSection.tsx'), 'utf8');
   const calcFieldsSource = await readFile(
     join(componentDir, 'tag-scenario/CalcConfigFields.tsx'),
     'utf8'
@@ -27,17 +27,17 @@ test('wave period uses the same minimum in scenario preview and editors as the b
   );
 
   assert.match(scenarioMathSource, /Math\.max\(period,\s*1\)/);
-  assert.match(drawerSource, /setCalcPeriod\(Math\.max\(1,\s*Number\(e\.target\.value\) \|\| 1\)\)/);
+  assert.match(calcSectionSource, /<CalcConfigFields/);
   assert.match(calcFieldsSource, /set\(\{ period: Math\.max\(1,\s*Number\(e\.target\.value\) \|\| 1\) \}\)/);
 });
 
 test('edit mode reuses one fallback scenario for form state and dirty snapshot', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
-  const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+  const utilsSource = await readFile(join(componentDir, 'tag-editor/tagEditorUtils.ts'), 'utf8');
 
-  assert.match(drawerSource, /const nextScenario = tag\.scenario \?\? \{\s*segments: \[defaultSegment\(\)\],\s*continueOnFormulaEnd: 'Repeat'(?: as const)?,\s*\};/);
-  assert.match(drawerSource, /setScenario\(nextScenario\);/);
-  assert.match(drawerSource, /scenario: nextScenario,/);
+  assert.match(utilsSource, /const nextScenario = tag\.scenario \?\? createDefaultScenario\(\);/);
+  assert.match(utilsSource, /scenario: nextScenario,/);
+  assert.match(utilsSource, /scenario: form\.scenario,/);
 });
 
 test('tag drawer duplicate validation ignores realtime preview-only tag updates', async () => {

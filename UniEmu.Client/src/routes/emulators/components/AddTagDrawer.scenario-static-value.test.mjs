@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 test('scenario calc uses Static instead of Text and renders static value input by tag type', async () => {
   const componentDir = dirname(fileURLToPath(import.meta.url));
   const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+  const scenarioSectionSource = await readFile(join(componentDir, 'tag-editor/TagScenarioSection.tsx'), 'utf8');
   const scenarioEditorSource = await readFile(join(componentDir, 'tag-scenario/ScenarioEditor.tsx'), 'utf8');
   const calcFieldsSource = await readFile(join(componentDir, 'tag-scenario/CalcConfigFields.tsx'), 'utf8');
   const calcLabelsSource = await readFile(join(componentDir, 'tag-scenario/calcLabels.ts'), 'utf8');
@@ -18,7 +19,8 @@ test('scenario calc uses Static instead of Text and renders static value input b
   assert.match(calcLabelsSource, /Static: 'Статическое значение'/);
   assert.doesNotMatch(calcLabelsSource, /Text: 'Текст'/);
 
-  assert.match(drawerSource, /<ScenarioEditor value=\{scenario\} onChange=\{setScenario\} tagType=\{type\} \/>/);
+  assert.match(drawerSource, /<TagScenarioSection[\s\S]*scenario=\{form\.scenario\}[\s\S]*tagType=\{form\.type\}/);
+  assert.match(scenarioSectionSource, /<ScenarioEditor value=\{scenario\} onChange=\{onChange\} tagType=\{tagType\} \/>/);
   assert.match(scenarioEditorSource, /tagType: TagType/);
   assert.match(scenarioEditorSource, /<CalcConfigFields[\s\S]*tagType=\{tagType\}/);
 
