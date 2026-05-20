@@ -878,9 +878,6 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     <SelectItem value="once">
                       {localization.routes.emulators.components.addTagDrawer.triggerModeOnceLabel}
                     </SelectItem>
-                    <SelectItem value="cron">
-                      {localization.routes.emulators.components.addTagDrawer.triggerModeCronLabel}
-                    </SelectItem>
                     <SelectItem value="interval">
                       {localization.routes.emulators.components.addTagDrawer.triggerModeIntervalLabel}
                     </SelectItem>
