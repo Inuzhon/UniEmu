@@ -2,6 +2,7 @@ import { useUniEmuStore } from '@/store/uniemu-store';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { TELEMETRY_PACKET_RETENTION_LIMIT } from '@/lib/constants';
 import { localization } from '@/localization';
 
 export function SettingsPage() {
@@ -37,7 +38,7 @@ export function SettingsPage() {
                 id="retention"
                 type="number"
                 min={1}
-                max={1000}
+                max={TELEMETRY_PACKET_RETENTION_LIMIT}
                 value={retention}
                 onChange={(e) => setRetention(Number(e.target.value))}
                 className="h-8 w-24 text-right font-mono"
@@ -46,12 +47,14 @@ export function SettingsPage() {
             <Slider
               value={[retention]}
               min={10}
-              max={500}
+              max={TELEMETRY_PACKET_RETENTION_LIMIT}
               step={10}
               onValueChange={([v]) => setRetention(v)}
             />
             <p className="text-xs text-muted-foreground">
-              {localization.routes.settings.components.settingsPage.packetHistoryLimitHint}
+              {localization.routes.settings.components.settingsPage.packetHistoryLimitHint(
+                TELEMETRY_PACKET_RETENTION_LIMIT
+              )}
             </p>
           </div>
         </div>

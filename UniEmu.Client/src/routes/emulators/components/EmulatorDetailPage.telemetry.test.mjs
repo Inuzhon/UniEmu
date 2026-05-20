@@ -27,6 +27,17 @@ test('monitoring values and packet history use actual telemetry packet values', 
   assert.doesNotMatch(source, /tagSeries\[t\.id\]\?\.\[i\]/);
 });
 
+test('packet history preview uses dispatcher monitoring JSON shape without useInnerId', async () => {
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+
+  assert.match(source, /MachineIntegrationId: emulator\.protocolId/);
+  assert.match(source, /ListValues: enabledTagsForDispatcher\.map\(\(t\) => \(\{/);
+  assert.match(source, /Key: t\.key/);
+  assert.match(source, /Value: pkt\.values\[t\.name\]/);
+  assert.doesNotMatch(source, /UseInnerId/);
+  assert.doesNotMatch(source, /tags: enabledTagsForDispatcher\.map/);
+});
+
 test('monitoring chart only plots int and double tags while packets keep all values', async () => {
   const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
 
@@ -52,7 +63,9 @@ test('monitoring subscribes to telemetry state so realtime points rerender chart
 
   assert.match(source, /const liveTelemetry = useUniEmuStore\(\(s\) => s\.telemetryByEmulator\[id\] \?\? emptyTelemetry\)/);
   assert.match(source, /const visibleTelemetry = telemetryPaused \? pausedTelemetrySnapshot : liveTelemetry/);
-  assert.match(source, /const telemetryPoints = useMemo\(\(\) => visibleTelemetry\.slice\(-60\), \[visibleTelemetry\]\)/);
+  assert.match(source, /TELEMETRY_CHART_VISIBLE_PACKET_COUNT/);
+  assert.match(source, /visibleTelemetry\.slice\(-TELEMETRY_CHART_VISIBLE_PACKET_COUNT\)/);
+  assert.doesNotMatch(source, /slice\(-60\)/);
   assert.match(source, /telemetryPoints\.map/);
   assert.doesNotMatch(source, /const getTelemetry = useUniEmuStore/);
   assert.doesNotMatch(source, /getTelemetry\(id, 60\)/);

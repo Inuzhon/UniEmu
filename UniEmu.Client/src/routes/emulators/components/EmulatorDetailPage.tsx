@@ -69,7 +69,10 @@ import {
   getTagTypeLabel,
 } from './tag-scenario/calcLabels';
 import { formatDuration, totalDuration } from './tag-scenario/scenarioMath';
-import { TELEMETRY_LINE_COLORS } from '@/lib/constants';
+import {
+  TELEMETRY_CHART_VISIBLE_PACKET_COUNT,
+  TELEMETRY_LINE_COLORS,
+} from '@/lib/constants';
 import { SHOW_TAG_SCENARIO_PREVIEWS } from '@/lib/feature-flags';
 import { cn } from '@/lib/utils';
 import type { CncProgram, EmulatorTag, TagSource, TagTrigger, TelemetryPoint } from '@/types/uniemu';
@@ -202,7 +205,10 @@ export function EmulatorDetailPage() {
   };
 
   const visibleTelemetry = telemetryPaused ? pausedTelemetrySnapshot : liveTelemetry;
-  const telemetryPoints = useMemo(() => visibleTelemetry.slice(-60), [visibleTelemetry]);
+  const telemetryPoints = useMemo(
+    () => visibleTelemetry.slice(-TELEMETRY_CHART_VISIBLE_PACKET_COUNT),
+    [visibleTelemetry]
+  );
   const enabledTagsForDispatcher = useMemo(() => tags.filter((t) => t.enabled !== false), [tags]);
   const numericTelemetryTags = useMemo(
     () => enabledTagsForDispatcher.filter((t) => t.type === 'int' || t.type === 'double'),
@@ -1050,12 +1056,10 @@ export function EmulatorDetailPage() {
                   listIdx === 0 ? openPackets[pkt.idx] !== false : !!openPackets[pkt.idx];
                 const json = JSON.stringify(
                   {
-                    emulatorId: emulator.id,
-                    timestamp: pkt.timestamp,
-                    tags: enabledTagsForDispatcher.map((t) => ({
-                      name: t.name,
-                      value: pkt.values[t.name],
-                      type: t.type,
+                    MachineIntegrationId: emulator.protocolId,
+                    ListValues: enabledTagsForDispatcher.map((t) => ({
+                      Key: t.key,
+                      Value: pkt.values[t.name],
                     })),
                   },
                   null,

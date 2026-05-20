@@ -559,7 +559,7 @@ export const localization = {
           telemetrySectionTitle: 'Телеметрия',
           telemetryHistoryDescription: 'История отправленных пакетов, доступная во вкладке мониторинга',
           packetHistoryLimitLabel: 'Сохранять последних пакетов',
-          packetHistoryLimitHint: 'Диапазон: 1–1000. Старые пакеты удаляются автоматически.',
+          packetHistoryLimitHint: (p0: number) => `Диапазон: 1–${p0}. Старые пакеты удаляются автоматически.`,
         },
       },
       index: {

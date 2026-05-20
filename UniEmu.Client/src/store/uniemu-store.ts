@@ -1,6 +1,10 @@
 import { create, type StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { uniEmuApi } from '@/api/uniemu-api';
+import {
+  TELEMETRY_CHART_VISIBLE_PACKET_COUNT,
+  TELEMETRY_PACKET_RETENTION_LIMIT,
+} from '@/lib/constants';
 import { PERSIST_STORE } from '@/lib/feature-flags';
 import { RuntimeUpdatesClient } from '@/realtime/runtime-updates-client';
 import type {
@@ -80,7 +84,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
   online: true,
   loading: false,
   apiError: null,
-  packetRetention: 3000,
+  packetRetention: TELEMETRY_PACKET_RETENTION_LIMIT,
   hydrate: async () => {
     set({ loading: true, apiError: null });
     try {
@@ -159,7 +163,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
       const [emulator, tags, telemetry] = await Promise.all([
         uniEmuApi.emulators.get(emulatorId),
         uniEmuApi.tags.list(emulatorId),
-        uniEmuApi.telemetry.list(emulatorId, 60),
+        uniEmuApi.telemetry.list(emulatorId, TELEMETRY_CHART_VISIBLE_PACKET_COUNT),
       ]);
       set((s) => ({
         emulators: upsertEmulator(s.emulators, emulator),
@@ -172,7 +176,9 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
       set({ online: false, apiError: error instanceof Error ? error.message : 'Backend API недоступен' });
     }
   },
-  setPacketRetention: (n) => set({ packetRetention: Math.max(1, Math.min(1000, Math.round(n))) }),
+  setPacketRetention: (n) => set({
+    packetRetention: Math.max(1, Math.min(TELEMETRY_PACKET_RETENTION_LIMIT, Math.round(n))),
+  }),
   toggleStatus: async (id) => {
     const current = get().emulators.find((e) => e.id === id);
     if (!current) return;
@@ -223,10 +229,10 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
     const created = await uniEmuApi.events.create(ev);
     set((s) => ({ events: [created, ...s.events].slice(0, 200) }));
   },
-  getTelemetry: (emulatorId, points = 60) => {
+  getTelemetry: (emulatorId, points = TELEMETRY_CHART_VISIBLE_PACKET_COUNT) => {
     return (get().telemetryByEmulator[emulatorId] ?? []).slice(-points);
   },
-  refreshTelemetry: async (emulatorId, points = 60) => {
+  refreshTelemetry: async (emulatorId, points = TELEMETRY_CHART_VISIBLE_PACKET_COUNT) => {
     const telemetry = await uniEmuApi.telemetry.list(emulatorId, points);
     set((s) => ({ telemetryByEmulator: { ...s.telemetryByEmulator, [emulatorId]: telemetry } }));
   },
