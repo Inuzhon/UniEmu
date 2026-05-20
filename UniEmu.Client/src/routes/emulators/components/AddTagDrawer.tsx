@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronsUpDown, FileText, Folder, Pencil, Sparkles } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Sheet,
   SheetContent,
@@ -46,6 +47,7 @@ import { MonacoCsxEditor } from '@/components/MonacoCsxEditor';
 import { buildCsxDocumentUri } from '@/components/csx-language-client';
 import { ScenarioEditor } from './tag-scenario/ScenarioEditor';
 import { getCalcTypeLabel, getTagTypeLabel } from './tag-scenario/calcLabels';
+import { GENERATOR_CALC_TYPES } from './tag-scenario/calcTypeOptions';
 import { defaultSegment } from './tag-scenario/scenarioMath';
 import { useUniEmuStore } from '@/store/uniemu-store';
 import { SPECIAL_PARAMETER_OPTIONS } from '@/types/uniemu';
@@ -78,21 +80,8 @@ const SOURCES: { id: TagSource; label: string }[] = [
 
 const TAG_TYPES: TagType[] = ['int', 'double', 'string', 'bool'];
 
-const CALC_TYPES: CalcType[] = [
-  'None',
-  'Text',
-  'Line',
-  'Curve',
-  // 'Sequence',
-  'Random',
-  'Sinusoid',
-  'Square',
-  'Sawtooth',
-  'SquircleEarly',
-  'SquircleLate',
-];
-
 const DEFAULT_INLINE = 'return 0;\n';
+const TAG_IDENTITY_SEPARATOR = '\u0000';
 
 const sanitizeStaticValue = (type: TagType, value: string) => {
   if (type === 'int') {
@@ -114,6 +103,8 @@ const sanitizeStaticValue = (type: TagType, value: string) => {
   return value;
 };
 
+const normalizeTagIdentity = (value: string) => value.trim().toLocaleLowerCase('ru-RU');
+
 interface Props {
   emulatorId: string;
   open: boolean;
@@ -127,6 +118,17 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   const updateTag = useUniEmuStore((s) => s.updateTag);
   const scripts = useUniEmuStore((s) => s.scripts);
   const cncPrograms = useUniEmuStore((s) => s.cncPrograms);
+  const tagIdentityRows = useUniEmuStore(
+    useShallow((s) =>
+      (s.tagsByEmulator[emulatorId] ?? []).map((existingTag) =>
+        [
+          existingTag.id,
+          normalizeTagIdentity(existingTag.name),
+          normalizeTagIdentity(existingTag.key),
+        ].join(TAG_IDENTITY_SEPARATOR)
+      )
+    )
+  );
 
   const isEdit = !!tag;
 
@@ -202,7 +204,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
     setKey('');
     setSpecialParameter('None');
     setName('');
-    setType('string');
+    setType('int');
     setSource('static');
     setStaticValue('');
     setDescription('');
@@ -364,8 +366,34 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
   const isScenario = source === 'scenario';
   const isProgramNameParameter = specialParameter === 'PrgName' || specialParameter === 'Subprogram';
+  const duplicateNameError = useMemo(() => {
+    const nextName = normalizeTagIdentity(name);
+    if (!nextName) return null;
+
+    return tagIdentityRows.some((existingTagIdentity) => {
+      const [id, tagName] = existingTagIdentity.split(TAG_IDENTITY_SEPARATOR);
+      return id !== tag?.id && tagName === nextName;
+    })
+      ? localization.routes.emulators.components.addTagDrawer.duplicateNameError
+      : null;
+  }, [tagIdentityRows, name, tag?.id]);
+  const duplicateKeyError = useMemo(() => {
+    const nextKey = normalizeTagIdentity(key);
+    if (!nextKey) return null;
+
+    return tagIdentityRows.some((existingTagIdentity) => {
+      const [id, , tagKey] = existingTagIdentity.split(TAG_IDENTITY_SEPARATOR);
+      return id !== tag?.id && tagKey === nextKey;
+    })
+      ? localization.routes.emulators.components.addTagDrawer.duplicateKeyError
+      : null;
+  }, [tagIdentityRows, key, tag?.id]);
   const canSubmit =
-    name.trim().length > 0 && (!isScenario || scenario.segments.some((s) => s.duration > 0));
+    name.trim().length > 0 &&
+    key.trim().length > 0 &&
+    !duplicateNameError &&
+    !duplicateKeyError &&
+    (!isScenario || scenario.segments.some((s) => s.duration > 0));
   const currentSnapshot = buildSnapshot();
   const isDirty = open && initialSnapshot.length > 0 && currentSnapshot !== initialSnapshot;
 
@@ -435,7 +463,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
           ? localization.routes.emulators.components.addTagDrawer.cncPreviewLabel
           : isScenario
             ? localization.routes.emulators.components.addTagDrawer.scenarioPreviewLabel
-            : calc?.type === 'Text'
+            : calc?.type === 'Static'
               ? calcStart
               : localization.routes.emulators.components.addTagDrawer.computedPreviewLabel;
     const normalizedPreview =
@@ -476,6 +504,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   const showScript =
     source === 'formula' || source === 'script' || source === 'formulaScript';
   const showTrigger = !isScenario;
+  const isStaticCalc = calcType === 'Static';
   const useInlineScript = !scriptId;
   const isEditorDirty = editorOpen && editorDraft !== inlineScript;
   const selectedCncProgram = visibleCncPrograms.find(
@@ -657,6 +686,29 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
     );
   };
 
+  const renderCalcStartInput = () => {
+    if (isStaticCalc && type === 'bool') {
+      return (
+        <div className="flex h-9 items-center rounded-md border border-border bg-background px-3">
+          <Switch
+            checked={calcStart === 'true'}
+            onCheckedChange={(checked) => setCalcStart(checked ? 'true' : 'false')}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <Input
+        value={calcStart}
+        inputMode={isStaticCalc && type === 'int' ? 'numeric' : isStaticCalc && type === 'double' ? 'decimal' : undefined}
+        spellCheck={(isStaticCalc && type === 'string') || calcType === 'Sequence'}
+        onChange={(e) => setCalcStart(isStaticCalc ? sanitizeStaticValue(type, e.target.value) : e.target.value)}
+        className="font-mono"
+      />
+    );
+  };
+
   return (
     <>
       <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -704,6 +756,9 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   <p className="text-[10px] text-muted-foreground">
                     {localization.routes.emulators.components.addTagDrawer.tagNameHint}
                   </p>
+                  {duplicateNameError && (
+                    <p className="text-[10px] text-destructive">{duplicateNameError}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">
@@ -719,6 +774,9 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   <p className="text-[10px] text-muted-foreground">
                     {localization.routes.emulators.components.addTagDrawer.tagKeyHint}
                   </p>
+                  {duplicateKeyError && (
+                    <p className="text-[10px] text-destructive">{duplicateKeyError}</p>
+                  )}
                 </div>
               </div>
 
@@ -857,7 +915,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     {localization.routes.emulators.components.addTagDrawer.scenarioTimelineTriggerHint}
                   </span>
                 </div>
-                <ScenarioEditor value={scenario} onChange={setScenario} />
+                <ScenarioEditor value={scenario} onChange={setScenario} tagType={type} />
               </section>
             )}
 
@@ -982,7 +1040,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CALC_TYPES.map((c) => (
+                    {GENERATOR_CALC_TYPES.map((c) => (
                       <SelectItem key={c} value={c}>
                         {getCalcTypeLabel(c)}
                       </SelectItem>
@@ -995,23 +1053,20 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   calcType === 'SquircleEarly' ||
                   calcType === 'SquircleLate' ||
                   calcType === 'Random' ||
-                  calcType === 'Text' ||
+                  isStaticCalc ||
                   calcType === 'Sequence') && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs">
                         {calcType === 'Sequence'
                           ? localization.routes.emulators.components.addTagDrawer.sequenceJsonLabel
+                          : isStaticCalc
+                            ? localization.routes.emulators.components.tagScenario.calcConfigFields.valueLabel
                           : localization.routes.emulators.components.addTagDrawer.startLabel}
                       </Label>
-                      <Input
-                        value={calcStart}
-                        spellCheck={calcType === 'Text' || calcType === 'Sequence'}
-                        onChange={(e) => setCalcStart(e.target.value)}
-                        className="font-mono"
-                      />
+                      {renderCalcStartInput()}
                     </div>
-                    {calcType !== 'Text' && calcType !== 'Sequence' && (
+                    {!isStaticCalc && calcType !== 'Sequence' && (
                       <div className="space-y-1.5">
                         <Label className="text-xs">
                           {localization.routes.emulators.components.addTagDrawer.finishLabel}
@@ -1088,19 +1143,21 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                   </div>
                 )}
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs">
-                    {localization.routes.emulators.components.addTagDrawer.distortionPercentLabel}
-                  </Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={calcDistortion}
-                    onChange={(e) => setCalcDistortion(Number(e.target.value) || 0)}
-                    className="font-mono"
-                  />
-                </div>
+                {!isStaticCalc && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      {localization.routes.emulators.components.addTagDrawer.distortionPercentLabel}
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={calcDistortion}
+                      onChange={(e) => setCalcDistortion(Number(e.target.value) || 0)}
+                      className="font-mono"
+                    />
+                  </div>
+                )}
               </section>
             )}
 

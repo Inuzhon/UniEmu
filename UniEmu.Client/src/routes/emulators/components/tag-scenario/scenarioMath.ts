@@ -77,7 +77,9 @@ function sampleCalcAt(calc: TagCalcConfig, u: number, durationSec: number, prevV
     //   }
     //   break;
     // }
-    case "Text":
+    case "Static":
+      v = num(calc.start, prevValue);
+      break;
     case "None":
     default:
       v = prevValue;

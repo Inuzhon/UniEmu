@@ -22,6 +22,72 @@ namespace UniEmu.Tests.Features.Tags;
 public sealed class TagServiceScriptValidationTests
 {
     [Fact]
+    public async Task CreateAsync_RejectsDuplicateName_WithinSameEmulatorIgnoringCaseAndTrim()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(CreateExistingTag("tg-existing", "Test", "test_key"));
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateAsync("em-1", CreateRequest("return 1;", name: " test "), CancellationToken.None));
+
+        Assert.Equal("Тег с таким именем уже существует в этом эмуляторе.", exception.Message);
+        Assert.Equal(1, await db.EmulatorTags.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsDuplicateKey_WithinSameEmulatorIgnoringCaseAndTrim()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(CreateExistingTag("tg-existing", "Existing", "Test_Key"));
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateAsync("em-1", CreateRequest("return 1;", key: " test_key "), CancellationToken.None));
+
+        Assert.Equal("Тег с таким ключом уже существует в этом эмуляторе.", exception.Message);
+        Assert.Equal(1, await db.EmulatorTags.CountAsync());
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_RejectsDuplicateNameOrKey_ButIgnoresCurrentTag()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(CreateExistingTag("tg-current", "Current", "current_key"));
+        db.EmulatorTags.Add(CreateExistingTag("tg-other", "Other", "other_key"));
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await service.ReplaceAsync(
+            "em-1",
+            "tg-current",
+            CreateReplaceRequest(" current ", " current_key "),
+            CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReplaceAsync(
+                "em-1",
+                "tg-current",
+                CreateReplaceRequest(" other ", "current_key"),
+                CancellationToken.None));
+
+        Assert.Equal("Тег с таким именем уже существует в этом эмуляторе.", exception.Message);
+
+        exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReplaceAsync(
+                "em-1",
+                "tg-current",
+                CreateReplaceRequest("Current", " other_key "),
+                CancellationToken.None));
+
+        Assert.Equal("Тег с таким ключом уже существует в этом эмуляторе.", exception.Message);
+    }
+
+    [Fact]
     public async Task CreateAsync_RejectsInlineScript_WithCompilerError()
     {
         await using var fixture = await TagDbFixture.CreateAsync();
@@ -110,9 +176,13 @@ public sealed class TagServiceScriptValidationTests
         return new TagService(db, dataCache, scheduleService, new CsxLanguageService());
     }
 
-    private static CreateTagRequest CreateRequest(string inlineScript, TagType type = TagType.Double) => new(
-        "Inline tag",
-        "inline_tag",
+    private static CreateTagRequest CreateRequest(
+        string inlineScript,
+        TagType type = TagType.Double,
+        string name = "Inline tag",
+        string key = "inline_tag") => new(
+        name,
+        key,
         type,
         TagSource.Formula,
         "(computed)",
@@ -124,6 +194,34 @@ public sealed class TagServiceScriptValidationTests
         null,
         null,
         null);
+
+    private static ReplaceTagRequest CreateReplaceRequest(string name, string key) => new(
+        name,
+        key,
+        TagType.Double,
+        TagSource.Formula,
+        "(computed)",
+        new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null),
+        null,
+        new TagFormulaConfigDto(null, "return 1;"),
+        null,
+        true,
+        null,
+        null,
+        null);
+
+    private static EmulatorTagEntity CreateExistingTag(string id, string name, string key) => new()
+    {
+        Id = id,
+        EmulatorId = "em-1",
+        Name = name,
+        Key = key,
+        Type = UniEmuJson.EnumString(TagType.Double),
+        Source = UniEmuJson.EnumString(TagSource.Static),
+        Preview = "0",
+        TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+        Enabled = true,
+    };
 
     private static CreateTagRequest CreateScenarioRequest(TagTriggerDto? trigger = null) => new(
         "Scenario tag",

@@ -64,14 +64,36 @@ public sealed class TelemetryValueGenerator
     /// <returns>Результат расчета тега.</returns>
     public GeneratedTagValue GenerateTag(EmulatorEntity emulator, EmulatorTagEntity tag, DateTimeOffset timestamp)
     {
-        var numericValue = GenerateNumericTag(emulator, tag, timestamp);
         var tagType = UniEmuJson.EnumValue<TagType>(tag.Type);
-        var value = ApplyTagRounding(tagType, tag, CastValue(tagType, tag, numericValue));
+        var value = ApplyTagRounding(tagType, tag, GenerateTypedTagValue(emulator, tag, tagType, timestamp));
         SpecialParameter? specialParameter = string.IsNullOrWhiteSpace(tag.SpecialParameter)
             ? null
             : UniEmuJson.EnumValue<SpecialParameter>(tag.SpecialParameter);
 
         return new GeneratedTagValue(tag.Key, tag.Name, value, ToNumericValue(value), specialParameter);
+    }
+
+    private static object? GenerateTypedTagValue(
+        EmulatorEntity emulator,
+        EmulatorTagEntity tag,
+        TagType tagType,
+        DateTimeOffset timestamp)
+    {
+        var elapsedSec = emulator.StartedAt is null
+            ? 0
+            : Math.Max(0, (timestamp - emulator.StartedAt.Value).TotalSeconds);
+        var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+
+        if (source == TagSource.Scenario)
+        {
+            return GenerateFromScenario(
+                UniEmuJson.Deserialize<TagScenarioConfigDto>(tag.ScenarioJson),
+                elapsedSec,
+                tag.Preview,
+                tagType);
+        }
+
+        return CastValue(tagType, tag, GenerateTagValue(tag, elapsedSec));
     }
 
     private static double GenerateNumericTag(EmulatorEntity emulator, EmulatorTagEntity tag, DateTimeOffset timestamp)
@@ -85,12 +107,22 @@ public sealed class TelemetryValueGenerator
 
     private static object? CastValue(TagType tagType, EmulatorTagEntity tag, double numericValue)
     {
+        if (tagType != TagType.String)
+        {
+            return CastNumericValue(tagType, numericValue);
+        }
+
+        return GetStringValue(tag, numericValue);
+    }
+
+    private static object? CastNumericValue(TagType tagType, double numericValue)
+    {
         return tagType switch
         {
             TagType.Bool => numericValue != 0,
             TagType.Int => (int)Math.Round(numericValue),
             TagType.Double => numericValue,
-            TagType.String => GetStringValue(tag, numericValue),
+            TagType.String => numericValue.ToString(CultureInfo.InvariantCulture),
             _ => null,
         };
     }
@@ -186,7 +218,7 @@ public sealed class TelemetryValueGenerator
         return source switch
         {
             TagSource.Generator or TagSource.FormulaScript => GenerateFromCalc(UniEmuJson.Deserialize<TagCalcConfigDto>(tag.CalcJson), elapsedSec, tag.Preview),
-            TagSource.Scenario => GenerateFromScenario(UniEmuJson.Deserialize<TagScenarioConfigDto>(tag.ScenarioJson), elapsedSec, tag.Preview),
+            TagSource.Scenario => ParsePreview(tag.Preview),
             _ => ParsePreview(tag.Preview),
         };
     }
@@ -196,6 +228,11 @@ public sealed class TelemetryValueGenerator
         if (calc is null)
         {
             return ParsePreview(preview);
+        }
+
+        if (calc.Type == CalcType.Static)
+        {
+            return ParsePreview(calc.Start, ParsePreview(preview));
         }
 
         var start = ParsePreview(calc.Start ?? preview);
@@ -285,17 +322,21 @@ public sealed class TelemetryValueGenerator
         }
     }
 
-    private static double GenerateFromScenario(TagScenarioConfigDto? scenario, double elapsedSec, string preview)
+    private static object? GenerateFromScenario(
+        TagScenarioConfigDto? scenario,
+        double elapsedSec,
+        string preview,
+        TagType tagType)
     {
         if (scenario is null || scenario.Segments.Count == 0)
         {
-            return ParsePreview(preview);
+            return FromPreview(tagType, preview);
         }
 
         var total = scenario.Segments.Sum(s => Math.Max(0, s.Duration));
         if (total <= 0)
         {
-            return ParsePreview(preview);
+            return FromPreview(tagType, preview);
         }
 
         var position = elapsedSec;
@@ -312,7 +353,7 @@ public sealed class TelemetryValueGenerator
 
         if (double.IsNaN(position))
         {
-            return 0;
+            return CastNumericValue(tagType, 0);
         }
 
         var offset = 0d;
@@ -321,16 +362,35 @@ public sealed class TelemetryValueGenerator
             var duration = Math.Max(0, segment.Duration);
             if (position <= offset + duration)
             {
-                return GenerateFromCalc(segment.Calc, Math.Max(0, position - offset), preview);
+                return GenerateScenarioSegmentValue(segment, Math.Max(0, position - offset), preview, tagType);
             }
 
             offset += duration;
         }
 
-        return GenerateFromCalc(scenario.Segments[^1].Calc, scenario.Segments[^1].Duration, preview);
+        return GenerateScenarioSegmentValue(scenario.Segments[^1], scenario.Segments[^1].Duration, preview, tagType);
+    }
+
+    private static object? GenerateScenarioSegmentValue(
+        TagScenarioSegmentDto segment,
+        double elapsedSec,
+        string preview,
+        TagType tagType)
+    {
+        if (segment.Calc.Type == CalcType.Static)
+        {
+            return FromPreview(tagType, segment.Calc.Start ?? preview);
+        }
+
+        return CastNumericValue(tagType, GenerateFromCalc(segment.Calc, elapsedSec, preview));
     }
 
     private static double ParsePreview(string? value)
+    {
+        return ParsePreview(value, fallback: 0);
+    }
+
+    private static double ParsePreview(string? value, double fallback)
     {
         if (bool.TryParse(value, out var boolValue))
         {
@@ -339,6 +399,6 @@ public sealed class TelemetryValueGenerator
 
         return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result)
             ? result
-            : 0;
+            : fallback;
     }
 }

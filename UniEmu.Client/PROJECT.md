@@ -98,7 +98,6 @@ interface Emulator {
   - `scenario` — таймлайн-сценарий (см. ниже).
 - `trigger: TagTrigger` — режим срабатывания:
   - `once` — один раз при `onStart` или `onStop`;
-  - `cron` — по cron-выражению;
   - `interval` — каждые N `ms / sec / min`.
 - `calc?: TagCalcConfig` — параметры формулы (для `generator / formula`).
 - `formula?: TagFormulaConfig` — `scriptId` или `inlineScript`.
@@ -116,7 +115,6 @@ interface Emulator {
 | `Line`          | Линейная интерполяция `start → finish` за `duration` |
 | `Curve`         | Степенная кривая с показателем `curvature` |
 | `SquircleEarly` / `SquircleLate` | Сглаженные ease-кривые |
-| `Sequence`      | Перебор JSON-массива значений |
 | `Random`        | Случайное в `[start, finish]` (детерминированно по фазе) |
 | `Sinusoid`      | `start + amplitude·sin(2πt/period)` |
 | `Square`        | Меандр амплитуды `amplitude` с периодом `period` |

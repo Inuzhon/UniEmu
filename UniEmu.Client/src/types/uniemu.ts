@@ -39,7 +39,7 @@ export type TagKey = string;
 
 export type CalcType =
   | 'None'
-  | 'Text'
+  | 'Static'
   | 'Line'
   | 'Curve'
   // | 'Sequence'

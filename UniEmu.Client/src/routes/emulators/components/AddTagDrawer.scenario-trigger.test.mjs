@@ -39,3 +39,20 @@ test('edit mode reuses one fallback scenario for form state and dirty snapshot',
   assert.match(drawerSource, /setScenario\(nextScenario\);/);
   assert.match(drawerSource, /scenario: nextScenario,/);
 });
+
+test('tag drawer duplicate validation ignores realtime preview-only tag updates', async () => {
+  const componentDir = dirname(fileURLToPath(import.meta.url));
+  const drawerSource = await readFile(join(componentDir, 'AddTagDrawer.tsx'), 'utf8');
+
+  assert.match(drawerSource, /useShallow/);
+  assert.match(drawerSource, /TAG_IDENTITY_SEPARATOR/);
+  assert.match(drawerSource, /tagIdentityRows/);
+  assert.doesNotMatch(
+    drawerSource,
+    /const tagsByEmulator = useUniEmuStore\(\(s\) => s\.tagsByEmulator\);/
+  );
+  assert.doesNotMatch(
+    drawerSource,
+    /const emulatorTags = tagsByEmulator\[emulatorId\] \?\? \[\];/
+  );
+});

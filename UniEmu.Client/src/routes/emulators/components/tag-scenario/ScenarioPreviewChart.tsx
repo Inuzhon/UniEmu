@@ -116,11 +116,14 @@ export function ScenarioPreviewChart({
           {showAxes && (
             <Tooltip
               contentStyle={{
-                background: 'oklch(0.22 0.018 240)',
-                border: '1px solid oklch(0.32 0.02 240)',
+                background: 'var(--popover)',
+                border: '1px solid var(--border)',
                 borderRadius: 6,
+                color: 'var(--popover-foreground)',
                 fontSize: 12,
               }}
+              labelStyle={{ color: 'var(--popover-foreground)' }}
+              itemStyle={{ color: 'var(--popover-foreground)' }}
               labelFormatter={(v) => `t = ${formatDuration(Number(v))}`}
               formatter={(v) => [Number(v).toFixed(2), 'value']}
             />

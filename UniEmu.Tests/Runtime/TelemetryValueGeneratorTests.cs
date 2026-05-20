@@ -47,7 +47,7 @@ public sealed class TelemetryValueGeneratorTests
         return new TheoryData<CalcType, string?, string?, int?, double?, double?, double?, double?, double, double>
         {
             { CalcType.None, null, null, null, null, null, null, null, 5, 42 },
-            { CalcType.Text, "not-a-number", null, null, null, null, null, null, 5, 42 },
+            { CalcType.Static, "not-a-number", null, null, null, null, null, null, 5, 42 },
             { CalcType.Line, "10", "20", 10, null, null, null, null, 5, 15 },
             { CalcType.Line, "10", "20", 10, null, null, null, null, 10, 20 },
             { CalcType.Line, "10", "20", 10, null, null, null, null, 15, 15 },
@@ -305,6 +305,63 @@ public sealed class TelemetryValueGeneratorTests
     }
 
     [Fact]
+    public void GenerateTag_CalculatesScenarioStaticStringValue()
+    {
+        var generator = new TelemetryValueGenerator();
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z") };
+        var tag = CreateTag("Mode", "Mode", TagType.String, TagSource.Scenario, preview: "Fallback");
+        tag.ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+            [
+                CreateScenarioSegment("static", 10, CalcType.Static, start: "Idle"),
+            ],
+            ContinueOnFormulaEnd.Stretch,
+            StartValue: null));
+
+        var value = generator.GenerateTag(emulator, tag, DateTimeOffset.Parse("2026-05-09T10:00:05Z"));
+
+        Assert.Equal("Idle", value.Value);
+        Assert.Null(value.NumericValue);
+    }
+
+    [Fact]
+    public void GenerateTag_CalculatesScenarioStaticBoolValue()
+    {
+        var generator = new TelemetryValueGenerator();
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z") };
+        var tag = CreateTag("Enabled", "Enabled", TagType.Bool, TagSource.Scenario, preview: "false");
+        tag.ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+            [
+                CreateScenarioSegment("static", 10, CalcType.Static, start: "true"),
+            ],
+            ContinueOnFormulaEnd.Stretch,
+            StartValue: null));
+
+        var value = generator.GenerateTag(emulator, tag, DateTimeOffset.Parse("2026-05-09T10:00:05Z"));
+
+        Assert.Equal(true, value.Value);
+        Assert.Equal(1, value.NumericValue);
+    }
+
+    [Fact]
+    public void GenerateTag_CalculatesScenarioStaticNumericValue()
+    {
+        var generator = new TelemetryValueGenerator();
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z") };
+        var tag = CreateTag("Setpoint", "Setpoint", TagType.Double, TagSource.Scenario, preview: "0");
+        tag.ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+            [
+                CreateScenarioSegment("static", 10, CalcType.Static, start: "12.5"),
+            ],
+            ContinueOnFormulaEnd.Stretch,
+            StartValue: null));
+
+        var value = generator.GenerateTag(emulator, tag, DateTimeOffset.Parse("2026-05-09T10:00:05Z"));
+
+        Assert.Equal(12.5d, value.Value);
+        Assert.Equal(12.5d, value.NumericValue);
+    }
+
+    [Fact]
     public void GenerateTag_StretchesScenarioToLastSegmentValueAfterTotalDuration()
     {
         var generator = new TelemetryValueGenerator();
@@ -338,6 +395,67 @@ public sealed class TelemetryValueGeneratorTests
             StartValue: null));
 
         var value = generator.GenerateTag(emulator, tag, DateTimeOffset.Parse("2026-05-09T10:00:10Z"));
+
+        Assert.Equal(0d, value.Value);
+        Assert.Equal(0d, value.NumericValue);
+    }
+
+    [Theory]
+    [MemberData(nameof(ScenarioEndBehaviorCases))]
+    public void GenerateTag_AppliesScenarioEndBehaviorAfterTotalDuration(
+        ContinueOnFormulaEnd endBehavior,
+        double elapsedSec,
+        double expected)
+    {
+        var generator = new TelemetryValueGenerator();
+        var startedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z");
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = startedAt };
+        var tag = CreateTwoSegmentScenarioTag(endBehavior);
+
+        var value = generator.GenerateTag(emulator, tag, startedAt.AddSeconds(elapsedSec));
+
+        Assert.Equal(expected, Assert.IsType<double>(value.Value), precision: 12);
+        Assert.Equal(expected, value.NumericValue!.Value, precision: 12);
+    }
+
+    public static TheoryData<ContinueOnFormulaEnd, double, double> ScenarioEndBehaviorCases()
+    {
+        return new TheoryData<ContinueOnFormulaEnd, double, double>
+        {
+            { ContinueOnFormulaEnd.NoSignal, 18, 0 },
+            { ContinueOnFormulaEnd.Zero, 18, 0 },
+            { ContinueOnFormulaEnd.Repeat, 18, 30 },
+            { ContinueOnFormulaEnd.Stretch, 18, 200 },
+        };
+    }
+
+    [Theory]
+    [InlineData(ContinueOnFormulaEnd.NoSignal)]
+    [InlineData(ContinueOnFormulaEnd.Zero)]
+    [InlineData(ContinueOnFormulaEnd.Repeat)]
+    [InlineData(ContinueOnFormulaEnd.Stretch)]
+    public void GenerateTag_CalculatesScenarioEndBoundaryBeforeApplyingEndBehavior(ContinueOnFormulaEnd endBehavior)
+    {
+        var generator = new TelemetryValueGenerator();
+        var startedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z");
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = startedAt };
+        var tag = CreateTwoSegmentScenarioTag(endBehavior);
+
+        var value = generator.GenerateTag(emulator, tag, startedAt.AddSeconds(15));
+
+        Assert.Equal(200d, value.Value);
+        Assert.Equal(200d, value.NumericValue);
+    }
+
+    [Fact]
+    public void GenerateTag_RepeatedScenarioStartsNextCycleAtExactMultipleOfTotalDuration()
+    {
+        var generator = new TelemetryValueGenerator();
+        var startedAt = DateTimeOffset.Parse("2026-05-09T10:00:00Z");
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = startedAt };
+        var tag = CreateTwoSegmentScenarioTag(ContinueOnFormulaEnd.Repeat);
+
+        var value = generator.GenerateTag(emulator, tag, startedAt.AddSeconds(30));
 
         Assert.Equal(0d, value.Value);
         Assert.Equal(0d, value.NumericValue);
@@ -386,5 +504,19 @@ public sealed class TelemetryValueGeneratorTests
                 curvature,
                 distortion),
             Label: id);
+    }
+
+    private static EmulatorTagEntity CreateTwoSegmentScenarioTag(ContinueOnFormulaEnd endBehavior)
+    {
+        var tag = CreateTag("Load", "Load", TagType.Double, TagSource.Scenario, preview: "99");
+        tag.ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+            [
+                CreateScenarioSegment("ramp-up", 10, CalcType.Line, start: "0", finish: "100"),
+                CreateScenarioSegment("ramp-out", 5, CalcType.Line, start: "100", finish: "200"),
+            ],
+            endBehavior,
+            StartValue: null));
+
+        return tag;
     }
 }

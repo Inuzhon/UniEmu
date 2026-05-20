@@ -134,8 +134,8 @@ public enum CalcType
     /// <summary>Генератор не используется.</summary>
     None,
 
-    /// <summary>Текстовое значение.</summary>
-    Text,
+    /// <summary>Статическое значение.</summary>
+    Static,
 
     /// <summary>Линейное изменение значения.</summary>
     Line,

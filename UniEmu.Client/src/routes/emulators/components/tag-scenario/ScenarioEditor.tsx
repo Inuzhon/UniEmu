@@ -23,8 +23,9 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { TagScenarioConfig, TagScenarioSegment } from '@/types/uniemu';
+import type { TagScenarioConfig, TagScenarioSegment, TagType } from '@/types/uniemu';
 import { CalcConfigFields } from './CalcConfigFields';
+import { SCENARIO_CALC_TYPES } from './calcTypeOptions';
 import { ScenarioPreviewChart, ScenarioSparkline } from './ScenarioPreviewChart';
 import { defaultSegment, formatDuration, totalDuration, valueAt } from './scenarioMath';
 import { localization } from '@/localization';
@@ -32,6 +33,7 @@ import { localization } from '@/localization';
 interface Props {
   value: TagScenarioConfig;
   onChange: (next: TagScenarioConfig) => void;
+  tagType: TagType;
 }
 
 type DurUnit = 'sec' | 'min';
@@ -49,7 +51,7 @@ function cloneSegment(seg: TagScenarioSegment): TagScenarioSegment {
   };
 }
 
-export function ScenarioEditor({ value, onChange }: Props) {
+export function ScenarioEditor({ value, onChange, tagType }: Props) {
   const segments = value.segments;
 
   const [selectedId, setSelectedId] = useState<string | null>(segments[0]?.id ?? null);
@@ -491,6 +493,8 @@ export function ScenarioEditor({ value, onChange }: Props) {
               <CalcConfigFields
                 value={selected.calc}
                 onChange={(calc) => updateSeg(selectedIdx, { calc })}
+                tagType={tagType}
+                calcTypes={SCENARIO_CALC_TYPES}
                 hideDuration
                 compact
               />

@@ -8,7 +8,7 @@ import type {
 
 export const CALC_TYPE_LABELS: Record<CalcType, string> = {
   None: 'Без расчёта',
-  Text: 'Текст',
+  Static: 'Статическое значение',
   Line: 'Линейная',
   Curve: 'Кривая',
   // Sequence: 'Последовательность',

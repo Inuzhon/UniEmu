@@ -256,6 +256,8 @@ export const localization = {
           tagNamePlaceholder: '',
           tagNameHint: 'Отображаемое имя - для удобства в UI.',
           tagKeyHint: 'Ключ, который уходит в SCADA-payload.',
+          duplicateNameError: 'Имя тега уже используется в этом эмуляторе',
+          duplicateKeyError: 'Ключ тега уже используется в этом эмуляторе',
           optionalBadge: '(опционально)',
           specialParameterHint: 'Отдельное поле UniEmu protocol - не влияет на Name и Key.',
           roundDigitsLabel: 'Округлять до',
@@ -434,6 +436,8 @@ export const localization = {
         },
         tagScenario: {
           calcConfigFields: {
+            formulaTypeLabel: 'Формула расчёта',
+            valueLabel: 'Значение',
             sequenceJsonLabel: 'Список (JSON)',
             periodSecondsLabel: 'Период (с)',
             durationSecondsLabel: 'Продолжительность (сек)',
@@ -463,7 +467,7 @@ export const localization = {
             moveDownMenuLabel: 'Вниз',
             deleteMenuLabel: 'Удалить',
             labelFieldLabel: 'Метка',
-            labelPlaceholder: 'Разгон…',
+            labelPlaceholder: '',
             durationLabel: 'Длительность',
             durationUnitLabel: 'Единица',
             secondsUnitLabel: 'сек',

@@ -53,6 +53,10 @@ public sealed class TagsController(TagService service) : ControllerBase
                 diagnostics = ex.Diagnostics,
             });
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     /// <summary>
@@ -78,6 +82,10 @@ public sealed class TagsController(TagService service) : ControllerBase
                 message = "CSX script validation failed.",
                 diagnostics = ex.Diagnostics,
             });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
         }
     }
 

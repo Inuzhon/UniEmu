@@ -19,7 +19,13 @@ test('tag edit drawer displays localized formula and base-card labels', async ()
   assert.match(drawerSource, /getTagTypeLabel\(tagType\)/);
   assert.match(drawerSource, /id: 'formulaScript'/);
   assert.match(drawerSource, /source === 'formulaScript'/);
-  assert.match(localizationSource, /parameterKeyLabel: 'Ключ параметра'/);
+  assert.match(drawerSource, /tagsByEmulator/);
+  assert.match(drawerSource, /duplicateNameError/);
+  assert.match(drawerSource, /duplicateKeyError/);
+  assert.match(drawerSource, /normalizeTagIdentity/);
+  assert.match(localizationSource, /duplicateNameError: 'Имя тега уже используется в этом эмуляторе'/);
+  assert.match(localizationSource, /duplicateKeyError: 'Ключ тега уже используется в этом эмуляторе'/);
+  assert.match(localizationSource, /tagKeyLabel: 'Ключ тега'/);
   assert.match(localizationSource, /specialParameterLabel: 'Специальный параметр'/);
   assert.match(localizationSource, /dataTypeLabel: 'Тип данных'/);
   assert.match(calcLabelsSource, /Line: 'Линейная'/);

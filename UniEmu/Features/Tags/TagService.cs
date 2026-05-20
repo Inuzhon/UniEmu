@@ -57,15 +57,18 @@ public sealed class TagService(
             return null;
         }
 
-        await ValidateInlineScriptAsync(emulatorId, $"inline/{request.Name.Trim()}.csx", request.Formula?.InlineScript, request.Type, cancellationToken);
+        var name = request.Name.Trim();
+        var key = request.Key.Trim();
+        await ValidateUniqueTagIdentityAsync(emulatorId, excludedTagId: null, name, key, cancellationToken);
+        await ValidateInlineScriptAsync(emulatorId, $"inline/{name}.csx", request.Formula?.InlineScript, request.Type, cancellationToken);
 
         var trigger = TagTriggerNormalizer.Normalize(request.Source, request.Trigger);
         var entity = new EmulatorTagEntity
         {
             Id = $"tg-{Guid.NewGuid():N}"[..12],
             EmulatorId = emulatorId,
-            Name = request.Name.Trim(),
-            Key = request.Key.Trim(),
+            Name = name,
+            Key = key,
             Type = UniEmuJson.EnumString(request.Type),
             Source = UniEmuJson.EnumString(request.Source),
             Preview = request.Preview,
@@ -104,11 +107,13 @@ public sealed class TagService(
             return null;
         }
 
+        var name = request.Name.Trim();
+        var key = request.Key.Trim();
+        await ValidateUniqueTagIdentityAsync(emulatorId, entity.Id, name, key, cancellationToken);
         await ValidateInlineScriptAsync(emulatorId, $"inline/{entity.Id}.csx", request.Formula?.InlineScript, request.Type, cancellationToken);
-
         var trigger = TagTriggerNormalizer.Normalize(request.Source, request.Trigger);
-        entity.Name = request.Name.Trim();
-        entity.Key = request.Key.Trim();
+        entity.Name = name;
+        entity.Key = key;
         entity.Type = UniEmuJson.EnumString(request.Type);
         entity.Source = UniEmuJson.EnumString(request.Source);
         entity.Preview = request.Preview;
@@ -152,6 +157,38 @@ public sealed class TagService(
     private static int? NormalizeRoundDigits(int? value)
     {
         return value is null ? null : Math.Clamp(value.Value, 0, 15);
+    }
+
+    /// <summary>
+    /// Проверяет уникальность имени и ключа тега внутри одного эмулятора.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="excludedTagId">Идентификатор редактируемого тега, который нужно исключить из проверки.</param>
+    /// <param name="name">Нормализованное имя тега.</param>
+    /// <param name="key">Нормализованный ключ тега.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    private async Task ValidateUniqueTagIdentityAsync(
+        string emulatorId,
+        string? excludedTagId,
+        string name,
+        string key,
+        CancellationToken cancellationToken)
+    {
+        var existingTags = await db.EmulatorTags
+            .AsNoTracking()
+            .Where(t => t.EmulatorId == emulatorId && (excludedTagId == null || t.Id != excludedTagId))
+            .Select(t => new { t.Name, t.Key })
+            .ToListAsync(cancellationToken);
+
+        if (existingTags.Any(t => string.Equals(t.Name.Trim(), name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Тег с таким именем уже существует в этом эмуляторе.");
+        }
+
+        if (existingTags.Any(t => string.Equals(t.Key.Trim(), key, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Тег с таким ключом уже существует в этом эмуляторе.");
+        }
     }
 
     private async Task ValidateInlineScriptAsync(
