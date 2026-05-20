@@ -80,7 +80,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
   online: true,
   loading: false,
   apiError: null,
-  packetRetention: 50,
+  packetRetention: 3000,
   hydrate: async () => {
     set({ loading: true, apiError: null });
     try {

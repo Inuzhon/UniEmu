@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams, useRouter } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -61,6 +62,13 @@ import { TimeAgo } from '@/components/TimeAgo';
 import { AddTagDrawer } from './AddTagDrawer';
 import { EditEmulatorDrawer } from './EditEmulatorDrawer';
 import { ScenarioPreviewChart, ScenarioSparkline } from './tag-scenario/ScenarioPreviewChart';
+import {
+  getTelemetryYBaseRange,
+  getTelemetryYDomain,
+  panTelemetryYViewport,
+  zoomTelemetryYViewport,
+} from './telemetryChartViewport';
+import type { TelemetryYViewport } from './telemetryChartViewport';
 import {
   getCalcTypeLabel,
   getContinueOnFormulaEndLabel,
@@ -150,9 +158,19 @@ export function EmulatorDetailPage() {
   const [openPackets, setOpenPackets] = useState<Record<number, boolean>>({});
   const [telemetryPaused, setTelemetryPaused] = useState(false);
   const [pausedTelemetrySnapshot, setPausedTelemetrySnapshot] = useState<TelemetryPoint[]>([]);
+  const [telemetryYViewport, setTelemetryYViewport] = useState<TelemetryYViewport>({
+    zoom: 1,
+    offset: 0,
+  });
   const [hiddenTelemetryTagNames, setHiddenTelemetryTagNames] = useState<Set<string>>(
     () => new Set()
   );
+  const telemetryChartRef = useRef<HTMLDivElement | null>(null);
+  const telemetryDragStartRef = useRef<{
+    pointerId: number;
+    y: number;
+    viewport: TelemetryYViewport;
+  } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [templateDownloading, setTemplateDownloading] = useState(false);
   const [programPreviewPickerOpenId, setProgramPreviewPickerOpenId] = useState<string | null>(null);
@@ -268,6 +286,18 @@ export function EmulatorDetailPage() {
     });
     return [...keys];
   }, [telemetry]);
+  const telemetryYBaseRange = useMemo(() => getTelemetryYBaseRange(telemetry), [telemetry]);
+  const telemetryYDomain = useMemo(
+    () => getTelemetryYDomain(telemetryYBaseRange, telemetryYViewport),
+    [telemetryYBaseRange, telemetryYViewport]
+  );
+
+  useEffect(() => {
+    setTelemetryYViewport((current) => {
+      if (!telemetryYBaseRange) return { zoom: 1, offset: 0 };
+      return panTelemetryYViewport(current, telemetryYBaseRange, 0);
+    });
+  }, [telemetryYBaseRange]);
 
   const toggleTelemetryTagVisibility = (tagName: string) => {
     setHiddenTelemetryTagNames((current) => {
@@ -279,6 +309,49 @@ export function EmulatorDetailPage() {
       }
       return next;
     });
+  };
+
+  const handleTelemetryChartWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!telemetryYBaseRange) return;
+
+    event.preventDefault();
+    setTelemetryYViewport((current) =>
+      panTelemetryYViewport(
+        zoomTelemetryYViewport(current, event.deltaY),
+        telemetryYBaseRange,
+        0
+      )
+    );
+  };
+
+  const handleTelemetryChartPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!telemetryYBaseRange || telemetryYViewport.zoom <= 1) return;
+
+    telemetryDragStartRef.current = {
+      pointerId: event.pointerId,
+      y: event.clientY,
+      viewport: telemetryYViewport,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleTelemetryChartPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const dragStart = telemetryDragStartRef.current;
+    if (!dragStart || dragStart.pointerId !== event.pointerId || !telemetryYBaseRange) return;
+
+    const chartHeight = telemetryChartRef.current?.getBoundingClientRect().height ?? 0;
+    const startDomain = getTelemetryYDomain(telemetryYBaseRange, dragStart.viewport);
+    if (chartHeight <= 0 || !startDomain) return;
+
+    const valueDelta = ((event.clientY - dragStart.y) / chartHeight) * (startDomain[1] - startDomain[0]);
+    setTelemetryYViewport(panTelemetryYViewport(dragStart.viewport, telemetryYBaseRange, valueDelta));
+  };
+
+  const handleTelemetryChartPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (telemetryDragStartRef.current?.pointerId !== event.pointerId) return;
+
+    telemetryDragStartRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   // Build packet history (newest first), bounded by retention setting
@@ -874,7 +947,18 @@ export function EmulatorDetailPage() {
                   ))}
                 </div>
               )}
-              <div className="h-[320px] w-full">
+              <div
+                ref={telemetryChartRef}
+                className={cn(
+                  'h-[320px] w-full touch-none select-none',
+                  telemetryYViewport.zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'
+                )}
+                onWheel={handleTelemetryChartWheel}
+                onPointerDown={handleTelemetryChartPointerDown}
+                onPointerMove={handleTelemetryChartPointerMove}
+                onPointerUp={handleTelemetryChartPointerEnd}
+                onPointerCancel={handleTelemetryChartPointerEnd}
+              >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={telemetry}
@@ -891,7 +975,13 @@ export function EmulatorDetailPage() {
                       fontSize={10}
                       tickLine={false}
                     />
-                    <YAxis stroke="oklch(0.68 0.025 235)" fontSize={10} tickLine={false} />
+                    <YAxis
+                      domain={telemetryYDomain}
+                      allowDataOverflow
+                      stroke="oklch(0.68 0.025 235)"
+                      fontSize={10}
+                      tickLine={false}
+                    />
                     <Tooltip
                       contentStyle={{
                         background: 'var(--popover)',

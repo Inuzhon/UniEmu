@@ -134,3 +134,17 @@ test('monitoring chart keeps tag colors stable when visible tags are toggled', a
   assert.match(source, /const tagIndex = numericTelemetryTags\.findIndex\(\(t\) => t\.name === key\)/);
   assert.doesNotMatch(source, /const tagIndex = visibleNumericTelemetryTags\.findIndex\(\(t\) => t\.name === key\)/);
 });
+
+test('monitoring chart supports y-axis wheel zoom and vertical pointer drag without control buttons', async () => {
+  const source = await readFile(join(dirname(fileURLToPath(import.meta.url)), 'EmulatorDetailPage.tsx'), 'utf8');
+
+  assert.match(source, /const \[telemetryYViewport, setTelemetryYViewport\] = useState<TelemetryYViewport>/);
+  assert.match(source, /const telemetryYBaseRange = useMemo\(\(\) => getTelemetryYBaseRange\(telemetry\), \[telemetry\]\)/);
+  assert.match(source, /const telemetryYDomain = useMemo/);
+  assert.match(source, /onWheel=\{handleTelemetryChartWheel\}/);
+  assert.match(source, /onPointerDown=\{handleTelemetryChartPointerDown\}/);
+  assert.match(source, /onPointerMove=\{handleTelemetryChartPointerMove\}/);
+  assert.match(source, /domain=\{telemetryYDomain\}/);
+  assert.match(source, /allowDataOverflow/);
+  assert.doesNotMatch(source, /ZoomIn|ZoomOut|ArrowUp|ArrowDown/);
+});
