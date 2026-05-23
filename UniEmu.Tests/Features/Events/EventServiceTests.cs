@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
+using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Features.Events;
@@ -32,6 +33,25 @@ public sealed class EventServiceTests
             command => command.Contains("SystemEvents", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("WHERE", eventQuery, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("LIMIT", eventQuery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ReturnsNull_WhenEmulatorDoesNotExist()
+    {
+        await using var fixture = await EventDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new EventService(db, new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+        var request = new PushEventRequest(
+            "missing",
+            "Missing emulator",
+            EventLevel.Warn,
+            "Unexpected event",
+            DateTimeOffset.Parse("2026-05-10T12:10:00Z"));
+
+        var created = await service.CreateAsync(request, CancellationToken.None);
+
+        Assert.Null(created);
+        Assert.False(await db.SystemEvents.AnyAsync(ev => ev.EmulatorId == "missing"));
     }
 
     private sealed class EventDbFixture : IAsyncDisposable

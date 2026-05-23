@@ -206,6 +206,47 @@ public sealed class TagValueJobTests
         Assert.Contains("boom", emulator.LastError, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Execute_DoesNotPublishValue_WhenCachedRunningEmulatorWasStoppedInDatabase()
+    {
+        await using var fixture = await TagValueJobDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var broadcaster = new CapturingRuntimeUpdateBroadcaster();
+        var job = new TagValueJob(
+            db,
+            dataCache,
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            stateStore,
+            flushService,
+            new RuntimeUpdateService(broadcaster),
+            NullLogger<TagValueJob>.Instance);
+
+        var cached = await dataCache.GetEmulatorWithTagsAsync("em-1", CancellationToken.None);
+        Assert.Equal(nameof(EmulatorStatus.Running), cached?.Status);
+
+        await using (var updateDb = fixture.CreateDbContext())
+        {
+            var emulator = await updateDb.Emulators.SingleAsync(e => e.Id == "em-1");
+            emulator.Status = nameof(EmulatorStatus.Error);
+            emulator.LastError = "Blocked";
+            await updateDb.SaveChangesAsync();
+        }
+
+        await job.Execute(CreateContext("tg-start"));
+        await flushService.FlushAsync();
+
+        Assert.False(stateStore.TryGet("em-1", "tg-start", out _));
+        Assert.Empty(broadcaster.TagValues);
+
+        db.ChangeTracker.Clear();
+        var tag = await db.EmulatorTags.SingleAsync(t => t.Id == "tg-start");
+        Assert.Equal("(computed)", tag.Preview);
+    }
+
     private static IJobExecutionContext CreateContext(string tagId)
     {
         var context = new Mock<IJobExecutionContext>();
@@ -327,6 +368,32 @@ public sealed class TagValueJobTests
                     Distortion: null)),
                 FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, "return (double)UniEmu.Tag.Value! * 2;")),
             };
+        }
+    }
+
+    private sealed class CapturingRuntimeUpdateBroadcaster : IRuntimeUpdateBroadcaster
+    {
+        public List<RuntimeTagValueUpdateDto> TagValues { get; } = [];
+
+        public Task SendTelemetryAsync(RuntimeTelemetryUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SendTagValueAsync(RuntimeTagValueUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            TagValues.Add(update);
+            return Task.CompletedTask;
+        }
+
+        public Task SendEmulatorUpdatedAsync(EmulatorDto emulator, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SendEventCreatedAsync(SystemEventDto ev, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
     }
 

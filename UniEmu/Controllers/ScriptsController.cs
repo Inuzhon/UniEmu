@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
@@ -40,8 +40,15 @@ public sealed class ScriptsController(ScriptService service) : ControllerBase
             return BadRequest("Name is required.");
         }
 
-        var script = await service.CreateAsync(request, cancellationToken);
-        return script is null ? BadRequest("Invalid scope/emulatorId combination.") : CreatedAtAction(nameof(List), script);
+        try
+        {
+            var script = await service.CreateAsync(request, cancellationToken);
+            return script is null ? BadRequest("Invalid scope/emulatorId combination.") : CreatedAtAction(nameof(List), script);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     /// <summary>
@@ -66,6 +73,10 @@ public sealed class ScriptsController(ScriptService service) : ControllerBase
                 message = "CSX script validation failed.",
                 diagnostics = ex.Diagnostics,
             });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
         }
     }
 

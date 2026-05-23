@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Quartz;
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
@@ -54,6 +54,13 @@ public sealed class TagValueJob(
         {
             var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
             var value = await GenerateTagValueAsync(emulator, tag, source, now, cancellationToken);
+
+            if (!await IsEmulatorStillRunningAsync(emulatorId, cancellationToken))
+            {
+                dataCache.InvalidateEmulator(emulatorId);
+                stateStore.Remove(emulatorId, tagId);
+                return;
+            }
 
             var preview = TelemetryValueGenerator.ToPreview(value.Value);
             tag.Preview = preview;
@@ -121,5 +128,14 @@ public sealed class TagValueJob(
         return source is TagSource.Script or TagSource.Formula
             ? await scriptExecutionService.GenerateScriptTagAsync(emulator, tag, timestamp, cancellationToken)
             : valueGenerator.GenerateTag(emulator, tag, timestamp);
+    }
+
+    private async Task<bool> IsEmulatorStillRunningAsync(string emulatorId, CancellationToken cancellationToken)
+    {
+        return await db.Emulators
+            .AsNoTracking()
+            .AnyAsync(
+                emulator => emulator.Id == emulatorId && emulator.Status == nameof(EmulatorStatus.Running),
+                cancellationToken);
     }
 }

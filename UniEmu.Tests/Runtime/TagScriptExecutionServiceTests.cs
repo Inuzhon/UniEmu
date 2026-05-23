@@ -300,6 +300,26 @@ public sealed class TagScriptExecutionServiceTests
     }
 
     [Fact]
+    public async Task GenerateScriptTagAsync_ThrowsTimeout_WhenCpuBoundScriptDoesNotYield()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db, new TagRuntimeStateStore(), scriptExecutionTimeout: TimeSpan.FromMilliseconds(100));
+        var (emulator, tag) = await LoadAsync(db, "tg-cpu-bound-loop");
+
+        var generationTask = service.GenerateScriptTagAsync(
+            emulator,
+            tag,
+            DateTimeOffset.Parse("2026-05-11T10:00:00Z"),
+            CancellationToken.None);
+        var completedTask = await Task.WhenAny(generationTask, Task.Delay(TimeSpan.FromSeconds(2)));
+
+        Assert.Same(generationTask, completedTask);
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() => generationTask);
+        Assert.Contains("timed out", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GenerateScriptTagAsync_CanAwaitRestWorkerOperation()
     {
         await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
@@ -326,7 +346,8 @@ public sealed class TagScriptExecutionServiceTests
         ITagScriptRestOperations? restOperations = null,
         TagPreviewFlushService? previewFlushService = null,
         CachedUniEmuDataService? dataCache = null,
-        CompiledTagScriptCache? compiledCache = null)
+        CompiledTagScriptCache? compiledCache = null,
+        TimeSpan? scriptExecutionTimeout = null)
     {
         return new TagScriptExecutionService(
             db,
@@ -334,7 +355,8 @@ public sealed class TagScriptExecutionServiceTests
             stateStore,
             compiledCache ?? new CompiledTagScriptCache(),
             restOperations,
-            previewFlushService);
+            previewFlushService,
+            scriptExecutionTimeout);
     }
 
     private static async Task<GeneratedTagValue> GenerateScriptTagWithDiagnosticsAsync(
@@ -698,6 +720,16 @@ public sealed class TagScriptExecutionServiceTests
                     "forbidden-api",
                     TagType.String,
                     "return System.Environment.GetEnvironmentVariable(\"UNIEMU_SECRET\");"),
+                CreateScriptTag(
+                    "tg-cpu-bound-loop",
+                    "CPU bound loop",
+                    "cpu-bound-loop",
+                    TagType.Int,
+                    """
+                    while (true)
+                    {
+                    }
+                    """),
                 CreateScriptTag(
                     "tg-rest-worker",
                     "Rest worker",

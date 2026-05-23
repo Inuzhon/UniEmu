@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Contracts.Requests;
@@ -38,8 +38,15 @@ public sealed class CncProgramsController(CncProgramService service) : Controlle
             return BadRequest("Name is required.");
         }
 
-        var program = await service.CreateAsync(request, cancellationToken);
-        return program is null ? BadRequest("Invalid scope/emulatorId combination.") : Created("api/cnc-programs", program);
+        try
+        {
+            var program = await service.CreateAsync(request, cancellationToken);
+            return program is null ? BadRequest("Invalid scope/emulatorId combination.") : Created("api/cnc-programs", program);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     /// <summary>
@@ -52,8 +59,15 @@ public sealed class CncProgramsController(CncProgramService service) : Controlle
     [HttpPost("api/emulators/{emulatorId}/cnc-programs")]
     public async Task<ActionResult<CncProgramDto>> CreateForEmulator(string emulatorId, CreateCncProgramRequest request, CancellationToken cancellationToken)
     {
-        var program = await service.CreateForEmulatorAsync(emulatorId, request, cancellationToken);
-        return program is null ? NotFound() : Created("api/cnc-programs", program);
+        try
+        {
+            var program = await service.CreateForEmulatorAsync(emulatorId, request, cancellationToken);
+            return program is null ? NotFound() : Created("api/cnc-programs", program);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     /// <summary>
@@ -66,8 +80,15 @@ public sealed class CncProgramsController(CncProgramService service) : Controlle
     [HttpPatch("api/cnc-programs/{programId}")]
     public async Task<ActionResult<CncProgramDto>> Patch(string programId, PatchCncProgramRequest request, CancellationToken cancellationToken)
     {
-        var program = await service.PatchAsync(programId, request, cancellationToken);
-        return program is null ? NotFound() : Ok(program);
+        try
+        {
+            var program = await service.PatchAsync(programId, request, cancellationToken);
+            return program is null ? NotFound() : Ok(program);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     /// <summary>
