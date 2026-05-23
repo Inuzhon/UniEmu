@@ -5,6 +5,12 @@ COPY ["UniEmu.Client/package.json", "UniEmu.Client/yarn.lock", "./"]
 RUN yarn install --frozen-lockfile
 
 COPY ["UniEmu.Client/", "./"]
+ARG VITE_API_BASE_URL=
+ARG VITE_API_PROXY_TARGET=http://localhost:5083
+ARG VITE_PERSIST_STORE=false
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
+    VITE_API_PROXY_TARGET=$VITE_API_PROXY_TARGET \
+    VITE_PERSIST_STORE=$VITE_PERSIST_STORE
 RUN yarn build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
