@@ -144,6 +144,36 @@ public sealed class EmulatorServiceTests
     }
 
     [Fact]
+    public async Task PatchStatusAsync_AssignsNewStartedAt_WhenEmulatorRestarts()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var initialStartedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var emulator = await db.Emulators.SingleAsync(e => e.Id == "em-1");
+        emulator.StartedAt = initialStartedAt;
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await service.PatchStatusAsync(
+            "em-1",
+            new PatchEmulatorStatusRequest(EmulatorStatus.Stopped),
+            CancellationToken.None);
+        var stopped = await db.Emulators.SingleAsync(e => e.Id == "em-1");
+        var stoppedStartedAt = stopped.StartedAt;
+        var restartRequestedAt = DateTimeOffset.UtcNow;
+        await service.PatchStatusAsync(
+            "em-1",
+            new PatchEmulatorStatusRequest(EmulatorStatus.Running),
+            CancellationToken.None);
+
+        var restarted = await db.Emulators.SingleAsync(e => e.Id == "em-1");
+        Assert.Null(stoppedStartedAt);
+        Assert.NotNull(restarted.StartedAt);
+        Assert.True(restarted.StartedAt >= restartRequestedAt);
+        Assert.NotEqual(initialStartedAt, restarted.StartedAt);
+    }
+
+    [Fact]
     public async Task PatchStatusAsync_DoesNotCreateEvent_WhenStatusDoesNotChange()
     {
         await using var fixture = await EmulatorServiceDbFixture.CreateAsync();

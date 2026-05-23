@@ -245,6 +245,33 @@ public sealed class TelemetryValueGeneratorTests
     }
 
     [Fact]
+    public void GenerateTag_RestartsScenarioTimeline_WhenEmulatorStartedAtChanges()
+    {
+        var generator = new TelemetryValueGenerator();
+        var firstStart = DateTimeOffset.Parse("2026-05-09T10:00:00Z");
+        var secondStart = DateTimeOffset.Parse("2026-05-09T10:01:00Z");
+        var emulator = new EmulatorEntity { Id = "emu-1", StartedAt = firstStart };
+        var tag = CreateTag("Load", "Load", TagType.Double, TagSource.Scenario, preview: "0");
+        tag.ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+            [
+                CreateScenarioSegment("line", 10, CalcType.Line, start: "0", finish: "100"),
+            ],
+            ContinueOnFormulaEnd.Stretch,
+            StartValue: null));
+
+        var beforeRestart = generator.GenerateTag(emulator, tag, firstStart.AddSeconds(8));
+        tag.Preview = TelemetryValueGenerator.ToPreview(beforeRestart.Value);
+        emulator.StartedAt = secondStart;
+
+        var afterRestart = generator.GenerateTag(emulator, tag, secondStart.AddSeconds(2));
+
+        Assert.Equal(80d, beforeRestart.Value);
+        Assert.Equal("80", tag.Preview);
+        Assert.Equal(20d, afterRestart.Value);
+        Assert.Equal(20d, afterRestart.NumericValue);
+    }
+
+    [Fact]
     public void GenerateTag_CalculatesSingleSegmentScenarioWithCurve()
     {
         var generator = new TelemetryValueGenerator();
