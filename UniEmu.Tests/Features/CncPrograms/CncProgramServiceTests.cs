@@ -66,6 +66,53 @@ public sealed class CncProgramServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_RejectsDuplicateSharedName_BeforeSaveChanges()
+    {
+        await using var fixture = await CncProgramDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = fixture.CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateAsync(
+                new CreateCncProgramRequest(" shared.nc ", CncScope.Shared, null, "M02", 0, null, null),
+                CancellationToken.None));
+
+        Assert.Equal("CNC-программа с таким именем уже существует в этой области видимости.", exception.Message);
+        Assert.Equal(4, await db.CncPrograms.CountAsync());
+    }
+
+    [Fact]
+    public async Task PatchAsync_RejectsDuplicateEmulatorName_BeforeSaveChanges()
+    {
+        await using var fixture = await CncProgramDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.CncPrograms.Add(new CncProgramEntity
+        {
+            Id = "cnc-local-other",
+            Name = "finish.nc",
+            Scope = UniEmuJson.EnumString(CncScope.Emulator),
+            EmulatorId = "em-1",
+            Content = "G02",
+            Description = string.Empty,
+            SizeBytes = 3,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            UploadedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        var service = fixture.CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PatchAsync(
+                "cnc-local",
+                new PatchCncProgramRequest(" finish.nc ", null, null),
+                CancellationToken.None));
+
+        Assert.Equal("CNC-программа с таким именем уже существует в этой области видимости.", exception.Message);
+        var unchanged = await db.CncPrograms.SingleAsync(program => program.Id == "cnc-local");
+        Assert.Equal("local.nc", unchanged.Name);
+    }
+
+    [Fact]
     public async Task PatchAsync_UpdatesContentSizeAndRefreshesVisibleProgramCache()
     {
         await using var fixture = await CncProgramDbFixture.CreateAsync();

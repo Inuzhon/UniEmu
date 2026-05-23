@@ -434,18 +434,13 @@ public sealed class CsxIntellisenseService(
         var scripts = await query
             .OrderBy(script => script.Scope == sharedScope ? 0 : 1)
             .ThenBy(script => script.Name)
-            .Select(script => new { script.Name, script.Content })
             .ToListAsync(cancellationToken);
 
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var script in scripts)
-        {
-            result[TagScriptPath.Normalize(script.Name)] = script.Content;
-        }
+        var result = VisibleScriptResolver.ToContentMap(scripts);
 
         if (!string.IsNullOrWhiteSpace(context.ScriptName))
         {
-            result[TagScriptPath.Normalize(context.ScriptName)] = sourceCode;
+            VisibleScriptResolver.AddOrReplace(result, context.ScriptName, sourceCode);
         }
 
         return result;

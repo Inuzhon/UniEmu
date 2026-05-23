@@ -116,6 +116,35 @@ public sealed class TagServiceScriptValidationTests
     }
 
     [Fact]
+    public async Task CreateAsync_UsesEmulatorScopedLoadedScript_WhenSharedScriptHasSamePath()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var shared = await db.ScriptFiles.SingleAsync(script => script.Id == "scr-shared");
+        shared.Content = "string Value() => \"bad\";";
+        db.ScriptFiles.Add(new ScriptFileEntity
+        {
+            Id = "scr-local-common",
+            Name = "common.csx",
+            Scope = "emulator",
+            EmulatorId = "em-1",
+            Content = "double Value() => 2;",
+            SizeBytes = 21,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var created = await service.CreateAsync(
+            "em-1",
+            CreateRequest("#load \"common.csx\"\nreturn Value();"),
+            CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.Equal("Inline tag", created.Name);
+    }
+
+    [Fact]
     public async Task CreateAsync_RejectsInvalidTagCompatibility_BeforeSaving()
     {
         await using var fixture = await TagDbFixture.CreateAsync();

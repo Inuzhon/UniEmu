@@ -10,17 +10,19 @@ using UniEmu.Realtime;
 namespace UniEmu.Runtime;
 
 /// <summary>
-/// Quartz-задача проверки блокировки мониторинга в Dispatcher.
+/// Quartz-задача проверки блокировки мониторинга в Диспетчере.
 /// </summary>
 [DisallowConcurrentExecution]
 public sealed class DispatcherBlockCheckJob(
     UniEmuDbContext db,
+    CachedUniEmuDataService dataCache,
+    EmulatorScheduleService scheduleService,
     TelemetryPacketSender sender,
     RuntimeUpdateService runtimeUpdateService,
     ILogger<DispatcherBlockCheckJob> logger) : IJob
 {
     /// <summary>
-    /// Переводит эмулятор в ошибку, если Dispatcher сообщил о блокировке мониторинга.
+    /// Переводит эмулятор в ошибку, если Диспетчер сообщил о блокировке мониторинга.
     /// </summary>
     /// <param name="context">Контекст Quartz с идентификатором эмулятора.</param>
     /// <returns>Задача проверки блокировки.</returns>
@@ -75,6 +77,11 @@ public sealed class DispatcherBlockCheckJob(
             db.SystemEvents.Add(systemEvent);
 
             await db.SaveChangesAsync(cancellationToken);
+            
+            // TODO: Пока не делать инвалидацию и остановку расчета
+            //dataCache.InvalidateEmulator(emulator.Id);
+            //await scheduleService.UnscheduleEmulatorAsync(emulator.Id, cancellationToken);
+            
             await runtimeUpdateService.PublishEmulatorUpdatedAsync(emulator.ToDto(emulator.Tags.Count), cancellationToken);
             await runtimeUpdateService.PublishEventCreatedAsync(systemEvent.ToDto(), cancellationToken);
         }

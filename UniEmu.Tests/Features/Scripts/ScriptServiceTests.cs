@@ -47,6 +47,49 @@ public sealed class ScriptServiceTests
         Assert.Equal("#load \"common.csx\"\nreturn Add(1, 2);", script.Content);
     }
 
+    [Fact]
+    public async Task PatchAsync_UsesEmulatorScopedScript_WhenSharedScriptHasSamePath()
+    {
+        await using var fixture = await ScriptDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var shared = await db.ScriptFiles.SingleAsync(script => script.Id == "scr-shared");
+        shared.Content = "string Value() => \"bad\";";
+        db.ScriptFiles.Add(new ScriptFileEntity
+        {
+            Id = "scr-local-common",
+            Name = "common.csx",
+            Scope = "emulator",
+            EmulatorId = "em-1",
+            Content = "double Value() => 2;",
+            SizeBytes = 21,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var script = await service.PatchAsync(
+            "scr-machine",
+            new PatchScriptRequest(null, "#load \"common.csx\"\nreturn Value();"),
+            CancellationToken.None);
+
+        Assert.NotNull(script);
+        Assert.Equal("#load \"common.csx\"\nreturn Value();", script.Content);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsDuplicateSharedName_BeforeSaveChanges()
+    {
+        await using var fixture = await ScriptDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateAsync(new CreateScriptRequest(" common ", ScriptScope.Shared, null), CancellationToken.None));
+
+        Assert.Equal("Скрипт с таким именем уже существует в этой области видимости.", exception.Message);
+        Assert.Equal(2, await db.ScriptFiles.CountAsync());
+    }
+
     [Theory]
     [InlineData("#r \"System.Text.Json.dll\"\nreturn 1;")]
     [InlineData("#r \"nuget: Newtonsoft.Json, 13.0.3\"\nreturn 1;")]

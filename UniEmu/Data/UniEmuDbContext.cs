@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using UniEmu.Domain.Entities;
 
 namespace UniEmu.Data;
@@ -80,7 +80,7 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasMaxLength(64);
-            entity.Property(e => e.Name).HasMaxLength(260).IsRequired();
+            entity.Property(e => e.Name).HasMaxLength(260).IsRequired().UseCollation("NOCASE");
             entity.Property(e => e.Scope).HasMaxLength(32).IsRequired();
             entity.Property(e => e.EmulatorId).HasMaxLength(64);
             entity.HasOne<EmulatorEntity>()
@@ -88,6 +88,14 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
                 .HasForeignKey(e => e.EmulatorId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.Scope, e.EmulatorId, e.Name }).IsUnique();
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("IX_ScriptFiles_Shared_Name")
+                .HasFilter("Scope = 'shared' AND EmulatorId IS NULL");
+            entity.HasIndex(e => new { e.EmulatorId, e.Name })
+                .IsUnique()
+                .HasDatabaseName("IX_ScriptFiles_EmulatorId_Name")
+                .HasFilter("Scope = 'emulator' AND EmulatorId IS NOT NULL");
         });
 
         modelBuilder.Entity<ScriptRuntimeStateEntity>(entity =>
@@ -108,7 +116,7 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasMaxLength(64);
-            entity.Property(e => e.Name).HasMaxLength(260).IsRequired();
+            entity.Property(e => e.Name).HasMaxLength(260).IsRequired().UseCollation("NOCASE");
             entity.Property(e => e.Scope).HasMaxLength(32).IsRequired();
             entity.Property(e => e.EmulatorId).HasMaxLength(64);
             entity.HasOne<EmulatorEntity>()
@@ -116,6 +124,14 @@ public sealed class UniEmuDbContext(DbContextOptions<UniEmuDbContext> options) :
                 .HasForeignKey(e => e.EmulatorId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.Scope, e.EmulatorId, e.Name }).IsUnique();
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("IX_CncPrograms_Shared_Name")
+                .HasFilter("Scope = 'shared' AND EmulatorId IS NULL");
+            entity.HasIndex(e => new { e.EmulatorId, e.Name })
+                .IsUnique()
+                .HasDatabaseName("IX_CncPrograms_EmulatorId_Name")
+                .HasFilter("Scope = 'emulator' AND EmulatorId IS NOT NULL");
         });
 
         modelBuilder.Entity<TelemetryPointEntity>(entity =>
