@@ -77,10 +77,8 @@ public sealed class DispatcherBlockCheckJob(
             db.SystemEvents.Add(systemEvent);
 
             await db.SaveChangesAsync(cancellationToken);
-            
-            // TODO: Пока не делать инвалидацию и остановку расчета
-            //dataCache.InvalidateEmulator(emulator.Id);
-            //await scheduleService.UnscheduleEmulatorAsync(emulator.Id, cancellationToken);
+            dataCache.InvalidateEmulator(emulator.Id);
+            await scheduleService.UnscheduleEmulatorAsync(emulator.Id, cancellationToken);
             
             await runtimeUpdateService.PublishEmulatorUpdatedAsync(emulator.ToDto(emulator.Tags.Count), cancellationToken);
             await runtimeUpdateService.PublishEventCreatedAsync(systemEvent.ToDto(), cancellationToken);

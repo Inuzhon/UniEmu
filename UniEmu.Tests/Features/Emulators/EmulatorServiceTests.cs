@@ -78,6 +78,81 @@ public sealed class EmulatorServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_ReturnsEmulatorWithTagCount_AndNullForMissingEmulator()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var emulator = await service.GetAsync("em-1", CancellationToken.None);
+        var missing = await service.GetAsync("missing", CancellationToken.None);
+
+        Assert.NotNull(emulator);
+        Assert.Equal("Main emulator", emulator.Name);
+        Assert.Equal(1, emulator.TagsCount);
+        Assert.Null(missing);
+    }
+
+    [Fact]
+    public async Task CreateAsync_TrimsFieldsClampsIntervalAndPublishesRuntimeUpdate()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var broadcaster = new RecordingRuntimeUpdateBroadcaster();
+        var service = CreateService(db, broadcaster: broadcaster);
+
+        var created = await service.CreateAsync(
+            new CreateEmulatorRequest("  New emulator  ", "  http://target  ", 0, 42),
+            CancellationToken.None);
+
+        Assert.Equal("New emulator", created.Name);
+        Assert.Equal("http://target", created.TargetUrl);
+        Assert.Equal(1, created.IntervalSec);
+        Assert.Equal(EmulatorStatus.Stopped, created.Status);
+        var stored = await db.Emulators.SingleAsync(e => e.Id == created.Id);
+        Assert.Equal("New emulator", stored.Name);
+        var update = Assert.Single(broadcaster.EmulatorUpdates);
+        Assert.Equal(created.Id, update.Emulator.Id);
+    }
+
+    [Fact]
+    public async Task PatchAsync_UpdatesRunningEmulatorAndRefreshesScheduleFields()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+        var beforePatch = DateTimeOffset.UtcNow;
+
+        var patched = await service.PatchAsync(
+            "em-1",
+            new PatchEmulatorRequest("  Renamed  ", "  http://new-target  ", 0, 3),
+            CancellationToken.None);
+
+        Assert.NotNull(patched);
+        Assert.Equal("Renamed", patched.Name);
+        Assert.Equal("http://new-target", patched.TargetUrl);
+        Assert.Equal(1, patched.IntervalSec);
+        Assert.Equal(3, patched.ProtocolId);
+        var stored = await db.Emulators.SingleAsync(e => e.Id == "em-1");
+        Assert.True(stored.NextRun >= beforePatch);
+    }
+
+    [Fact]
+    public async Task PatchAsync_ReturnsNull_WhenEmulatorDoesNotExist()
+    {
+        await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var patched = await service.PatchAsync(
+            "missing",
+            new PatchEmulatorRequest("Missing", null, null, null),
+            CancellationToken.None);
+
+        Assert.Null(patched);
+    }
+
+    [Fact]
     public async Task PatchStatusAsync_DoesNotEvaluateOnStartTags_WhenEmulatorIsAlreadyRunning()
     {
         await using var fixture = await EmulatorServiceDbFixture.CreateAsync();
@@ -372,6 +447,7 @@ public sealed class EmulatorServiceTests
     private sealed class RecordingRuntimeUpdateBroadcaster : IRuntimeUpdateBroadcaster
     {
         public List<(SystemEventDto Event, IReadOnlyList<string> Groups)> EventUpdates { get; } = [];
+        public List<(EmulatorDto Emulator, IReadOnlyList<string> Groups)> EmulatorUpdates { get; } = [];
 
         public Task SendTelemetryAsync(RuntimeTelemetryUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken)
         {
@@ -385,6 +461,7 @@ public sealed class EmulatorServiceTests
 
         public Task SendEmulatorUpdatedAsync(EmulatorDto emulator, IReadOnlyList<string> groups, CancellationToken cancellationToken)
         {
+            EmulatorUpdates.Add((emulator, groups));
             return Task.CompletedTask;
         }
 

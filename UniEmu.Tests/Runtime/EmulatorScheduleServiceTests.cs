@@ -20,6 +20,49 @@ namespace UniEmu.Tests.Runtime;
 public sealed class EmulatorScheduleServiceTests
 {
     [Fact]
+    public async Task ScheduleRunningEmulatorsAsync_SchedulesExistingRunningEmulators()
+    {
+        await using var fixture = await ScheduleDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var scheduler = new Mock<IScheduler>();
+        scheduler
+            .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTimeOffset.UtcNow);
+        scheduler
+            .Setup(s => s.GetJobKeys(It.IsAny<GroupMatcher<JobKey>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<JobKey>());
+
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduler.Object);
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var service = new EmulatorScheduleService(
+            db,
+            dataCache,
+            schedulerFactory.Object,
+            stateStore,
+            flushService,
+            NullLogger<EmulatorScheduleService>.Instance,
+            Options.Create(new UniEmuOptions()),
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
+
+        await service.ScheduleRunningEmulatorsAsync(CancellationToken.None);
+
+        var scheduledJobs = scheduler.Invocations
+            .Where(invocation => invocation.Method.Name == nameof(IScheduler.ScheduleJob))
+            .Select(invocation => (IJobDetail)invocation.Arguments[0])
+            .ToList();
+        Assert.Contains(scheduledJobs, job => job.Key.Equals(RuntimeJobKeys.PublishJob("em-1")));
+        Assert.Contains(scheduledJobs, job => job.Key.Equals(RuntimeJobKeys.DispatcherBlockCheckJob("em-1")));
+    }
+
+    [Fact]
     public async Task ScheduleEmulatorAsync_DoesNotScheduleEventTags()
     {
         await using var fixture = await ScheduleDbFixture.CreateAsync();
