@@ -1,7 +1,9 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
@@ -214,6 +216,73 @@ public sealed class UniEmuSeederTests
                     securityIssues.Count == 0,
                     $"{path}:{Environment.NewLine}{string.Join(Environment.NewLine, securityIssues)}");
             }
+        }
+    }
+
+    [Fact]
+    public async Task SeedAsync_BatchReactorScriptsExecuteThroughRuntimeService()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            await db.Database.MigrateAsync();
+
+            await UniEmuSeeder.SeedAsync(db);
+        }
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            var emulator = await db.Emulators
+                .Include(e => e.Tags)
+                .SingleAsync(e => e.Name == "Смесительный реактор BR-101");
+            var stateStore = new TagRuntimeStateStore();
+            var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+            var service = new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache());
+            var generator = new TelemetryValueGenerator();
+            var timestamp = DateTimeOffset.Parse("2026-05-24T12:00:00Z");
+            var scriptBackedTags = emulator.Tags
+                .Where(tag => UniEmuJson.EnumValue<TagSource>(tag.Source) is TagSource.Formula or TagSource.Script or TagSource.FormulaScript)
+                .OrderBy(tag => tag.Key)
+                .ToList();
+
+            Assert.NotEmpty(scriptBackedTags);
+
+            foreach (var tag in scriptBackedTags)
+            {
+                var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+                var currentValue = source == TagSource.FormulaScript
+                    ? generator.GenerateTag(emulator, tag, timestamp).Value
+                    : null;
+
+                var value = await GenerateScriptTagWithDiagnosticsAsync(service, emulator, tag, timestamp, currentValue);
+
+                Assert.Equal(tag.Key, value.Key);
+                Assert.NotNull(value.Value);
+            }
+        }
+    }
+
+    private static async Task<GeneratedTagValue> GenerateScriptTagWithDiagnosticsAsync(
+        TagScriptExecutionService service,
+        EmulatorEntity emulator,
+        EmulatorTagEntity tag,
+        DateTimeOffset timestamp,
+        object? currentValue = null)
+    {
+        try
+        {
+            return await service.GenerateScriptTagAsync(emulator, tag, timestamp, CancellationToken.None, currentValue);
+        }
+        catch (CompilationErrorException ex)
+        {
+            var diagnostics = string.Join(Environment.NewLine, ex.Diagnostics.Select(diagnostic => diagnostic.ToString()));
+            throw new InvalidOperationException($"{tag.Key}:{Environment.NewLine}{diagnostics}", ex);
         }
     }
 

@@ -60,7 +60,7 @@ public sealed class DispatcherBlockCheckJob(
                 return;
             }
 
-            var message = $"Протокол {protocolId} заблокирован Dispatcher";
+            var message = $"Протокол {protocolId} заблокирован в Диспетчере";
             emulator.Status = nameof(EmulatorStatus.Error);
             emulator.LastError = message;
             emulator.NextRun = null;

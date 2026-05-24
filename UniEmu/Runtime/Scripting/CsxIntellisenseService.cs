@@ -27,14 +27,16 @@ public sealed class CsxIntellisenseService(
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
         var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var entryPath = EntryPath(context);
 
-        return (await language.AnalyzeAsync(
-                EntryPath(context),
+        var result = await language.AnalyzeAsync(
+                entryPath,
                 sourceCode,
                 visibleScripts,
                 typeof(TagScriptGlobals),
-                cancellationToken))
-            .Diagnostics;
+                cancellationToken);
+
+        return MapDiagnostics(result.Diagnostics, entryPath, request.DocumentUri);
     }
 
     /// <summary>
@@ -463,6 +465,27 @@ public sealed class CsxIntellisenseService(
             {
                 DocumentPath = MapDocumentPath(location.DocumentPath, entryPath, documentUri),
             })
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CsxDiagnostic> MapDiagnostics(
+        IReadOnlyList<CsxDiagnostic> diagnostics,
+        string entryPath,
+        string? documentUri)
+    {
+        var targetDocumentPath = string.IsNullOrWhiteSpace(documentUri) ? entryPath : documentUri;
+        return diagnostics
+            .Select(diagnostic =>
+            {
+                var documentPath = string.IsNullOrWhiteSpace(diagnostic.DocumentPath)
+                    ? entryPath
+                    : diagnostic.DocumentPath;
+                return diagnostic with
+                {
+                    DocumentPath = MapDocumentPath(documentPath, entryPath, documentUri),
+                };
+            })
+            .Where(diagnostic => string.Equals(diagnostic.DocumentPath, targetDocumentPath, StringComparison.OrdinalIgnoreCase))
             .ToArray();
     }
 

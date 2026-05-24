@@ -27,6 +27,42 @@ public sealed class CsxIntellisenseServiceTests
     }
 
     [Fact]
+    public async Task GetDiagnosticsAsync_DoesNotProjectLoadedScriptDiagnosticsOntoEntryDocument()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var sharedScript = await db.ScriptFiles.SingleAsync(script => script.Name == "common.csx");
+        sharedScript.Content = "#r \"System.Text.Json.dll\"\nint Add(int a, int b) => a + b;";
+        await db.SaveChangesAsync();
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+
+        var diagnostics = await service.GetDiagnosticsAsync(new CsxIntellisenseRequest(
+            "#load \"common.csx\"\nreturn Add(1, 2);",
+            MachineDocumentUri,
+            null), CancellationToken.None);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "CSX001");
+    }
+
+    [Fact]
+    public async Task GetDiagnosticsAsync_DoesNotProjectLoadedCompilerDiagnosticsOntoEntryDocument()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var sharedScript = await db.ScriptFiles.SingleAsync(script => script.Name == "common.csx");
+        sharedScript.Content = "int Add(int a, int b) => MissingLoaded;";
+        await db.SaveChangesAsync();
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+
+        var diagnostics = await service.GetDiagnosticsAsync(new CsxIntellisenseRequest(
+            "#load \"common.csx\"\nreturn Add(1, 2);",
+            MachineDocumentUri,
+            null), CancellationToken.None);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "CS0103");
+    }
+
+    [Fact]
     public async Task GetCompletionsAsync_ReturnsLoadedScriptSymbolsFromRestRequest()
     {
         await using var fixture = await IntellisenseDbFixture.CreateAsync();

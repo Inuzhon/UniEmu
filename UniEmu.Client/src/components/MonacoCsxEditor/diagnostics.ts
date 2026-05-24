@@ -1,6 +1,6 @@
 import { MARKER_OWNER } from './constants';
 import { cancelRequestsForModel, request } from './request';
-import type { CsxDiagnostic, MonacoApi, MonacoEditor, MonacoMarkerData } from './types';
+import type { CsxDiagnostic, ITextModel, MonacoApi, MonacoEditor, MonacoMarkerData } from './types';
 
 export function bindCsxDiagnostics(editor: MonacoEditor, monacoApi: MonacoApi) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -20,7 +20,9 @@ export function bindCsxDiagnostics(editor: MonacoEditor, monacoApi: MonacoApi) {
       monacoApi.editor.setModelMarkers(
         model,
         MARKER_OWNER,
-        (diagnostics ?? []).map((diagnostic) => mapDiagnostic(monacoApi, diagnostic))
+        (diagnostics ?? [])
+          .filter((diagnostic) => isDiagnosticForModel(diagnostic, model))
+          .map((diagnostic) => mapDiagnostic(monacoApi, diagnostic))
       );
     }, 350);
   };
@@ -40,6 +42,10 @@ export function bindCsxDiagnostics(editor: MonacoEditor, monacoApi: MonacoApi) {
       monacoApi.editor.setModelMarkers(model, MARKER_OWNER, []);
     }
   };
+}
+
+function isDiagnosticForModel(diagnostic: CsxDiagnostic, model: ITextModel) {
+  return !diagnostic.documentPath || diagnostic.documentPath === model.uri.toString();
 }
 
 function mapDiagnostic(monacoApi: MonacoApi, diagnostic: CsxDiagnostic): MonacoMarkerData {

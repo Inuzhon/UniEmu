@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -61,10 +61,10 @@ public sealed class DispatcherBlockCheckJobTests
 
         var emulator = await db.Emulators.SingleAsync(e => e.Id == "em-1");
         Assert.Equal(nameof(EmulatorStatus.Error), emulator.Status);
-        Assert.Equal("Протокол 2 заблокирован Dispatcher", emulator.LastError);
+        Assert.Equal("Протокол 2 заблокирован в Диспетчере", emulator.LastError);
         Assert.Contains(await db.SystemEvents.ToListAsync(), ev =>
             ev.Level == UniEmuJson.EnumString(EventLevel.Error) &&
-            ev.Message == "Протокол 2 заблокирован Dispatcher");
+            ev.Message == "Протокол 2 заблокирован в Диспетчере");
     }
 
     [Fact]

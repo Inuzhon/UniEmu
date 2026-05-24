@@ -124,7 +124,7 @@ public sealed class CsxScriptDirectiveValidator(CsxLoadedScriptExpander expander
 
         foreach (Match match in s_blockedDirective.Matches(content))
         {
-            diagnostics.Add(CreateUnsupportedDirectiveDiagnostic(content, match));
+            diagnostics.Add(CreateUnsupportedDirectiveDiagnostic(path, content, match));
         }
 
         foreach (var loadPathValue in expander.GetLoadDirectivePaths(content))
@@ -143,7 +143,8 @@ public sealed class CsxScriptDirectiveValidator(CsxLoadedScriptExpander expander
     /// <param name="content">Текст скрипта, в котором найдена директива.</param>
     /// <param name="match">Совпадение регулярного выражения директивы.</param>
     /// <returns>Диагностика с позицией директивы в документе.</returns>
-    private static CsxDiagnostic CreateUnsupportedDirectiveDiagnostic(string content, Match match)
+    /// <param name="path">Normalized path of the script that owns the directive.</param>
+    private static CsxDiagnostic CreateUnsupportedDirectiveDiagnostic(string path, string content, Match match)
     {
         var start = GetLinePosition(content, match.Index);
         var end = GetLinePosition(content, match.Index + match.Length);
@@ -154,7 +155,8 @@ public sealed class CsxScriptDirectiveValidator(CsxLoadedScriptExpander expander
             start.Line,
             start.Character,
             end.Line,
-            end.Character);
+            end.Character,
+            path);
     }
 
     /// <summary>

@@ -54,6 +54,64 @@ public sealed class CsxLanguageServiceTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task AnalyzeAsync_KeepsDiagnosticRangeOnOriginalReturnStatement()
+    {
+        var service = new CsxLanguageService();
+        const string content = """
+            var seed = 0;
+            return MissingValue;
+            """;
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            content,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+        var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "CS0103");
+        Assert.Equal(1, diagnostic.StartLine);
+        Assert.Equal(7, diagnostic.StartCharacter);
+        Assert.Equal(1, diagnostic.EndLine);
+        Assert.Equal(19, diagnostic.EndCharacter);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_EnablesNullableAnnotationsByDefault()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["shared/math.csx"] = "double ToDouble(object? value, double fallback) => fallback;",
+        };
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "#load \"shared/math.csx\"\nobject? value = null;\nreturn ToDouble(value, 0);",
+            visibleScripts);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "CS8632");
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_AssignsCompilerDiagnosticToLoadedScriptDocument()
+    {
+        var service = new CsxLanguageService();
+        var visibleScripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["shared/math.csx"] = "int Add(int left, int right) => MissingLoaded;",
+        };
+
+        var result = await service.AnalyzeAsync(
+            "inline/tag-1.csx",
+            "#load \"shared/math.csx\"\nreturn Add(1, 2);",
+            visibleScripts);
+
+        var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "CS0103");
+        Assert.Equal("shared/math.csx", diagnostic.DocumentPath);
+        Assert.Equal(0, diagnostic.StartLine);
+        Assert.Equal(32, diagnostic.StartCharacter);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_UsesLoadedScriptContent_WhenEntryScriptHasLoadDirective()
     {
         var service = new CsxLanguageService();

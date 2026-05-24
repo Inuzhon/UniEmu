@@ -44,6 +44,15 @@ test('editor uses REST intellisense instead of WebSocket LSP transport', async (
   assert.doesNotMatch(combinedSource, /activateCsxLanguageClient/);
 });
 
+test('diagnostics only create Monaco markers for the current model document', async () => {
+  const diagnosticsSource = await readComponentFile('diagnostics.ts');
+  const typesSource = await readComponentFile('types.ts');
+
+  assert.match(typesSource, /documentPath\?: string \| null/);
+  assert.match(diagnosticsSource, /\.filter\(\(diagnostic\) => isDiagnosticForModel\(diagnostic, model\)\)/);
+  assert.match(diagnosticsSource, /diagnostic\.documentPath === model\.uri\.toString\(\)/);
+});
+
 test('csx intellisense registers advanced Monaco language providers', async () => {
   const registerSource = await readComponentFile('registerCsxIntellisense.ts');
   const providerSources = await Promise.all(

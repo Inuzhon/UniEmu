@@ -13,6 +13,7 @@ export type CsxDiagnostic = {
   startCharacter: number;
   endLine: number;
   endCharacter: number;
+  documentPath?: string | null;
 };
 
 export type CsxCompletionItem = {

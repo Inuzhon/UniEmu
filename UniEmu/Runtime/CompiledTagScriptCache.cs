@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
+using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Runtime;
 
@@ -187,8 +188,8 @@ public sealed class CompiledTagScriptCache
     {
         var options = baseOptions
             .WithFilePath(TagScriptPath.Normalize(entryPath))
-            .WithSourceResolver(new DbScriptSourceResolver(visibleScripts));
-        var script = CSharpScript.Create<object?>(content, options, globalsType);
+            .WithSourceResolver(new DbScriptSourceResolver(CsxNullableContext.ApplyToScripts(visibleScripts)));
+        var script = CSharpScript.Create<object?>(CsxNullableContext.Apply(content, entryPath), options, globalsType);
         var diagnostics = script.Compile();
         var errors = diagnostics.Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToList();
 
