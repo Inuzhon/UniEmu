@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using UniEmu.Runtime.Scripting;
 
 namespace UniEmu.Runtime.Scripting.Environment;
@@ -12,7 +12,7 @@ public sealed class CsxScriptDirectiveValidator(CsxLoadedScriptExpander expander
     /// Регулярное выражение для директив, запрещенных в пользовательских скриптах.
     /// </summary>
     private static readonly Regex s_blockedDirective = new(
-        @"^\s*#\s*(r|using)\b",
+        @"^\s*#\s*(r|using|line|pragma|nullable)\b",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
     /// <summary>
@@ -29,10 +29,21 @@ public sealed class CsxScriptDirectiveValidator(CsxLoadedScriptExpander expander
     /// <param name="content">Текст CSX-скрипта.</param>
     public void ValidateSupportedDirectives(string content)
     {
+        ValidateSupportedDirectives("script.csx", content);
+    }
+
+    /// <summary>
+    /// Проверяет содержимое одного скрипта и выбрасывает диагностическое исключение при неподдерживаемой директиве.
+    /// </summary>
+    /// <param name="path">Путь CSX-скрипта.</param>
+    /// <param name="content">Текст CSX-скрипта.</param>
+    public void ValidateSupportedDirectives(string path, string content)
+    {
         var match = s_blockedDirective.Match(content);
         if (match.Success)
         {
-            throw new InvalidOperationException($"Unsupported script directive '{match.Value.Trim()}'. Use #load for shared scripts.");
+            throw new CsxScriptValidationException(
+                [CreateUnsupportedDirectiveDiagnostic(TagScriptPath.Normalize(path), content, match)]);
         }
     }
 
@@ -143,7 +154,7 @@ public sealed class CsxScriptDirectiveValidator(CsxLoadedScriptExpander expander
     /// <param name="content">Текст скрипта, в котором найдена директива.</param>
     /// <param name="match">Совпадение регулярного выражения директивы.</param>
     /// <returns>Диагностика с позицией директивы в документе.</returns>
-    /// <param name="path">Normalized path of the script that owns the directive.</param>
+    /// <param name="path">Нормализованный путь к скрипту, которому принадлежит директива.</param>
     private static CsxDiagnostic CreateUnsupportedDirectiveDiagnostic(string path, string content, Match match)
     {
         var start = GetLinePosition(content, match.Index);

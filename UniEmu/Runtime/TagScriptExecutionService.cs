@@ -213,7 +213,7 @@ public sealed class TagScriptExecutionService
     {
         var script = await ResolveEntryScriptAsync(emulator.Id, tag, cancellationToken);
         var entryContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(script.Content);
-        directiveValidator.ValidateSupportedDirectives(entryContent);
+        directiveValidator.ValidateSupportedDirectives(script.Path, entryContent);
 
         var scripts = await LoadVisibleScriptsAsync(emulator.Id, cancellationToken);
         scripts[script.Path] = entryContent;
@@ -295,7 +295,7 @@ public sealed class TagScriptExecutionService
         var scripts = await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken);
         return VisibleScriptResolver.ToContentMap(
             scripts,
-            script => directiveValidator.ValidateSupportedDirectives(script.Content));
+            script => directiveValidator.ValidateSupportedDirectives(script.Name, script.Content));
     }
 
     /// <summary>

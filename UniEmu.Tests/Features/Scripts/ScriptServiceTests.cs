@@ -93,7 +93,10 @@ public sealed class ScriptServiceTests
     [Theory]
     [InlineData("#r \"System.Text.Json.dll\"\nreturn 1;")]
     [InlineData("#r \"nuget: Newtonsoft.Json, 13.0.3\"\nreturn 1;")]
-    public async Task PatchAsync_RejectsReferenceDirective_AndKeepsExistingContent(string content)
+    [InlineData("#line 1 \"other.csx\"\nreturn 1;")]
+    [InlineData("#pragma warning disable CS0168\nreturn 1;")]
+    [InlineData("#nullable disable\nreturn 1;")]
+    public async Task PatchAsync_RejectsUnsupportedDirective_AndKeepsExistingContent(string content)
     {
         await using var fixture = await ScriptDbFixture.CreateAsync();
         await using var db = fixture.CreateDbContext();

@@ -299,6 +299,27 @@ public sealed class TagScriptExecutionServiceTests
             diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "SEC003");
     }
 
+    [Theory]
+    [InlineData("#line 1 \"other.csx\"\nreturn 1;")]
+    [InlineData("#pragma warning disable CS0168\nreturn 1;")]
+    [InlineData("#nullable disable\nreturn 1;")]
+    public async Task GenerateScriptTagAsync_ReturnsDiagnosticError_WhenInlineScriptUsesUnsupportedDirective(string content)
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var (_, tag) = await LoadAsync(db, "tg-previous");
+        tag.FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto(null, content));
+        await db.SaveChangesAsync();
+        var (emulator, updatedTag) = await LoadAsync(db, "tg-previous");
+        var service = CreateService(db, new TagRuntimeStateStore());
+
+        var exception = await Assert.ThrowsAsync<CsxScriptValidationException>(() =>
+            service.GenerateScriptTagAsync(emulator, updatedTag, DateTimeOffset.Parse("2026-05-11T10:00:00Z"), CancellationToken.None));
+
+        Assert.Contains(exception.Diagnostics, diagnostic =>
+            diagnostic.Severity == CsxDiagnosticSeverity.Error && diagnostic.Code == "CSX001");
+    }
+
     [Fact]
     public async Task GenerateScriptTagAsync_ThrowsTimeout_WhenCpuBoundScriptDoesNotYield()
     {

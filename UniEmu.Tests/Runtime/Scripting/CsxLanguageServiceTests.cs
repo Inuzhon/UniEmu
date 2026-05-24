@@ -131,7 +131,10 @@ public sealed class CsxLanguageServiceTests(ITestOutputHelper output)
     [Theory]
     [InlineData("#r \"System.Text.Json.dll\"\nreturn 0;")]
     [InlineData("#r \"nuget: Newtonsoft.Json, 13.0.3\"\nreturn 0;")]
-    public async Task AnalyzeAsync_ReturnsDirectiveErrorDiagnostic_WhenScriptUsesReferenceDirective(string content)
+    [InlineData("#line 1 \"other.csx\"\nreturn 0;")]
+    [InlineData("#pragma warning disable CS0168\nreturn 0;")]
+    [InlineData("#nullable disable\nreturn 0;")]
+    public async Task AnalyzeAsync_ReturnsDirectiveErrorDiagnostic_WhenScriptUsesUnsupportedDirective(string content)
     {
         var service = new CsxLanguageService();
 
