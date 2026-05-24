@@ -121,6 +121,58 @@ public sealed class EmulatorScheduleServiceTests
     }
 
     [Fact]
+    public async Task ScheduleEmulatorAsync_DoesNotScheduleCalculatedProgramFrameTags()
+    {
+        await using var fixture = await ScheduleDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.AddRange(
+            ScheduleDbFixture.CreateProgramFrameTag("tg-frame-num", "Frame number", TagType.Int, SpecialParameter.FrameNum),
+            ScheduleDbFixture.CreateProgramFrameTag("tg-frame-text", "Frame text", TagType.String, SpecialParameter.FrameText));
+        await db.SaveChangesAsync();
+
+        var scheduler = new Mock<IScheduler>();
+        scheduler
+            .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTimeOffset.UtcNow);
+        scheduler
+            .Setup(s => s.GetJobKeys(It.IsAny<GroupMatcher<JobKey>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<JobKey>());
+
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduler.Object);
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var flushService = new TagPreviewFlushService(fixture.CreateDbContext, NullLogger<TagPreviewFlushService>.Instance);
+        var service = new EmulatorScheduleService(
+            db,
+            dataCache,
+            schedulerFactory.Object,
+            stateStore,
+            flushService,
+            NullLogger<EmulatorScheduleService>.Instance,
+            Options.Create(new UniEmuOptions()),
+            new TelemetryValueGenerator(),
+            new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache()),
+            new RuntimeUpdateService(new CapturingRuntimeUpdateBroadcaster()));
+
+        await service.ScheduleEmulatorAsync("em-1", CancellationToken.None);
+
+        var scheduledTagIds = scheduler.Invocations
+            .Where(invocation => invocation.Method.Name == nameof(IScheduler.ScheduleJob))
+            .Select(invocation => (IJobDetail)invocation.Arguments[0])
+            .Where(job => job.JobType == typeof(TagValueJob))
+            .Select(job => job.JobDataMap.GetString(RuntimeJobKeys.TagId))
+            .ToList();
+
+        Assert.DoesNotContain("tg-frame-num", scheduledTagIds);
+        Assert.DoesNotContain("tg-frame-text", scheduledTagIds);
+        Assert.Contains("tg-interval", scheduledTagIds);
+    }
+
+    [Fact]
     public async Task ScheduleEmulatorAsync_SchedulesCronTagsWithNormalizedUnixCron()
     {
         await using var fixture = await ScheduleDbFixture.CreateAsync();
@@ -533,6 +585,26 @@ public sealed class EmulatorScheduleServiceTests
                     ],
                     ContinueOnFormulaEnd.Repeat,
                     StartValue: null)),
+            };
+        }
+
+        public static EmulatorTagEntity CreateProgramFrameTag(
+            string id,
+            string name,
+            TagType type,
+            SpecialParameter specialParameter)
+        {
+            return new EmulatorTagEntity
+            {
+                Id = id,
+                EmulatorId = "em-1",
+                Name = name,
+                Key = id,
+                Type = UniEmuJson.EnumString(type),
+                Source = UniEmuJson.EnumString(TagSource.Static),
+                Preview = type == TagType.Int ? "0" : string.Empty,
+                TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
+                SpecialParameter = UniEmuJson.EnumString(specialParameter),
             };
         }
     }

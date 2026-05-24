@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -227,6 +228,46 @@ public sealed class EmulatorPublishJobTests
         Assert.Equal("N20", values.Single(value => value.SpecialParameter == SpecialParameter.FrameText).Value);
         Assert.Equal("1", emulator.Tags.Single(tag => tag.Id == "tg-frame-num").Preview);
         Assert.Equal("N20", emulator.Tags.Single(tag => tag.Id == "tg-frame-text").Preview);
+    }
+
+    [Fact]
+    public async Task BuildValuesAsync_DoesNotWaitForScheduledFrameTags()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.CncPrograms.Add(CreateProgram("cnc-main", "Fast.nc", CncScope.Shared, null, "N10\nN20"));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var timestamp = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 1,
+            StartedAt = timestamp,
+            Tags =
+            [
+                CreateSpecialTag("tg-prg", "Program", "PrgName", TagType.String, TagSource.Static, "Fast.nc", SpecialParameter.PrgName),
+                CreateSpecialIntervalTag("tg-frame-num", "Frame number", "FrameNum", TagType.Int, "0", SpecialParameter.FrameNum),
+                CreateSpecialIntervalTag("tg-frame-text", "Frame text", "FrameText", TagType.String, "", SpecialParameter.FrameText),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var stopwatch = Stopwatch.StartNew();
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+        stopwatch.Stop();
+
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(500));
+        AssertProgramFrame(values, 0, "N10");
     }
 
     [Fact]
@@ -1072,6 +1113,29 @@ public sealed class EmulatorPublishJobTests
             Source = UniEmuJson.EnumString(source),
             Preview = preview,
             TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+            SpecialParameter = UniEmuJson.EnumString(specialParameter),
+            Enabled = true,
+        };
+    }
+
+    private static EmulatorTagEntity CreateSpecialIntervalTag(
+        string id,
+        string name,
+        string key,
+        TagType type,
+        string preview,
+        SpecialParameter specialParameter)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = id,
+            EmulatorId = "emu-1",
+            Name = name,
+            Key = key,
+            Type = UniEmuJson.EnumString(type),
+            Source = UniEmuJson.EnumString(TagSource.Static),
+            Preview = preview,
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
             SpecialParameter = UniEmuJson.EnumString(specialParameter),
             Enabled = true,
         };

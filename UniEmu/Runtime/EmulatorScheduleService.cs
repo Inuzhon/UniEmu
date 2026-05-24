@@ -90,7 +90,7 @@ public sealed class EmulatorScheduleService(
             var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)
                 ?? new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null);
 
-            if (!ShouldScheduleTag(trigger))
+            if (!ShouldScheduleTag(tag, trigger))
             {
                 continue;
             }
@@ -380,9 +380,23 @@ public sealed class EmulatorScheduleService(
             .Build();
     }
 
-    private static bool ShouldScheduleTag(TagTriggerDto trigger)
+    private static bool ShouldScheduleTag(EmulatorTagEntity tag, TagTriggerDto trigger)
     {
-        return trigger.Mode is TagTriggerMode.Interval or TagTriggerMode.Cron;
+        return !IsCalculatedProgramFrameTag(tag)
+               && (trigger.Mode is TagTriggerMode.Interval or TagTriggerMode.Cron);
+    }
+
+    private static bool IsCalculatedProgramFrameTag(EmulatorTagEntity tag)
+    {
+        var specialParameter = tag.SpecialParameter;
+        if (!string.Equals(specialParameter, nameof(SpecialParameter.FrameNum), StringComparison.Ordinal)
+            && !string.Equals(specialParameter, nameof(SpecialParameter.FrameText), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+        return source is TagSource.Static or TagSource.Scenario;
     }
 
     private static TimeSpan ToTimeSpan(TagTriggerDto trigger)

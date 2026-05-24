@@ -417,6 +417,11 @@ public sealed class EmulatorPublishJob(
     /// <returns><see langword="true"/>, если publish-задача должна подождать свежий runtime-снимок тега.</returns>
     private static bool ShouldWaitForScheduledValue(EmulatorEntity emulator, EmulatorTagEntity tag)
     {
+        if (IsCalculatedProgramFrameTag(tag))
+        {
+            return false;
+        }
+
         if (ShouldCalculateScriptAtPublish(emulator, tag))
         {
             return false;
