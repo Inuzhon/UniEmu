@@ -1,5 +1,15 @@
 import { useMemo, useState } from 'react';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Check,
   ChevronsUpDown,
   FileText,
@@ -63,8 +73,16 @@ export function EmulatorTagsTab({
   onEditTag,
 }: EmulatorTagsTabProps) {
   const [programPreviewPickerOpenId, setProgramPreviewPickerOpenId] = useState<string | null>(null);
+  const [deleteCandidateTag, setDeleteCandidateTag] = useState<EmulatorTag | null>(null);
   const enabledTags = useMemo(() => tags.filter((t) => t.enabled !== false), [tags]);
   const disabledTags = useMemo(() => tags.filter((t) => t.enabled === false), [tags]);
+
+  const handleConfirmDelete = () => {
+    if (!deleteCandidateTag) return;
+
+    void deleteTag(emulatorId, deleteCandidateTag.id);
+    setDeleteCandidateTag(null);
+  };
 
   const renderProgramOption = (tag: EmulatorTag, program: CncProgram) => (
     <CommandItem
@@ -214,7 +232,7 @@ export function EmulatorTagsTab({
       </td>
       <td className="px-4 py-3 font-mono text-xs text-primary">
         {tag.source === 'scenario' && tag.scenario ? (
-          <ScenarioSparkline scenario={tag.scenario} />
+          <ScenarioSparkline scenario={tag.scenario} tagType={tag.type} />
         ) : tag.source === 'static' ? (
           tag.type === 'bool' ? (
             <Switch
@@ -267,7 +285,7 @@ export function EmulatorTagsTab({
             size="icon"
             variant="ghost"
             className="h-7 w-7 text-muted-foreground hover:text-signal-offline"
-            onClick={() => void deleteTag(emulatorId, tag.id)}
+            onClick={() => setDeleteCandidateTag(tag)}
             title={localization.routes.emulators.components.emulatorDetailPage.deleteTagTitle}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -319,52 +337,87 @@ export function EmulatorTagsTab({
   );
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <div>
-            <h3 className="font-semibold">
-              {localization.routes.emulators.components.emulatorDetailPage.enabledTagsSectionTitle}
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {localization.routes.emulators.components.emulatorDetailPage.enabledTagsSectionDescription}{' '}
-              {localization.routes.emulators.components.emulatorDetailPage.tagsCountLabel(enabledTags.length)}
-            </p>
+    <>
+      <div className="space-y-4">
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border p-4">
+            <div>
+              <h3 className="font-semibold">
+                {localization.routes.emulators.components.emulatorDetailPage.enabledTagsSectionTitle}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {localization.routes.emulators.components.emulatorDetailPage.enabledTagsSectionDescription}{' '}
+                {localization.routes.emulators.components.emulatorDetailPage.tagsCountLabel(enabledTags.length)}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={onAddTag}
+              title={localization.routes.emulators.components.emulatorDetailPage.addTagButtonLabel}
+            >
+              <Plus className="h-3.5 w-3.5" />{' '}
+              {localization.routes.emulators.components.emulatorDetailPage.addTagButtonLabel}
+            </Button>
           </div>
-          <Button
-            size="sm"
-            onClick={onAddTag}
-            title={localization.routes.emulators.components.emulatorDetailPage.addTagButtonLabel}
-          >
-            <Plus className="h-3.5 w-3.5" />{' '}
-            {localization.routes.emulators.components.emulatorDetailPage.addTagButtonLabel}
-          </Button>
+          {renderTable(
+            enabledTags,
+            localization.routes.emulators.components.emulatorDetailPage.emptyEnabledTagsMessage
+          )}
         </div>
-        {renderTable(
-          enabledTags,
-          localization.routes.emulators.components.emulatorDetailPage.emptyEnabledTagsMessage
+
+        {disabledTags.length > 0 && (
+          <div className="rounded-lg border border-dashed border-border bg-card/50">
+            <div className="border-b border-border/60 p-4">
+              <h3 className="font-semibold text-muted-foreground">
+                {localization.routes.emulators.components.emulatorDetailPage.disabledTagsSectionTitle}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {localization.routes.emulators.components.emulatorDetailPage.disabledTagsSectionDescription}{' '}
+                {localization.routes.emulators.components.emulatorDetailPage.tagsCountLabel(disabledTags.length)}
+              </p>
+            </div>
+            {renderTable(
+              disabledTags,
+              localization.routes.emulators.components.emulatorDetailPage.emptyDisabledTagsMessage,
+              true
+            )}
+          </div>
         )}
       </div>
 
-      {disabledTags.length > 0 && (
-        <div className="rounded-lg border border-dashed border-border bg-card/50">
-          <div className="border-b border-border/60 p-4">
-            <h3 className="font-semibold text-muted-foreground">
-              {localization.routes.emulators.components.emulatorDetailPage.disabledTagsSectionTitle}
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {localization.routes.emulators.components.emulatorDetailPage.disabledTagsSectionDescription}{' '}
-              {localization.routes.emulators.components.emulatorDetailPage.tagsCountLabel(disabledTags.length)}
-            </p>
-          </div>
-          {renderTable(
-            disabledTags,
-            localization.routes.emulators.components.emulatorDetailPage.emptyDisabledTagsMessage,
-            true
-          )}
-        </div>
-      )}
-    </div>
+      <AlertDialog
+        open={deleteCandidateTag !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCandidateTag(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {localization.routes.emulators.components.emulatorDetailPage.deleteTagDialogTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCandidateTag
+                ? localization.routes.emulators.components.emulatorDetailPage.deleteTagDialogDescription(
+                    deleteCandidateTag.name
+                  )
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {localization.routes.emulators.components.emulatorDetailPage.cancelButtonLabel}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-signal-offline text-white hover:bg-signal-offline/90"
+            >
+              {localization.routes.emulators.components.emulatorDetailPage.confirmDeleteButtonLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
