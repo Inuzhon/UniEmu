@@ -20,7 +20,7 @@ public static partial class UniEmuSeeder
         [
             new FurnaceSeedSpec(
                 Id: "em-8a2d4a98a",
-                Name: "Furnace_Carburizing_01",
+                Name: "Печь цементации 1",
                 ProtocolId: 31,
                 IntervalSec: 2,
                 TotalRequests: 0,
@@ -35,7 +35,7 @@ public static partial class UniEmuSeeder
                 FanPeriodSec: 90),
             new FurnaceSeedSpec(
                 Id: "em-a9d16c278",
-                Name: "Furnace_Tempering_02",
+                Name: "Печь отпуска 2",
                 ProtocolId: 32,
                 IntervalSec: 2,
                 TotalRequests: 0,
@@ -50,7 +50,7 @@ public static partial class UniEmuSeeder
                 FanPeriodSec: 75),
             new FurnaceSeedSpec(
                 Id: "em-c55895497",
-                Name: "Furnace_Brazing_03",
+                Name: "Печь пайки 3",
                 ProtocolId: 33,
                 IntervalSec: 1,
                 TotalRequests: 0,

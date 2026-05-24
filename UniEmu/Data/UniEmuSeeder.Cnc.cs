@@ -20,7 +20,7 @@ public static partial class UniEmuSeeder
         [
             new CncSeedSpec(
                 Id: "em-2ad967c1d",
-                Name: "CNC_VMC_650_01",
+                Name: "Фрезерный центр VMC 650",
                 ProtocolId: 41,
                 IntervalSec: 1,
                 TotalRequests: 0,
@@ -50,7 +50,7 @@ public static partial class UniEmuSeeder
                 DistanceMax: 180),
             new CncSeedSpec(
                 Id: "em-332847e64",
-                Name: "CNC_Lathe_Turn_200_02",
+                Name: "Токарный станок Turn 200",
                 ProtocolId: 42,
                 IntervalSec: 1,
                 TotalRequests: 0,
@@ -80,7 +80,7 @@ public static partial class UniEmuSeeder
                 DistanceMax: 240),
             new CncSeedSpec(
                 Id: "em-1426dc9ea",
-                Name: "CNC_Router_Gantry_03",
+                Name: "Портальный фрезерный станок",
                 ProtocolId: 43,
                 IntervalSec: 2,
                 TotalRequests: 0,
@@ -257,21 +257,21 @@ public static partial class UniEmuSeeder
     /// <returns>Имена CNC-программ станка.</returns>
     private static IReadOnlyList<string> CreateCncProgramNames(CncSeedSpec spec)
     {
-        return spec.Name switch
+        return spec.Id switch
         {
-            "CNC_VMC_650_01" =>
+            "em-2ad967c1d" =>
             [
                 "VMC650_MAIN.NC",
                 "VMC650_DRILL_GRID.NC",
                 "VMC650_3D_SURFACE_LONG.NC",
             ],
-            "CNC_Lathe_Turn_200_02" =>
+            "em-332847e64" =>
             [
                 "LATHE200_MAIN.NC",
                 "LATHE200_GROOVE_CYCLE.NC",
                 "LATHE200_THREAD_SHAFT.NC",
             ],
-            "CNC_Router_Gantry_03" =>
+            "em-1426dc9ea" =>
             [
                 "ROUTER03_NESTING.NC",
                 "ROUTER03_PANEL_LONG.NC",

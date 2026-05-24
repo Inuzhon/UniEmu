@@ -20,7 +20,7 @@ public static partial class UniEmuSeeder
         [
             new BatchReactorSeedSpec(
                 Id: "em-b6f42a901",
-                Name: "Batch_Reactor_Mix_01",
+                Name: "Смесительный реактор BR-101",
                 ProtocolId: 51,
                 IntervalSec: 1,
                 TotalRequests: 0,

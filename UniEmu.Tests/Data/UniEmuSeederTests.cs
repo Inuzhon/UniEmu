@@ -43,35 +43,35 @@ public sealed class UniEmuSeederTests
 
             Assert.Equal(
                 [
-                    "Batch_Reactor_Mix_01",
-                    "CNC_Lathe_Turn_200_02",
-                    "CNC_Router_Gantry_03",
-                    "CNC_VMC_650_01",
-                    "Furnace_Brazing_03",
-                    "Furnace_Carburizing_01",
-                    "Furnace_Tempering_02",
+                    "Печь отпуска 2",
+                    "Печь пайки 3",
+                    "Печь цементации 1",
+                    "Портальный фрезерный станок",
+                    "Смесительный реактор BR-101",
+                    "Токарный станок Turn 200",
+                    "Фрезерный центр VMC 650",
                 ],
                 emulators.Select(emulator => emulator.Name));
 
-            foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("Furnace_", StringComparison.Ordinal)))
+            foreach (var emulator in emulators.Where(emulator => emulator.ProtocolId is >= 31 and <= 33))
             {
                 var furnaceTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
                 AssertFurnaceTagSetIsComplete(furnaceTags, scripts, emulator.Id);
             }
 
-            foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("CNC_", StringComparison.Ordinal)))
+            foreach (var emulator in emulators.Where(emulator => emulator.ProtocolId is >= 41 and <= 43))
             {
                 var cncTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
                 AssertCncTagSetIsComplete(cncTags, scripts, emulator.Id);
             }
 
-            foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("Batch_", StringComparison.Ordinal)))
+            foreach (var emulator in emulators.Where(emulator => emulator.ProtocolId == 51))
             {
                 var batchTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
                 AssertBatchReactorTagSetIsComplete(batchTags, scripts, emulator.Id);
             }
 
-            var carburizingEmulatorId = emulators.Single(emulator => emulator.Name == "Furnace_Carburizing_01").Id;
+            var carburizingEmulatorId = emulators.Single(emulator => emulator.Name == "Печь цементации 1").Id;
             var carburizingTemperature = tags.Single(tag =>
                 tag.EmulatorId == carburizingEmulatorId &&
                 tag.Key == "Temperature");
@@ -112,7 +112,7 @@ public sealed class UniEmuSeederTests
                 ],
                 programs.Select(program => program.Name));
 
-            foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("CNC_", StringComparison.Ordinal)))
+            foreach (var emulator in emulators.Where(emulator => emulator.ProtocolId is >= 41 and <= 43))
             {
                 var emulatorPrograms = programs.Where(program => program.EmulatorId == emulator.Id).ToList();
                 Assert.True(emulatorPrograms.Count >= 3, $"{emulator.Name} has {emulatorPrograms.Count} CNC programs.");
