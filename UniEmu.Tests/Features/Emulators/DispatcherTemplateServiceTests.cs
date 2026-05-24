@@ -34,9 +34,9 @@ public sealed class DispatcherTemplateServiceTests
         Assert.Equal(3, items.Count);
         var itemsByName = items.ToDictionary(item => item.Element("Name")?.Value ?? string.Empty);
 
-        AssertUniversalItem(itemsByName["PowerOn"], "PowerOn", "0", "0");
-        AssertUniversalItem(itemsByName["FeedRate"], "FeedRate", "4", "1");
-        AssertUniversalItem(itemsByName["ProgramName"], "ProgramName", "1", "2");
+        AssertUniversalItem(itemsByName["Power"], "Power", "PowerOn", "0", "0");
+        AssertUniversalItem(itemsByName["Feed"], "Feed", "FeedRate", "4", "1");
+        AssertUniversalItem(itemsByName["Program"], "Program", "ProgramName", "1", "2");
     }
 
     [Fact]
@@ -51,11 +51,16 @@ public sealed class DispatcherTemplateServiceTests
         Assert.Null(template);
     }
 
-    private static void AssertUniversalItem(XElement item, string key, string specialParameter, string dataType)
+    private static void AssertUniversalItem(
+        XElement item,
+        string name,
+        string key,
+        string specialParameter,
+        string dataType)
     {
         Assert.NotNull(item.Element("MatchingXmlList"));
         Assert.Empty(item.Element("MatchingXmlList")!.Elements("MatchingXml"));
-        Assert.Equal(key, item.Element("Name")?.Value);
+        Assert.Equal(name, item.Element("Name")?.Value);
         Assert.Equal(key, item.Element("UniversalParam")?.Value);
         Assert.Equal(specialParameter, item.Element("SpecialParamNum")?.Value);
         Assert.Equal(dataType, item.Element("DataTypeNum")?.Value);

@@ -140,7 +140,8 @@ public sealed class EmulatorsControllerTests
         Assert.Equal("Universal_template_machineID_7.xml", file.FileDownloadName);
 
         var content = Encoding.UTF8.GetString(file.FileContents);
-        Assert.Contains("<Name>PowerOn</Name>", content);
+        Assert.Contains("<Name>Power</Name>", content);
+        Assert.Contains("<UniversalParam>PowerOn</UniversalParam>", content);
     }
 
     [Fact]
