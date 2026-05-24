@@ -12,7 +12,62 @@ export type PacketHistoryRow = {
   values: Record<string, string>;
 };
 
+export const TELEMETRY_HIDDEN_TAGS_STORAGE_PREFIX = 'uniemu.telemetry.hidden-tags.';
+
 export const emptyTelemetry: TelemetryPoint[] = [];
+
+export function getTelemetryHiddenTagsStorageKey(emulatorId: string): string {
+  return `${TELEMETRY_HIDDEN_TAGS_STORAGE_PREFIX}${emulatorId}`;
+}
+
+function getTelemetryStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function readHiddenTelemetryTagNames(emulatorId: string): Set<string> {
+  const storage = getTelemetryStorage();
+  if (!storage) return new Set();
+
+  try {
+    const raw = storage.getItem(getTelemetryHiddenTagsStorageKey(emulatorId));
+    if (!raw) return new Set();
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+
+    return new Set(parsed.filter((name): name is string => typeof name === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
+export function writeHiddenTelemetryTagNames(
+  emulatorId: string,
+  hiddenTelemetryTagNames: Set<string>,
+): void {
+  const storage = getTelemetryStorage();
+  if (!storage) return;
+
+  const key = getTelemetryHiddenTagsStorageKey(emulatorId);
+  const values = [...hiddenTelemetryTagNames];
+
+  try {
+    if (values.length === 0) {
+      storage.removeItem(key);
+      return;
+    }
+
+    storage.setItem(key, JSON.stringify(values));
+  } catch {
+    // localStorage can be unavailable or full; chart visibility still works in memory.
+  }
+}
 
 export function parseTelemetryNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;

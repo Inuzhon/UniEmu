@@ -159,6 +159,22 @@ test('monitoring chart lets users choose visible numeric tags locally', async ()
   assert.match(source, /telemetryKeys\.map\(\(key\) => \{/);
 });
 
+test('monitoring chart persists hidden tag names and drops stale saved names', async () => {
+  const componentDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'src', 'routes', 'emulators', 'components');
+  const source = [
+    await readFile(join(componentDir, 'EmulatorMonitoringTab.tsx'), 'utf8'),
+    await readFile(join(componentDir, 'emulator-detail/telemetry.ts'), 'utf8'),
+  ].join('\n');
+
+  assert.match(source, /TELEMETRY_HIDDEN_TAGS_STORAGE_PREFIX/);
+  assert.match(source, /getTelemetryHiddenTagsStorageKey\(emulatorId\)/);
+  assert.match(source, /readHiddenTelemetryTagNames\(emulatorId\)/);
+  assert.match(source, /writeHiddenTelemetryTagNames\(emulatorId, next\)/);
+  assert.match(source, /const numericTagNames = new Set\(numericTelemetryTags\.map\(\(t\) => t\.name\)\)/);
+  assert.match(source, /\[\.\.\.readHiddenTelemetryTagNames\(emulatorId\)\]\.filter\(\(name\) => numericTagNames\.has\(name\)\)/);
+  assert.match(source, /writeHiddenTelemetryTagNames\(emulatorId, next\)/);
+});
+
 test('monitoring chart keeps tag colors stable when visible tags are toggled', async () => {
   const source = await readFile(join(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'src', 'routes', 'emulators', 'components'), 'EmulatorMonitoringTab.tsx'), 'utf8');
 

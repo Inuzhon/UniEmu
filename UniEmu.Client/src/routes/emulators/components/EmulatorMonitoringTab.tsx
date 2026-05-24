@@ -26,6 +26,8 @@ import {
   emptyTelemetry,
   formatTelemetryValue,
   getTelemetryKeys,
+  readHiddenTelemetryTagNames,
+  writeHiddenTelemetryTagNames,
 } from './emulator-detail/telemetry';
 
 type EmulatorMonitoringTabProps = {
@@ -48,7 +50,7 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
   const [telemetryPaused, setTelemetryPaused] = useState(false);
   const [pausedTelemetrySnapshot, setPausedTelemetrySnapshot] = useState<TelemetryPoint[]>([]);
   const [hiddenTelemetryTagNames, setHiddenTelemetryTagNames] = useState<Set<string>>(
-    () => new Set()
+    () => readHiddenTelemetryTagNames(emulatorId)
   );
 
   const handleTelemetryPauseToggle = useCallback(() => {
@@ -73,11 +75,12 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
 
   useEffect(() => {
     const numericTagNames = new Set(numericTelemetryTags.map((t) => t.name));
-    setHiddenTelemetryTagNames((current) => {
-      const next = new Set([...current].filter((name) => numericTagNames.has(name)));
-      return next.size === current.size ? current : next;
-    });
-  }, [numericTelemetryTags]);
+    const next = new Set(
+      [...readHiddenTelemetryTagNames(emulatorId)].filter((name) => numericTagNames.has(name))
+    );
+    writeHiddenTelemetryTagNames(emulatorId, next);
+    setHiddenTelemetryTagNames(next);
+  }, [emulatorId, numericTelemetryTags]);
 
   const telemetry = useMemo(
     () => buildTelemetryChartPoints(telemetryPoints, visibleNumericTelemetryTags),
@@ -93,9 +96,10 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
       } else {
         next.add(tagName);
       }
+      writeHiddenTelemetryTagNames(emulatorId, next);
       return next;
     });
-  }, []);
+  }, [emulatorId]);
 
   const packets = useMemo(
     () => buildPacketHistory(telemetryPoints, enabledTagsForDispatcher, packetRetention),
@@ -216,7 +220,7 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card xl:flex xl:min-h-0 xl:flex-col">
           <div className="border-b border-border p-4">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {localization.routes.emulators.components.emulatorDetailPage.tagValuesTitle}
@@ -227,7 +231,7 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
                 : localization.routes.emulators.components.emulatorDetailPage.latestSnapshotLabel}
             </p>
           </div>
-          <div className="max-h-[320px] overflow-auto">
+          <div className="max-h-[320px] overflow-auto xl:min-h-0 xl:max-h-none xl:flex-1">
             <table className="w-full text-sm">
               <thead className="sticky top-0 border-b border-border bg-card text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
