@@ -19,11 +19,11 @@ public static partial class UniEmuSeeder
         return
         [
             new CncSeedSpec(
-                Id: "em-cnc-vmc-650-01",
+                Id: "em-2ad967c1d",
                 Name: "CNC_VMC_650_01",
                 ProtocolId: 41,
                 IntervalSec: 1,
-                TotalRequests: 45120,
+                TotalRequests: 0,
                 ProgramName: "VMC650_MAIN.NC",
                 Model: "Fanuc 0i-MF Plus",
                 FirmwareVersion: "31i-B5 6.17",
@@ -49,11 +49,11 @@ public static partial class UniEmuSeeder
                 ZFinish: -45,
                 DistanceMax: 180),
             new CncSeedSpec(
-                Id: "em-cnc-lathe-turn-200-02",
+                Id: "em-332847e64",
                 Name: "CNC_Lathe_Turn_200_02",
                 ProtocolId: 42,
                 IntervalSec: 1,
-                TotalRequests: 38760,
+                TotalRequests: 0,
                 ProgramName: "LATHE200_MAIN.NC",
                 Model: "Siemens SINUMERIK 828D",
                 FirmwareVersion: "PPU.4.95 SP3",
@@ -79,11 +79,11 @@ public static partial class UniEmuSeeder
                 ZFinish: -160,
                 DistanceMax: 240),
             new CncSeedSpec(
-                Id: "em-cnc-router-gantry-03",
+                Id: "em-1426dc9ea",
                 Name: "CNC_Router_Gantry_03",
                 ProtocolId: 43,
                 IntervalSec: 2,
-                TotalRequests: 26440,
+                TotalRequests: 0,
                 ProgramName: "ROUTER03_NESTING.NC",
                 Model: "Syntec 6MB-E",
                 FirmwareVersion: "10.118.52",
@@ -125,7 +125,7 @@ public static partial class UniEmuSeeder
             Name = spec.Name,
             Status = nameof(EmulatorStatus.Stopped),
             ProtocolId = spec.ProtocolId,
-            TargetUrl = "https://scada.local/api/cnc/ingest",
+            TargetUrl = "http://127.0.0.1:8080",
             IntervalSec = spec.IntervalSec,
             LastRun = now.AddMinutes(-7),
             NextRun = now.AddSeconds(spec.IntervalSec),
@@ -140,87 +140,87 @@ public static partial class UniEmuSeeder
     /// <returns>Теги для указанного ЧПУ-станка.</returns>
     private static IEnumerable<EmulatorTagEntity> CreateCncTags(CncSeedSpec spec)
     {
-        yield return CreateTag(spec, "power-state", "PowerState", "PowerState", TagType.Bool, TagSource.Scenario, "true",
+        yield return CreateTag(spec, "power-state", "Питание", "PowerState", TagType.Bool, TagSource.Scenario, "true",
             scenario: CreatePowerScenario(), description: "Состояние питания стойки УЧПУ.");
-        yield return CreateTag(spec, "controller-mode", "ControllerMode", "ControllerMode", TagType.String, TagSource.Scenario, "AUTO",
+        yield return CreateTag(spec, "controller-mode", "Режим ЧПУ", "ControllerMode", TagType.String, TagSource.Scenario, "AUTO",
             scenario: CreateControllerModeScenario(), specialParameter: SpecialParameter.WorkMode, description: "Режим стойки: AUTO, MDI, JOG или EDIT.");
-        yield return CreateTag(spec, "execution-state", "ExecutionState", "ExecutionState", TagType.String, TagSource.Scenario, "READY",
+        yield return CreateTag(spec, "execution-state", "Выполнение", "ExecutionState", TagType.String, TagSource.Scenario, "READY",
             scenario: CreateExecutionStateScenario(), specialParameter: SpecialParameter.SystemState, description: "MTConnect-подобное состояние выполнения программы.");
-        yield return CreateTag(spec, "cycle-state", "CycleState", "CycleState", TagType.String, TagSource.Scenario, "Reset",
+        yield return CreateTag(spec, "cycle-state", "Состояние цикла", "CycleState", TagType.String, TagSource.Scenario, "Reset",
             scenario: CreateCycleStateScenario(), description: "Состояние кнопок цикла: Reset, Cycle Start или Feed Hold.");
-        yield return CreateTag(spec, "program-name", "ProgramName", "ProgramName", TagType.String, TagSource.Static, spec.ProgramName,
+        yield return CreateTag(spec, "program-name", "Программа", "ProgramName", TagType.String, TagSource.Static, spec.ProgramName,
             specialParameter: SpecialParameter.PrgName, description: "Имя основной УП, по которому publish-задача выбирает CNC-программу.");
-        yield return CreateTag(spec, "subprogram-name", "SubprogramName", "SubprogramName", TagType.String, TagSource.Static, string.Empty,
+        yield return CreateTag(spec, "subprogram-name", "Подпрограмма", "SubprogramName", TagType.String, TagSource.Static, string.Empty,
             specialParameter: SpecialParameter.Subprogram, description: "Имя активной подпрограммы, если она выбрана оператором.");
-        yield return CreateTag(spec, "frame-number", "FrameNumber", "FrameNumber", TagType.Int, TagSource.Static, "0",
+        yield return CreateTag(spec, "frame-number", "Кадр", "FrameNumber", TagType.Int, TagSource.Static, "0",
             specialParameter: SpecialParameter.FrameNum, description: "Номер текущего кадра, рассчитываемый publish-задачей по выбранной УП.");
-        yield return CreateTag(spec, "frame-text", "FrameText", "FrameText", TagType.String, TagSource.Static, string.Empty,
+        yield return CreateTag(spec, "frame-text", "Текст кадра", "FrameText", TagType.String, TagSource.Static, string.Empty,
             specialParameter: SpecialParameter.FrameText, description: "Текст текущего кадра, рассчитываемый publish-задачей по выбранной УП.");
-        yield return CreateTag(spec, "door-closed", "DoorClosed", "DoorClosed", TagType.Bool, TagSource.Scenario, "true",
+        yield return CreateTag(spec, "door-closed", "Двери закрыты", "DoorClosed", TagType.Bool, TagSource.Scenario, "true",
             scenario: CreateDoorClosedScenario(), description: "Состояние защитных дверей рабочей зоны.");
-        yield return CreateTag(spec, "fixture-clamped", "FixtureClamped", "FixtureClamped", TagType.Bool, TagSource.Scenario, "true",
+        yield return CreateTag(spec, "fixture-clamped", "Зажим", "FixtureClamped", TagType.Bool, TagSource.Scenario, "true",
             scenario: CreateFixtureClampedScenario(), description: "Состояние зажима детали или патрона.");
-        yield return CreateTag(spec, "servo-ready", "ServoReady", "ServoReady", TagType.Bool, TagSource.Scenario, "true",
+        yield return CreateTag(spec, "servo-ready", "Приводы готовы", "ServoReady", TagType.Bool, TagSource.Scenario, "true",
             scenario: CreateServoReadyScenario(), description: "Готовность сервоприводов осей.");
-        yield return CreateTag(spec, "machine-readiness", "MachineReadiness", "MachineReadiness", TagType.Bool, TagSource.Script, "true",
-            formula: ScriptFormula("scr-cnc-machine-readiness"), specialParameter: SpecialParameter.MachineReadiness, description: "Интегральная готовность станка по питанию, дверям, зажиму и сервоприводам.");
-        yield return CreateTag(spec, "technological-stop", "TechnologicalStop", "TechnologicalStop", TagType.Bool, TagSource.Script, "false",
-            formula: ScriptFormula("scr-cnc-tech-stop"), specialParameter: SpecialParameter.TechnologicalStop, description: "Технологический останов, связанный с HOLD или ожиданием оператора.");
-        yield return CreateTag(spec, "emergency-stop", "EmergencyStop", "EmergencyStop", TagType.Bool, TagSource.Script, "false",
-            formula: ScriptFormula("scr-cnc-emergency-stop"), specialParameter: SpecialParameter.EmergencyStop, description: "Аварийный останов, рассчитанный по состоянию ALARM и диагностическому коду.");
-        yield return CreateTag(spec, "machine-x", "MachineX", "MachineX", TagType.Double, TagSource.Scenario, Invariant(spec.XStart),
+        yield return CreateTag(spec, "machine-readiness", "Готовность", "MachineReadiness", TagType.Bool, TagSource.Script, "true",
+            formula: ScriptFormula(CncScriptId(spec, "machine-readiness")), specialParameter: SpecialParameter.MachineReadiness, description: "Интегральная готовность станка по питанию, дверям, зажиму и сервоприводам.");
+        yield return CreateTag(spec, "technological-stop", "Тех. останов", "TechnologicalStop", TagType.Bool, TagSource.Script, "false",
+            formula: ScriptFormula(CncScriptId(spec, "technological-stop")), specialParameter: SpecialParameter.TechnologicalStop, description: "Технологический останов, связанный с HOLD или ожиданием оператора.");
+        yield return CreateTag(spec, "emergency-stop", "Аварийный стоп", "EmergencyStop", TagType.Bool, TagSource.Script, "false",
+            formula: ScriptFormula(CncScriptId(spec, "emergency-stop")), specialParameter: SpecialParameter.EmergencyStop, description: "Аварийный останов, рассчитанный по состоянию ALARM и диагностическому коду.");
+        yield return CreateTag(spec, "machine-x", "Позиция X", "MachineX", TagType.Double, TagSource.Scenario, Invariant(spec.XStart),
             scenario: CreateAxisScenario("x", spec.XStart, spec.XFinish), roundDigits: 3, specialParameter: SpecialParameter.AxisPosition, description: "Фактическая машинная позиция оси X.");
-        yield return CreateTag(spec, "machine-y", "MachineY", "MachineY", TagType.Double, TagSource.Scenario, Invariant(spec.YStart),
+        yield return CreateTag(spec, "machine-y", "Позиция Y", "MachineY", TagType.Double, TagSource.Scenario, Invariant(spec.YStart),
             scenario: CreateAxisScenario("y", spec.YStart, spec.YFinish), roundDigits: 3, description: "Фактическая машинная позиция оси Y.");
-        yield return CreateTag(spec, "machine-z", "MachineZ", "MachineZ", TagType.Double, TagSource.Scenario, Invariant(spec.ZStart),
+        yield return CreateTag(spec, "machine-z", "Позиция Z", "MachineZ", TagType.Double, TagSource.Scenario, Invariant(spec.ZStart),
             scenario: CreateAxisScenario("z", spec.ZStart, spec.ZFinish), roundDigits: 3, description: "Фактическая машинная позиция оси Z.");
-        yield return CreateTag(spec, "distance-to-go", "DistanceToGo", "DistanceToGo", TagType.Double, TagSource.Scenario, Invariant(spec.DistanceMax),
+        yield return CreateTag(spec, "distance-to-go", "Остаток хода", "DistanceToGo", TagType.Double, TagSource.Scenario, Invariant(spec.DistanceMax),
             scenario: CreateDistanceToGoScenario(spec), roundDigits: 3, description: "Остаток перемещения до конца активного кадра.");
-        yield return CreateTag(spec, "spindle-command", "SpindleCommandRpm", "SpindleCommandRpm", TagType.Double, TagSource.Scenario, Invariant(spec.SpindleCommand),
+        yield return CreateTag(spec, "spindle-command", "Задание шпинделя", "SpindleCommandRpm", TagType.Double, TagSource.Scenario, Invariant(spec.SpindleCommand),
             scenario: CreateSpindleCommandScenario(spec), roundDigits: 0, description: "Командная скорость шпинделя S из управляющей программы.");
-        yield return CreateTag(spec, "spindle-actual", "SpindleActualRpm", "SpindleActualRpm", TagType.Double, TagSource.Generator, Invariant(spec.SpindleActualBase),
+        yield return CreateTag(spec, "spindle-actual", "Обороты шпинделя", "SpindleActualRpm", TagType.Double, TagSource.Generator, Invariant(spec.SpindleActualBase),
             calc: SinusoidCalc(spec.SpindleActualBase, spec.SpindleAmplitude, 24, distortion: 0.5), roundDigits: 0, specialParameter: SpecialParameter.SpindleSpeed, description: "Фактическая скорость шпинделя с небольшой волной регулирования.");
-        yield return CreateTag(spec, "spindle-direction", "SpindleDirection", "SpindleDirection", TagType.String, TagSource.Scenario, "CW",
+        yield return CreateTag(spec, "spindle-direction", "Направление шпинделя", "SpindleDirection", TagType.String, TagSource.Scenario, "CW",
             scenario: CreateSpindleDirectionScenario(), description: "Направление вращения шпинделя: CW, CCW или STOPPED.");
-        yield return CreateTag(spec, "spindle-load", "SpindleLoadPct", "SpindleLoadPct", TagType.Double, TagSource.Generator, Invariant(spec.SpindleLoadBase),
+        yield return CreateTag(spec, "spindle-load", "Нагрузка шпинделя", "SpindleLoadPct", TagType.Double, TagSource.Generator, Invariant(spec.SpindleLoadBase),
             calc: SinusoidCalc(spec.SpindleLoadBase, spec.SpindleLoadAmplitude, 35, distortion: 1.2), roundDigits: 1, specialParameter: SpecialParameter.SpindleLoad, description: "Нагрузка шпинделя в процентах.");
-        yield return CreateTag(spec, "vibration", "VibrationMmS", "VibrationMmS", TagType.Double, TagSource.Generator, Invariant(spec.VibrationBase),
+        yield return CreateTag(spec, "vibration", "Вибрация", "VibrationMmS", TagType.Double, TagSource.Generator, Invariant(spec.VibrationBase),
             calc: SinusoidCalc(spec.VibrationBase, 0.35, 18, distortion: 2.0), roundDigits: 2, description: "Вибрация шпиндельного узла в мм/с.");
-        yield return CreateTag(spec, "spindle-temperature", "SpindleTemperatureC", "SpindleTemperatureC", TagType.Double, TagSource.Generator, Invariant(spec.SpindleTemperatureBase),
+        yield return CreateTag(spec, "spindle-temperature", "Темп. шпинделя", "SpindleTemperatureC", TagType.Double, TagSource.Generator, Invariant(spec.SpindleTemperatureBase),
             calc: SinusoidCalc(spec.SpindleTemperatureBase, 3.5, 180, distortion: 0.8), roundDigits: 1, description: "Температура шпиндельного узла.");
-        yield return CreateTag(spec, "spindle-override", "SpindleOverridePct", "SpindleOverridePct", TagType.Double, TagSource.Generator, "100",
+        yield return CreateTag(spec, "spindle-override", "Коррекция шпинделя", "SpindleOverridePct", TagType.Double, TagSource.Generator, "100",
             calc: SequenceCalc(80, 100, 100, 120, 100), roundDigits: 0, specialParameter: SpecialParameter.SpindleOvr, description: "Операторская коррекция оборотов шпинделя.");
-        yield return CreateTag(spec, "command-feed", "CommandFeedMmMin", "CommandFeedMmMin", TagType.Double, TagSource.Scenario, Invariant(spec.CommandFeed),
+        yield return CreateTag(spec, "command-feed", "Заданная подача", "CommandFeedMmMin", TagType.Double, TagSource.Scenario, Invariant(spec.CommandFeed),
             scenario: CreateCommandFeedScenario(spec), roundDigits: 1, description: "Командная подача из УП.");
-        yield return CreateTag(spec, "actual-feed", "ActualFeedMmMin", "ActualFeedMmMin", TagType.Double, TagSource.Script, "0",
-            formula: ScriptFormula("scr-cnc-actual-feed"), roundDigits: 1, specialParameter: SpecialParameter.FeedRate, description: "Фактическая подача с учетом режима выполнения и override.");
-        yield return CreateTag(spec, "feed-override", "FeedOverridePct", "FeedOverridePct", TagType.Double, TagSource.Generator, Invariant(spec.FeedOverrideBase),
+        yield return CreateTag(spec, "actual-feed", "Факт. подача", "ActualFeedMmMin", TagType.Double, TagSource.Script, "0",
+            formula: ScriptFormula(CncScriptId(spec, "actual-feed")), roundDigits: 1, specialParameter: SpecialParameter.FeedRate, description: "Фактическая подача с учетом режима выполнения и override.");
+        yield return CreateTag(spec, "feed-override", "Коррекция подачи", "FeedOverridePct", TagType.Double, TagSource.Generator, Invariant(spec.FeedOverrideBase),
             calc: SequenceCalc(spec.FeedOverrideBase, 100, 100, 80, spec.FeedOverrideBase), roundDigits: 0, specialParameter: SpecialParameter.FeedOvr, description: "Коррекция рабочей подачи оператором.");
-        yield return CreateTag(spec, "rapid-override", "RapidOverridePct", "RapidOverridePct", TagType.Double, TagSource.Generator, Invariant(spec.RapidOverrideBase),
+        yield return CreateTag(spec, "rapid-override", "Коррекция G00", "RapidOverridePct", TagType.Double, TagSource.Generator, Invariant(spec.RapidOverrideBase),
             calc: SequenceCalc(25, spec.RapidOverrideBase, 50, 100, spec.RapidOverrideBase), roundDigits: 0, description: "Коррекция быстрых перемещений G00.");
-        yield return CreateTag(spec, "active-motion-mode", "ActiveMotionMode", "ActiveMotionMode", TagType.String, TagSource.Scenario, "G00",
+        yield return CreateTag(spec, "active-motion-mode", "Режим движения", "ActiveMotionMode", TagType.String, TagSource.Scenario, "G00",
             scenario: CreateMotionModeScenario(), description: "Активный режим интерполяции: G00, G01, G02 или G03.");
-        yield return CreateTag(spec, "active-tool", "ActiveTool", "ActiveTool", TagType.Int, TagSource.Scenario, Invariant(spec.ActiveTool),
+        yield return CreateTag(spec, "active-tool", "Инструмент", "ActiveTool", TagType.Int, TagSource.Scenario, Invariant(spec.ActiveTool),
             scenario: CreateActiveToolScenario(spec), specialParameter: SpecialParameter.ToolNum, description: "Номер активного инструмента или позиции револьвера.");
-        yield return CreateTag(spec, "tool-life", "ToolLifeRemainingPct", "ToolLifeRemainingPct", TagType.Double, TagSource.Generator, "100",
+        yield return CreateTag(spec, "tool-life", "Ресурс инструмента", "ToolLifeRemainingPct", TagType.Double, TagSource.Generator, "100",
             calc: new TagCalcConfigDto(CalcType.Line, "100", "8", 900, null, null, null, 0.4), roundDigits: 1, description: "Остаток ресурса активного инструмента.");
-        yield return CreateTag(spec, "axis-load", "AxisLoadPct", "AxisLoadPct", TagType.Double, TagSource.FormulaScript, Invariant(spec.AxisLoadBase),
-            calc: SinusoidCalc(spec.AxisLoadBase, 5, 28, distortion: 1.0), formula: ScriptFormula("scr-cnc-axis-load"), roundDigits: 1, specialParameter: SpecialParameter.AxisLoad, description: "Нагрузка оси после генератора и CSX-постобработки по подаче и шпинделю.");
-        yield return CreateTag(spec, "cycle-time", "CycleTimeSec", "CycleTimeSec", TagType.Double, TagSource.Formula, "0",
-            formula: ScriptFormula("scr-cnc-cycle-time"), roundDigits: 1, specialParameter: SpecialParameter.CycleTime, description: "Накопленное время активного цикла с persistent state скрипта.");
-        yield return CreateTag(spec, "alarm-code", "AlarmCode", "AlarmCode", TagType.Int, TagSource.Script, "0",
-            formula: ScriptFormula("scr-cnc-alarm-code"), specialParameter: SpecialParameter.ErrorNum, description: "Код аварии по дверям, зажиму, сервоприводам, нагрузке и вибрации.");
-        yield return CreateTag(spec, "alarm-text", "AlarmText", "AlarmText", TagType.String, TagSource.Script, string.Empty,
-            formula: ScriptFormula("scr-cnc-alarm-text"), specialParameter: SpecialParameter.ErrorText, description: "Текст аварии, соответствующий AlarmCode.");
-        yield return CreateTag(spec, "warning-text", "WarningText", "WarningText", TagType.String, TagSource.Script, string.Empty,
-            formula: ScriptFormula("scr-cnc-warning-text"), specialParameter: SpecialParameter.Message, description: "Предупреждение о ресурсе инструмента, температуре или вибрации.");
-        yield return CreateTag(spec, "cnc-model", "CncModel", "CncModel", TagType.String, TagSource.Cnc, spec.Model,
+        yield return CreateTag(spec, "axis-load", "Нагрузка оси", "AxisLoadPct", TagType.Double, TagSource.FormulaScript, Invariant(spec.AxisLoadBase),
+            calc: SinusoidCalc(spec.AxisLoadBase, 5, 28, distortion: 1.0), formula: ScriptFormula(CncScriptId(spec, "axis-load")), roundDigits: 1, specialParameter: SpecialParameter.AxisLoad, description: "Нагрузка оси после генератора и CSX-постобработки по подаче и шпинделю.");
+        yield return CreateTag(spec, "cycle-time", "Время цикла", "CycleTimeSec", TagType.Double, TagSource.Formula, "0",
+            formula: ScriptFormula(CncScriptId(spec, "cycle-time")), roundDigits: 1, specialParameter: SpecialParameter.CycleTime, description: "Накопленное время активного цикла с persistent state скрипта.");
+        yield return CreateTag(spec, "alarm-code", "Код аварии", "AlarmCode", TagType.Int, TagSource.Script, "0",
+            formula: ScriptFormula(CncScriptId(spec, "alarm-code")), specialParameter: SpecialParameter.ErrorNum, description: "Код аварии по дверям, зажиму, сервоприводам, нагрузке и вибрации.");
+        yield return CreateTag(spec, "alarm-text", "Текст аварии", "AlarmText", TagType.String, TagSource.Script, string.Empty,
+            formula: ScriptFormula(CncScriptId(spec, "alarm-text")), specialParameter: SpecialParameter.ErrorText, description: "Текст аварии, соответствующий AlarmCode.");
+        yield return CreateTag(spec, "warning-text", "Предупреждение", "WarningText", TagType.String, TagSource.Script, string.Empty,
+            formula: ScriptFormula(CncScriptId(spec, "warning-text")), specialParameter: SpecialParameter.Message, description: "Предупреждение о ресурсе инструмента, температуре или вибрации.");
+        yield return CreateTag(spec, "cnc-model", "Модель ЧПУ", "CncModel", TagType.String, TagSource.Static, spec.Model,
             specialParameter: SpecialParameter.CNCModel, description: "Модель стойки УЧПУ.");
-        yield return CreateTag(spec, "firmware-version", "FirmwareVersion", "FirmwareVersion", TagType.String, TagSource.Cnc, spec.FirmwareVersion,
+        yield return CreateTag(spec, "firmware-version", "Прошивка", "FirmwareVersion", TagType.String, TagSource.Static, spec.FirmwareVersion,
             specialParameter: SpecialParameter.FirmwareVersion, description: "Версия прошивки стойки.");
-        yield return CreateTag(spec, "serial-number", "SerialNumber", "SerialNumber", TagType.String, TagSource.Cnc, spec.SerialNumber,
+        yield return CreateTag(spec, "serial-number", "Серийный номер", "SerialNumber", TagType.String, TagSource.Static, spec.SerialNumber,
             specialParameter: SpecialParameter.SerialNumber, description: "Серийный номер стойки или станка.");
-        yield return CreateTag(spec, "plc-version", "PlcVersion", "PlcVersion", TagType.String, TagSource.Cnc, spec.PlcVersion,
+        yield return CreateTag(spec, "plc-version", "Версия ПЛК", "PlcVersion", TagType.String, TagSource.Static, spec.PlcVersion,
             specialParameter: SpecialParameter.PLCVersion, description: "Версия PLC-проекта стойки.");
     }
 
@@ -234,92 +234,90 @@ public static partial class UniEmuSeeder
     {
         foreach (var spec in specs)
         {
-            yield return CreateCncProgram(
-                $"cnc-{spec.Id["em-cnc-".Length..]}-main",
-                spec.ProgramName,
-                spec.Id,
-                $"Seed: основная управляющая программа для {spec.Name}.",
-                CreateCncProgramContent(spec.ProgramName),
-                now.AddHours(-1));
+            foreach (var programName in CreateCncProgramNames(spec))
+            {
+                var isMainProgram = string.Equals(programName, spec.ProgramName, StringComparison.OrdinalIgnoreCase);
+                yield return CreateCncProgram(
+                    CncProgramId(spec, programName),
+                    programName,
+                    spec.Id,
+                    isMainProgram
+                        ? $"Seed: основная управляющая программа для {spec.Name}."
+                        : $"Seed: альтернативная управляющая программа для {spec.Name}.",
+                    CreateCncProgramContent(programName),
+                    now.AddHours(-1));
+            }
         }
     }
 
     /// <summary>
-    /// Создает shared CSX-скрипты, используемые тегами ЧПУ-станков.
+    /// Возвращает имена CNC-программ, доступных демонстрационному станку.
     /// </summary>
-    /// <param name="now">Текущее время заполнения базы.</param>
-    /// <returns>Коллекция shared-скриптов.</returns>
-    private static IEnumerable<ScriptFileEntity> CreateSharedCncScripts(DateTimeOffset now)
+    /// <param name="spec">Настройки демонстрационного ЧПУ-станка.</param>
+    /// <returns>Имена CNC-программ станка.</returns>
+    private static IReadOnlyList<string> CreateCncProgramNames(CncSeedSpec spec)
     {
-        yield return CreateSharedScript("scr-cnc-math", "cnc/math.csx",
+        return spec.Name switch
+        {
+            "CNC_VMC_650_01" =>
+            [
+                "VMC650_MAIN.NC",
+                "VMC650_DRILL_GRID.NC",
+                "VMC650_3D_SURFACE_LONG.NC",
+            ],
+            "CNC_Lathe_Turn_200_02" =>
+            [
+                "LATHE200_MAIN.NC",
+                "LATHE200_GROOVE_CYCLE.NC",
+                "LATHE200_THREAD_SHAFT.NC",
+            ],
+            "CNC_Router_Gantry_03" =>
+            [
+                "ROUTER03_NESTING.NC",
+                "ROUTER03_PANEL_LONG.NC",
+                "ROUTER03_SIGN_ENGRAVE.NC",
+            ],
+            _ => [spec.ProgramName],
+        };
+    }
+
+    /// <summary>
+    /// Возвращает идентификатор seed CNC-программы.
+    /// </summary>
+    /// <param name="spec">Настройки демонстрационного ЧПУ-станка.</param>
+    /// <param name="programName">Имя CNC-программы.</param>
+    /// <returns>Идентификатор CNC-программы.</returns>
+    private static string CncProgramId(CncSeedSpec spec, string programName)
+    {
+        var programSuffix = programName[..^".NC".Length].ToLowerInvariant().Replace('_', '-');
+        return $"cnc-{spec.Id["em-".Length..]}-{programSuffix}";
+    }
+
+    /// <summary>
+    /// Возвращает идентификатор scoped-скрипта ЧПУ-станка.
+    /// </summary>
+    /// <param name="spec">Настройки демонстрационного ЧПУ-станка.</param>
+    /// <param name="scriptName">Короткое имя скрипта без расширения.</param>
+    /// <returns>Идентификатор скрипта.</returns>
+    private static string CncScriptId(CncSeedSpec spec, string scriptName)
+    {
+        return $"scr-{spec.Id["em-".Length..]}-{scriptName}";
+    }
+
+    /// <summary>
+    /// Создает CSX-скрипты, привязанные к конкретному ЧПУ-станку.
+    /// </summary>
+    /// <param name="spec">Настройки демонстрационного ЧПУ-станка.</param>
+    /// <param name="now">Текущее время заполнения базы.</param>
+    /// <returns>Коллекция scoped-скриптов станка.</returns>
+    private static IEnumerable<ScriptFileEntity> CreateCncScripts(CncSeedSpec spec, DateTimeOffset now)
+    {
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "actual-feed"),
+            "actual-feed.csx",
+            spec.Id,
             """
-            double Clamp(double value, double min, double max)
-            {
-                if (value < min)
-                    return min;
-
-                if (value > max)
-                    return max;
-
-                return value;
-            }
-
-            double ToDouble(object? value, double fallback)
-            {
-                return value switch
-                {
-                    null => fallback,
-                    byte byteValue => byteValue,
-                    short shortValue => shortValue,
-                    int intValue => intValue,
-                    long longValue => longValue,
-                    float floatValue => floatValue,
-                    double doubleValue => doubleValue,
-                    decimal decimalValue => (double)decimalValue,
-                    bool boolValue => boolValue ? 1 : 0,
-                    string stringValue => double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
-                        ? parsed
-                        : fallback,
-                    IConvertible convertible => Convert.ToDouble(convertible, CultureInfo.InvariantCulture),
-                    _ => fallback,
-                };
-            }
-
-            string ToText(object? value, string fallback)
-            {
-                return value?.ToString() ?? fallback;
-            }
-
-            bool ToBool(object? value, bool fallback)
-            {
-                return value switch
-                {
-                    null => fallback,
-                    bool boolValue => boolValue,
-                    string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
-                    _ => ToDouble(value, fallback ? 1 : 0) != 0,
-                };
-            }
-            """,
-            now.AddHours(-1).AddMinutes(1));
-
-        yield return CreateSharedScript("scr-cnc-actual-feed", "cnc/actual-feed.csx",
-            """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
-
-            string ReadText(string key, string fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToText(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             var execution = ReadText("ExecutionState", "READY");
             if (execution != "ACTIVE")
@@ -337,16 +335,12 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-1).AddMinutes(2));
 
-        yield return CreateSharedScript("scr-cnc-cycle-time", "cnc/cycle-time.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "cycle-time"),
+            "cycle-time.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            string ReadText(string key, string fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToText(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             var execution = ReadText("ExecutionState", "READY");
             var cycleSeconds = UniEmu.State.Get<double>("cycleSeconds", 0);
@@ -367,16 +361,12 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-1).AddMinutes(3));
 
-        yield return CreateSharedScript("scr-cnc-axis-load", "cnc/axis-load.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "axis-load"),
+            "axis-load.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             var baseLoad = ToDouble(UniEmu.Tag.Value, 15);
             var spindleLoad = ReadNumber("SpindleLoadPct", 0);
@@ -391,16 +381,12 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-1).AddMinutes(4));
 
-        yield return CreateSharedScript("scr-cnc-machine-readiness", "cnc/machine-readiness.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "machine-readiness"),
+            "machine-readiness.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            bool ReadBool(string key, bool fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToBool(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             return ReadBool("PowerState", true)
                 && ReadBool("DoorClosed", true)
@@ -409,68 +395,35 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-1).AddMinutes(5));
 
-        yield return CreateSharedScript("scr-cnc-tech-stop", "cnc/technological-stop.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "technological-stop"),
+            "technological-stop.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            string ReadText(string key, string fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToText(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             return ReadText("ExecutionState", "READY") == "HOLD";
             """,
             now.AddHours(-1).AddMinutes(6));
 
-        yield return CreateSharedScript("scr-cnc-emergency-stop", "cnc/emergency-stop.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "emergency-stop"),
+            "emergency-stop.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
-
-            string ReadText(string key, string fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToText(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             return ReadText("ExecutionState", "READY") == "ALARM"
                 || ReadNumber("AlarmCode", 0) >= 700;
             """,
             now.AddHours(-1).AddMinutes(7));
 
-        yield return CreateSharedScript("scr-cnc-alarm-code", "cnc/alarm-code.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "alarm-code"),
+            "alarm-code.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
-
-            bool ReadBool(string key, bool fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToBool(tag?.Value, fallback)
-                    : fallback;
-            }
-
-            string ReadText(string key, string fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToText(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             var execution = ReadText("ExecutionState", "READY");
             var active = execution == "ACTIVE";
@@ -497,16 +450,12 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-1).AddMinutes(8));
 
-        yield return CreateSharedScript("scr-cnc-alarm-text", "cnc/alarm-text.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "alarm-text"),
+            "alarm-text.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             var code = (int)Math.Round(ReadNumber("AlarmCode", 0));
             return code switch
@@ -522,16 +471,12 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-1).AddMinutes(9));
 
-        yield return CreateSharedScript("scr-cnc-warning-text", "cnc/warning-text.csx",
+        yield return CreateEmulatorScript(
+            CncScriptId(spec, "warning-text"),
+            "warning-text.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             if (ReadNumber("ToolLifeRemainingPct", 100) < 12)
                 return "Tool life is below planned replacement threshold.";
@@ -876,6 +821,28 @@ public static partial class UniEmuSeeder
                 N110 M05
                 N120 M30
                 """,
+            "VMC650_DRILL_GRID.NC" => """
+                O6502 (VMC650 DRILL GRID)
+                N10 G21 G17 G90 G54
+                N20 T05 M06
+                N30 S6200 M03
+                N40 G00 X-80. Y-60. Z120.
+                N50 G43 H05 Z40.
+                N60 G81 X-80. Y-60. Z-18. R4. F360.
+                N70 X0. Y-60.
+                N80 X80. Y-60.
+                N90 X-80. Y0.
+                N100 X0. Y0.
+                N110 X80. Y0.
+                N120 X-80. Y60.
+                N130 X0. Y60.
+                N140 X80. Y60.
+                N150 G80
+                N160 G00 Z120.
+                N170 M05
+                N180 M30
+                """,
+            "VMC650_3D_SURFACE_LONG.NC" => CreateVmc650SurfaceProgram(),
             "LATHE200_MAIN.NC" => """
                 O2002 (TURN200 DEMO SHAFT)
                 N10 G21 G18 G90
@@ -889,6 +856,35 @@ public static partial class UniEmuSeeder
                 N90 G00 X210. Z420.
                 N100 M05
                 N110 M30
+                """,
+            "LATHE200_GROOVE_CYCLE.NC" => """
+                O2003 (TURN200 GROOVE CYCLE)
+                N10 G21 G18 G90
+                N20 T0505
+                N30 G97 S2400 M03
+                N40 G00 X92. Z8.
+                N50 G01 X78. F220.
+                N60 G01 Z-18.
+                N70 G01 X84.
+                N80 G00 X96.
+                N90 Z-42.
+                N100 G01 X74. F180.
+                N110 G01 Z-58.
+                N120 G00 X120. Z120.
+                N130 M05
+                N140 M30
+                """,
+            "LATHE200_THREAD_SHAFT.NC" => """
+                O2004 (TURN200 THREAD SHAFT)
+                N10 G21 G18 G90
+                N20 T0707
+                N30 G97 S1100 M03
+                N40 G00 X62. Z6.
+                N50 G76 P020060 Q120 R0.03
+                N60 G76 X48.2 Z-72. P900 Q240 F2.0
+                N70 G00 X120. Z120.
+                N80 M05
+                N90 M30
                 """,
             "ROUTER03_NESTING.NC" => """
                 O0303 (ROUTER03 DEMO NEST)
@@ -905,8 +901,98 @@ public static partial class UniEmuSeeder
                 N110 M05
                 N120 M30
                 """,
+            "ROUTER03_PANEL_LONG.NC" => """
+                O0304 (ROUTER03 PANEL OUTLINE)
+                N10 G21 G17 G90 G54
+                N20 T08 M06
+                N30 S16500 M03
+                N40 G00 X25. Y25. Z90.
+                N50 G01 Z-8. F2400.
+                N60 G01 X1425. F5200.
+                N70 G01 Y875.
+                N80 G01 X25.
+                N90 G01 Y25.
+                N100 G00 Z90.
+                N110 G00 X160. Y140.
+                N120 G01 Z-6. F2200.
+                N130 G01 X1290. F4800.
+                N140 G01 Y760.
+                N150 G01 X160.
+                N160 G01 Y140.
+                N170 G00 Z90.
+                N180 M05
+                N190 M30
+                """,
+            "ROUTER03_SIGN_ENGRAVE.NC" => """
+                O0305 (ROUTER03 SIGN ENGRAVE)
+                N10 G21 G17 G90 G54
+                N20 T03 M06
+                N30 S21000 M03
+                N40 G00 X120. Y120. Z60.
+                N50 G01 Z-2.5 F1200.
+                N60 G01 X520. F3600.
+                N70 G03 X600. Y200. I0. J80.
+                N80 G01 X920.
+                N90 G02 X1040. Y320. I120. J0.
+                N100 G01 Y520.
+                N110 G01 X120.
+                N120 G00 Z60.
+                N130 M05
+                N140 M30
+                """,
             _ => "M30",
         };
+    }
+
+    /// <summary>
+    /// Создает длинную демонстрационную программу чистовой 3D-обработки для VMC650.
+    /// </summary>
+    /// <returns>Текст CNC-программы.</returns>
+    private static string CreateVmc650SurfaceProgram()
+    {
+        var builder = new System.Text.StringBuilder();
+        var lineNumber = 10;
+        builder.AppendLine("O6503 (VMC650 3D SURFACE LONG)");
+        AppendCncLine(builder, ref lineNumber, "G21 G17 G90 G54");
+        AppendCncLine(builder, ref lineNumber, "T09 M06");
+        AppendCncLine(builder, ref lineNumber, "S9800 M03");
+        AppendCncLine(builder, ref lineNumber, "G00 X-140. Y-90. Z160.");
+        AppendCncLine(builder, ref lineNumber, "G43 H09 Z45.");
+        AppendCncLine(builder, ref lineNumber, "G01 Z-6. F620.");
+
+        for (var pass = 0; pass < 28; pass++)
+        {
+            var y = -84 + pass * 6;
+            var direction = pass % 2 == 0 ? 1 : -1;
+            for (var step = 0; step < 10; step++)
+            {
+                var x = direction > 0
+                    ? -130 + step * 30
+                    : 140 - step * 30;
+                var z = -6 - Math.Sin((pass + step) / 4d) * 2.4;
+                AppendCncLine(
+                    builder,
+                    ref lineNumber,
+                    $"G01 X{Invariant(x)} Y{Invariant(y)} Z{Invariant(z)} F780.");
+            }
+        }
+
+        AppendCncLine(builder, ref lineNumber, "G00 Z160.");
+        AppendCncLine(builder, ref lineNumber, "M05");
+        AppendCncLine(builder, ref lineNumber, "M30");
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Добавляет строку CNC-программы с последовательным номером кадра.
+    /// </summary>
+    /// <param name="builder">Буфер CNC-программы.</param>
+    /// <param name="lineNumber">Текущий номер кадра.</param>
+    /// <param name="command">Команда кадра.</param>
+    private static void AppendCncLine(System.Text.StringBuilder builder, ref int lineNumber, string command)
+    {
+        builder.Append('N').Append(lineNumber).Append(' ').AppendLine(command);
+        lineNumber += 10;
     }
 
     /// <summary>

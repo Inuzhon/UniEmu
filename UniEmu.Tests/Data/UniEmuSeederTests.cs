@@ -8,6 +8,7 @@ using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Runtime;
+using UniEmu.Runtime.Scripting;
 using UniEmu.Runtime.Scripting.Environment;
 using UniEmu.Scripting.Api;
 
@@ -39,7 +40,6 @@ public sealed class UniEmuSeederTests
                 .ToListAsync();
             var tags = await db.EmulatorTags.ToListAsync();
             var scripts = await db.ScriptFiles.ToListAsync();
-            var scriptIds = scripts.Select(script => script.Id).ToHashSet(StringComparer.Ordinal);
 
             Assert.Equal(
                 [
@@ -55,17 +55,18 @@ public sealed class UniEmuSeederTests
             foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("Furnace_", StringComparison.Ordinal)))
             {
                 var furnaceTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
-                AssertFurnaceTagSetIsComplete(furnaceTags, scriptIds);
+                AssertFurnaceTagSetIsComplete(furnaceTags, scripts, emulator.Id);
             }
 
             foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("CNC_", StringComparison.Ordinal)))
             {
                 var cncTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
-                AssertCncTagSetIsComplete(cncTags, scriptIds);
+                AssertCncTagSetIsComplete(cncTags, scripts, emulator.Id);
             }
 
+            var carburizingEmulatorId = emulators.Single(emulator => emulator.Name == "Furnace_Carburizing_01").Id;
             var carburizingTemperature = tags.Single(tag =>
-                tag.EmulatorId == "em-furnace-carburizing-01" &&
+                tag.EmulatorId == carburizingEmulatorId &&
                 tag.Key == "Temperature");
             var scenario = UniEmuJson.Deserialize<TagScenarioConfigDto>(carburizingTemperature.ScenarioJson)!;
 
@@ -76,29 +77,43 @@ public sealed class UniEmuSeederTests
             Assert.Contains(scenario.Segments, segment => segment.Label == "HighTempSoak");
             Assert.Contains(scenario.Segments, segment => segment.Label == "Cooling");
 
-            Assert.Contains(scripts, script => script.Id == "scr-furnace-math" && script.Name == "furnace/math.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-furnace-heater-power" && script.Name == "furnace/heater-power.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-furnace-deviation" && script.Name == "furnace/deviation.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-furnace-alarm-code" && script.Name == "furnace/alarm-code.csx");
-
-            Assert.Contains(scripts, script => script.Id == "scr-cnc-math" && script.Name == "cnc/math.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-cnc-actual-feed" && script.Name == "cnc/actual-feed.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-cnc-cycle-time" && script.Name == "cnc/cycle-time.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-cnc-axis-load" && script.Name == "cnc/axis-load.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-cnc-alarm-code" && script.Name == "cnc/alarm-code.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-cnc-alarm-text" && script.Name == "cnc/alarm-text.csx");
-            Assert.Contains(scripts, script => script.Id == "scr-cnc-warning-text" && script.Name == "cnc/warning-text.csx");
+            Assert.Contains(scripts, script => script.Id == "scr-math" && script.Name == "math.csx");
+            Assert.Contains(scripts, script => script.Id == "scr-read-tags" && script.Name == "read-tags.csx");
+            Assert.DoesNotContain(scripts, script => script.Name.Contains('/', StringComparison.Ordinal));
+            Assert.All(
+                scripts.Where(script => script.Id is not "scr-math" and not "scr-read-tags"),
+                script =>
+                {
+                    Assert.Equal(ScriptScope.Emulator, UniEmuJson.EnumValue<ScriptScope>(script.Scope));
+                    Assert.False(string.IsNullOrWhiteSpace(script.EmulatorId));
+                });
 
             var programs = await db.CncPrograms
                 .OrderBy(program => program.Name)
                 .ToListAsync();
             Assert.Equal(
                 [
+                    "LATHE200_GROOVE_CYCLE.NC",
                     "LATHE200_MAIN.NC",
+                    "LATHE200_THREAD_SHAFT.NC",
                     "ROUTER03_NESTING.NC",
+                    "ROUTER03_PANEL_LONG.NC",
+                    "ROUTER03_SIGN_ENGRAVE.NC",
+                    "VMC650_3D_SURFACE_LONG.NC",
+                    "VMC650_DRILL_GRID.NC",
                     "VMC650_MAIN.NC",
                 ],
                 programs.Select(program => program.Name));
+
+            foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("CNC_", StringComparison.Ordinal)))
+            {
+                var emulatorPrograms = programs.Where(program => program.EmulatorId == emulator.Id).ToList();
+                Assert.True(emulatorPrograms.Count >= 3, $"{emulator.Name} has {emulatorPrograms.Count} CNC programs.");
+                Assert.All(emulatorPrograms, program => Assert.Equal(CncScope.Emulator, UniEmuJson.EnumValue<CncScope>(program.Scope)));
+            }
+
+            var largeProgram = programs.Single(program => program.Name == "VMC650_3D_SURFACE_LONG.NC");
+            Assert.True(largeProgram.Content.Split('\n').Length >= 250);
             Assert.All(programs, program => Assert.True(program.SizeBytes > 0));
         }
     }
@@ -123,10 +138,7 @@ public sealed class UniEmuSeederTests
         await using (var db = new UniEmuDbContext(options))
         {
             var scripts = await db.ScriptFiles.ToListAsync();
-            var visibleScripts = scripts.ToDictionary(
-                script => TagScriptPath.Normalize(script.Name),
-                script => script.Content,
-                StringComparer.OrdinalIgnoreCase);
+            var sharedScope = UniEmuJson.EnumString(ScriptScope.Shared);
             var environment = new CsxScriptEnvironment();
             var directiveValidator = new CsxScriptDirectiveValidator();
             var securityValidator = new CsxScriptSecurityValidator();
@@ -134,6 +146,10 @@ public sealed class UniEmuSeederTests
             foreach (var script in scripts)
             {
                 var path = TagScriptPath.Normalize(script.Name);
+                var visibleScriptEntities = scripts.Where(candidate =>
+                    candidate.Scope == sharedScope ||
+                    !string.IsNullOrWhiteSpace(script.EmulatorId) && candidate.EmulatorId == script.EmulatorId);
+                var visibleScripts = VisibleScriptResolver.ToContentMap(visibleScriptEntities);
                 directiveValidator.ValidateSupportedDirectives(script.Content);
                 directiveValidator.DetectLoadCycles(path, visibleScripts);
 
@@ -157,7 +173,10 @@ public sealed class UniEmuSeederTests
         }
     }
 
-    private static void AssertFurnaceTagSetIsComplete(IReadOnlyList<EmulatorTagEntity> tags, ISet<string> scriptIds)
+    private static void AssertFurnaceTagSetIsComplete(
+        IReadOnlyList<EmulatorTagEntity> tags,
+        IReadOnlyList<ScriptFileEntity> scripts,
+        string emulatorId)
     {
         string[] expectedKeys =
         [
@@ -205,11 +224,17 @@ public sealed class UniEmuSeederTests
         {
             var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(tag.FormulaJson);
             Assert.NotNull(formula?.ScriptId);
-            Assert.Contains(formula!.ScriptId!, scriptIds);
+            var script = scripts.SingleOrDefault(script => script.Id == formula!.ScriptId);
+            Assert.NotNull(script);
+            Assert.Equal(ScriptScope.Emulator, UniEmuJson.EnumValue<ScriptScope>(script!.Scope));
+            Assert.Equal(emulatorId, script.EmulatorId);
         }
     }
 
-    private static void AssertCncTagSetIsComplete(IReadOnlyList<EmulatorTagEntity> tags, ISet<string> scriptIds)
+    private static void AssertCncTagSetIsComplete(
+        IReadOnlyList<EmulatorTagEntity> tags,
+        IReadOnlyList<ScriptFileEntity> scripts,
+        string emulatorId)
     {
         string[] expectedKeys =
         [
@@ -266,7 +291,21 @@ public sealed class UniEmuSeederTests
         Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Formula);
         Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Script);
         Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.FormulaScript);
-        Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Cnc);
+        Assert.DoesNotContain(tags, tag => string.Equals(tag.Source, "Cnc", StringComparison.Ordinal));
+
+        string[] staticCncMetadataKeys =
+        [
+            "CncModel",
+            "FirmwareVersion",
+            "SerialNumber",
+            "PlcVersion",
+        ];
+        foreach (var key in staticCncMetadataKeys)
+        {
+            var tag = tags.Single(tag => tag.Key == key);
+            Assert.Equal(TagSource.Static, UniEmuJson.EnumValue<TagSource>(tag.Source));
+            Assert.False(string.IsNullOrWhiteSpace(tag.Preview));
+        }
 
         var controllerMode = tags.Single(tag => tag.Key == "ControllerMode");
         Assert.Equal(TagType.String, UniEmuJson.EnumValue<TagType>(controllerMode.Type));
@@ -309,7 +348,10 @@ public sealed class UniEmuSeederTests
         {
             var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(tag.FormulaJson);
             Assert.NotNull(formula?.ScriptId);
-            Assert.Contains(formula!.ScriptId!, scriptIds);
+            var script = scripts.SingleOrDefault(script => script.Id == formula!.ScriptId);
+            Assert.NotNull(script);
+            Assert.Equal(ScriptScope.Emulator, UniEmuJson.EnumValue<ScriptScope>(script!.Scope));
+            Assert.Equal(emulatorId, script.EmulatorId);
         }
     }
 }

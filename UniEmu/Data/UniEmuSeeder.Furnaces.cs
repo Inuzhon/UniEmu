@@ -19,11 +19,11 @@ public static partial class UniEmuSeeder
         return
         [
             new FurnaceSeedSpec(
-                Id: "em-furnace-carburizing-01",
+                Id: "em-8a2d4a98a",
                 Name: "Furnace_Carburizing_01",
                 ProtocolId: 31,
                 IntervalSec: 2,
-                TotalRequests: 18420,
+                TotalRequests: 0,
                 AmbientTemperature: 32,
                 ProcessSetpoint: 920,
                 DoorOpenTemperature: 760,
@@ -34,11 +34,11 @@ public static partial class UniEmuSeeder
                 FanAmplitude: 8,
                 FanPeriodSec: 90),
             new FurnaceSeedSpec(
-                Id: "em-furnace-tempering-02",
+                Id: "em-a9d16c278",
                 Name: "Furnace_Tempering_02",
                 ProtocolId: 32,
                 IntervalSec: 2,
-                TotalRequests: 12375,
+                TotalRequests: 0,
                 AmbientTemperature: 28,
                 ProcessSetpoint: 540,
                 DoorOpenTemperature: 430,
@@ -49,11 +49,11 @@ public static partial class UniEmuSeeder
                 FanAmplitude: 6,
                 FanPeriodSec: 75),
             new FurnaceSeedSpec(
-                Id: "em-furnace-brazing-03",
+                Id: "em-c55895497",
                 Name: "Furnace_Brazing_03",
                 ProtocolId: 33,
                 IntervalSec: 1,
-                TotalRequests: 29710,
+                TotalRequests: 0,
                 AmbientTemperature: 34,
                 ProcessSetpoint: 780,
                 DoorOpenTemperature: 620,
@@ -80,7 +80,7 @@ public static partial class UniEmuSeeder
             Name = spec.Name,
             Status = nameof(EmulatorStatus.Stopped),
             ProtocolId = spec.ProtocolId,
-            TargetUrl = "https://scada.local/api/thermal/ingest",
+            TargetUrl = "http://127.0.0.1:8080",
             IntervalSec = spec.IntervalSec,
             LastRun = now.AddMinutes(-12),
             NextRun = now.AddSeconds(spec.IntervalSec),
@@ -98,7 +98,7 @@ public static partial class UniEmuSeeder
         yield return CreateTag(
             spec,
             "temperature",
-            "Temperature",
+            "Температура",
             "Temperature",
             TagType.Double,
             TagSource.Scenario,
@@ -110,7 +110,7 @@ public static partial class UniEmuSeeder
         yield return CreateTag(
             spec,
             "setpoint",
-            "Setpoint",
+            "Уставка",
             "Setpoint",
             TagType.Double,
             TagSource.Scenario,
@@ -122,7 +122,7 @@ public static partial class UniEmuSeeder
         yield return CreateTag(
             spec,
             "work-mode",
-            "WorkMode",
+            "Режим работы",
             "WorkMode",
             TagType.String,
             TagSource.Scenario,
@@ -134,7 +134,7 @@ public static partial class UniEmuSeeder
         yield return CreateTag(
             spec,
             "door-open",
-            "DoorOpen",
+            "Дверца открыта",
             "DoorOpen",
             TagType.Bool,
             TagSource.Scenario,
@@ -145,19 +145,19 @@ public static partial class UniEmuSeeder
         yield return CreateTag(
             spec,
             "heater-power",
-            "HeaterPowerPct",
+            "Мощность нагрева",
             "HeaterPowerPct",
             TagType.Double,
             TagSource.Script,
             "0",
-            formula: ScriptFormula("scr-furnace-heater-power"),
+            formula: ScriptFormula(FurnaceScriptId(spec, "heater-power")),
             roundDigits: 1,
             description: "Мощность нагревателей, рассчитанная CSX-скриптом по температуре, уставке и состоянию дверцы.");
 
         yield return CreateTag(
             spec,
             "fan-speed",
-            "FanSpeedPct",
+            "Скорость вентилятора",
             "FanSpeedPct",
             TagType.Double,
             TagSource.Generator,
@@ -177,32 +177,32 @@ public static partial class UniEmuSeeder
         yield return CreateTag(
             spec,
             "temperature-deviation",
-            "TemperatureDeviation",
+            "Отклонение",
             "TemperatureDeviation",
             TagType.Double,
             TagSource.FormulaScript,
             "0",
             calc: FlatLineCalc(),
-            formula: ScriptFormula("scr-furnace-deviation"),
+            formula: ScriptFormula(FurnaceScriptId(spec, "deviation")),
             roundDigits: 1,
             description: "Отклонение фактической температуры от уставки: генераторная формула с постобработкой CSX-скриптом.");
 
         yield return CreateTag(
             spec,
             "alarm-code",
-            "AlarmCode",
+            "Код аварии",
             "AlarmCode",
             TagType.Int,
             TagSource.Script,
             "0",
-            formula: ScriptFormula("scr-furnace-alarm-code"),
+            formula: ScriptFormula(FurnaceScriptId(spec, "alarm-code")),
             specialParameter: SpecialParameter.ErrorNum,
             description: "Код технологического предупреждения, вычисляемый скриптом по отклонению температуры и открытой дверце.");
 
         yield return CreateTag(
             spec,
             "program-name",
-            "ProgramName",
+            "Программа",
             "ProgramName",
             TagType.String,
             TagSource.Static,
@@ -290,79 +290,34 @@ public static partial class UniEmuSeeder
     }
 
     /// <summary>
-    /// Создает shared CSX-скрипты, используемые script и formula-script тегами печей.
+    /// Возвращает идентификатор scoped-скрипта печи.
     /// </summary>
-    /// <param name="now">Текущее время заполнения базы.</param>
-    /// <returns>Коллекция shared-скриптов.</returns>
-    private static IEnumerable<ScriptFileEntity> CreateSharedFurnaceScripts(DateTimeOffset now)
+    /// <param name="spec">Настройки демонстрационной печи.</param>
+    /// <param name="scriptName">Короткое имя скрипта без расширения.</param>
+    /// <returns>Идентификатор скрипта.</returns>
+    private static string FurnaceScriptId(FurnaceSeedSpec spec, string scriptName)
     {
-        yield return CreateSharedScript(
-            "scr-furnace-math",
-            "furnace/math.csx",
+        return $"scr-{spec.Id["em-".Length..]}-{scriptName}";
+    }
+
+    /// <summary>
+    /// Создает CSX-скрипты, привязанные к конкретной печи.
+    /// </summary>
+    /// <param name="spec">Настройки демонстрационной печи.</param>
+    /// <param name="now">Текущее время заполнения базы.</param>
+    /// <returns>Коллекция scoped-скриптов печи.</returns>
+    private static IEnumerable<ScriptFileEntity> CreateFurnaceScripts(FurnaceSeedSpec spec, DateTimeOffset now)
+    {
+        yield return CreateEmulatorScript(
+            FurnaceScriptId(spec, "heater-power"),
+            "heater-power.csx",
+            spec.Id,
             """
-            double Clamp(double value, double min, double max)
-            {
-                if (value < min)
-                    return min;
-
-                if (value > max)
-                    return max;
-
-                return value;
-            }
-
-            double ToDouble(object? value, double fallback)
-            {
-                return value switch
-                {
-                    null => fallback,
-                    byte byteValue => byteValue,
-                    short shortValue => shortValue,
-                    int intValue => intValue,
-                    long longValue => longValue,
-                    float floatValue => floatValue,
-                    double doubleValue => doubleValue,
-                    decimal decimalValue => (double)decimalValue,
-                    bool boolValue => boolValue ? 1 : 0,
-                    string stringValue => double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
-                        ? parsed
-                        : fallback,
-                    IConvertible convertible => Convert.ToDouble(convertible, CultureInfo.InvariantCulture),
-                    _ => fallback,
-                };
-            }
-            """,
-            now.AddHours(-2));
-
-        yield return CreateSharedScript(
-            "scr-furnace-heater-power",
-            "furnace/heater-power.csx",
-            """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
-
-            bool ReadBool(string key)
-            {
-                if (!UniEmu.Tags.TryGetValue(key, out var tag) || tag?.Value is null)
-                    return false;
-
-                return tag.Value switch
-                {
-                    bool boolValue => boolValue,
-                    string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
-                    _ => ToDouble(tag.Value, 0) != 0,
-                };
-            }
+            #load "read-tags.csx"
 
             var temperature = ReadNumber("Temperature", 25);
             var setpoint = ReadNumber("Setpoint", temperature);
-            var doorOpen = ReadBool("DoorOpen");
+            var doorOpen = ReadBool("DoorOpen", false);
 
             if (doorOpen)
                 return 0d;
@@ -376,18 +331,12 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-2).AddMinutes(5));
 
-        yield return CreateSharedScript(
-            "scr-furnace-deviation",
-            "furnace/deviation.csx",
+        yield return CreateEmulatorScript(
+            FurnaceScriptId(spec, "deviation"),
+            "deviation.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
+            #load "read-tags.csx"
 
             var fallback = ToDouble(UniEmu.Tag.Value, 0);
             var temperature = ReadNumber("Temperature", fallback);
@@ -397,35 +346,16 @@ public static partial class UniEmuSeeder
             """,
             now.AddHours(-2).AddMinutes(10));
 
-        yield return CreateSharedScript(
-            "scr-furnace-alarm-code",
-            "furnace/alarm-code.csx",
+        yield return CreateEmulatorScript(
+            FurnaceScriptId(spec, "alarm-code"),
+            "alarm-code.csx",
+            spec.Id,
             """
-            #load "math.csx"
-
-            double ReadNumber(string key, double fallback)
-            {
-                return UniEmu.Tags.TryGetValue(key, out var tag)
-                    ? ToDouble(tag?.Value, fallback)
-                    : fallback;
-            }
-
-            bool ReadBool(string key)
-            {
-                if (!UniEmu.Tags.TryGetValue(key, out var tag) || tag?.Value is null)
-                    return false;
-
-                return tag.Value switch
-                {
-                    bool boolValue => boolValue,
-                    string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
-                    _ => ToDouble(tag.Value, 0) != 0,
-                };
-            }
+            #load "read-tags.csx"
 
             var temperature = ReadNumber("Temperature", 25);
             var setpoint = ReadNumber("Setpoint", temperature);
-            var doorOpen = ReadBool("DoorOpen");
+            var doorOpen = ReadBool("DoorOpen", false);
             var deviation = Math.Abs(temperature - setpoint);
 
             if (doorOpen && temperature > 300)
@@ -456,7 +386,7 @@ public static partial class UniEmuSeeder
                 EmulatorId = spec.Id,
                 EmulatorName = spec.Name,
                 Level = UniEmuJson.EnumString(EventLevel.Info),
-                Message = $"Seed: термическая печь {spec.Name} подготовлена с циклом нагрева, замены детали, второго режима и охлаждения.",
+                Message = $"Термическая печь {spec.Name} подготовлена с циклом нагрева, замены детали, второго режима и охлаждения.",
                 Timestamp = now.AddSeconds(index),
             };
 

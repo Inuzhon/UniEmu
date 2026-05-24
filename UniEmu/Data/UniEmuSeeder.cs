@@ -34,14 +34,106 @@ public static partial class UniEmuSeeder
             furnaces.SelectMany(CreateFurnaceTags)
                 .Concat(cncMachines.SelectMany(CreateCncTags)));
         db.ScriptFiles.AddRange(
-            CreateSharedFurnaceScripts(now)
-                .Concat(CreateSharedCncScripts(now)));
+            CreateSharedScripts(now)
+                .Concat(furnaces.SelectMany(spec => CreateFurnaceScripts(spec, now)))
+                .Concat(cncMachines.SelectMany(spec => CreateCncScripts(spec, now))));
         db.CncPrograms.AddRange(CreateCncPrograms(cncMachines, now));
-        db.SystemEvents.AddRange(
-            CreateFurnaceSeedEvents(furnaces, now)
-                .Concat(CreateCncSeedEvents(cncMachines, now)));
+        //db.SystemEvents.AddRange(
+        //    CreateFurnaceSeedEvents(furnaces, now)
+        //        .Concat(CreateCncSeedEvents(cncMachines, now)));
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Создает общие CSX-скрипты, доступные всем эмуляторам.
+    /// </summary>
+    /// <param name="now">Текущее время заполнения базы.</param>
+    /// <returns>Коллекция общих скриптов.</returns>
+    private static IEnumerable<ScriptFileEntity> CreateSharedScripts(DateTimeOffset now)
+    {
+        yield return CreateSharedScript(
+            "scr-math",
+            "math.csx",
+            """
+            double Clamp(double value, double min, double max)
+            {
+                if (value < min)
+                    return min;
+
+                if (value > max)
+                    return max;
+
+                return value;
+            }
+
+            double ToDouble(object? value, double fallback)
+            {
+                return value switch
+                {
+                    null => fallback,
+                    byte byteValue => byteValue,
+                    short shortValue => shortValue,
+                    int intValue => intValue,
+                    long longValue => longValue,
+                    float floatValue => floatValue,
+                    double doubleValue => doubleValue,
+                    decimal decimalValue => (double)decimalValue,
+                    bool boolValue => boolValue ? 1 : 0,
+                    string stringValue => double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                        ? parsed
+                        : fallback,
+                    IConvertible convertible => Convert.ToDouble(convertible, CultureInfo.InvariantCulture),
+                    _ => fallback,
+                };
+            }
+
+            string ToText(object? value, string fallback)
+            {
+                return value?.ToString() ?? fallback;
+            }
+
+            bool ToBool(object? value, bool fallback)
+            {
+                return value switch
+                {
+                    null => fallback,
+                    bool boolValue => boolValue,
+                    string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
+                    _ => ToDouble(value, fallback ? 1 : 0) != 0,
+                };
+            }
+            """,
+            now.AddHours(-2));
+
+        yield return CreateSharedScript(
+            "scr-read-tags",
+            "read-tags.csx",
+            """
+            #load "math.csx"
+
+            double ReadNumber(string key, double fallback)
+            {
+                return UniEmu.Tags.TryGetValue(key, out var tag)
+                    ? ToDouble(tag?.Value, fallback)
+                    : fallback;
+            }
+
+            string ReadText(string key, string fallback)
+            {
+                return UniEmu.Tags.TryGetValue(key, out var tag)
+                    ? ToText(tag?.Value, fallback)
+                    : fallback;
+            }
+
+            bool ReadBool(string key, bool fallback)
+            {
+                return UniEmu.Tags.TryGetValue(key, out var tag)
+                    ? ToBool(tag?.Value, fallback)
+                    : fallback;
+            }
+            """,
+            now.AddHours(-2).AddMinutes(1));
     }
 
     /// <summary>
@@ -110,6 +202,34 @@ public static partial class UniEmuSeeder
             Id = id,
             Name = name,
             Scope = UniEmuJson.EnumString(ScriptScope.Shared),
+            Content = content,
+            UpdatedAt = updatedAt,
+            SizeBytes = Encoding.UTF8.GetByteCount(content),
+        };
+    }
+
+    /// <summary>
+    /// Создает скрипт, доступный только указанному эмулятору.
+    /// </summary>
+    /// <param name="id">Идентификатор скрипта.</param>
+    /// <param name="name">Имя скрипта для редактора и директив <c>#load</c>.</param>
+    /// <param name="emulatorId">Идентификатор эмулятора-владельца.</param>
+    /// <param name="content">Содержимое CSX-скрипта.</param>
+    /// <param name="updatedAt">Время последнего обновления.</param>
+    /// <returns>Сущность scoped-скрипта.</returns>
+    private static ScriptFileEntity CreateEmulatorScript(
+        string id,
+        string name,
+        string emulatorId,
+        string content,
+        DateTimeOffset updatedAt)
+    {
+        return new ScriptFileEntity
+        {
+            Id = id,
+            Name = name,
+            Scope = UniEmuJson.EnumString(ScriptScope.Emulator),
+            EmulatorId = emulatorId,
             Content = content,
             UpdatedAt = updatedAt,
             SizeBytes = Encoding.UTF8.GetByteCount(content),
