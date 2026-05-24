@@ -4,13 +4,16 @@ import { ChangelogDialog } from '@/components/ChangelogDialog';
 import {
   applyDocumentAppTheme,
   getInitialAppTheme,
+  getInitialSidebarCollapsed,
+  saveAppThemePreference,
+  saveSidebarCollapsedPreference,
   type AppTheme,
 } from '@/config/app-theme';
 import { useUniEmuStore } from '@/store/uniemu-store';
 import { Sidebar } from './Sidebar';
 
 export function AppLayout() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => getInitialSidebarCollapsed());
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [theme, setTheme] = useState<AppTheme>(() => getInitialAppTheme());
   const hydrate = useUniEmuStore((s) => s.hydrate);
@@ -29,15 +32,23 @@ export function AppLayout() {
   const handleThemeToggle = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    localStorage.setItem('app-theme', newTheme);
+    saveAppThemePreference(newTheme);
     applyDocumentAppTheme(newTheme);
+  };
+
+  const handleSidebarToggle = () => {
+    setCollapsed((currentCollapsed) => {
+      const newCollapsed = !currentCollapsed;
+      saveSidebarCollapsedPreference(newCollapsed);
+      return newCollapsed;
+    });
   };
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       <Sidebar
         collapsed={collapsed}
-        onToggle={() => setCollapsed((c) => !c)}
+        onToggle={handleSidebarToggle}
         onOpenChangelog={() => setChangelogOpen(true)}
         theme={theme}
         onThemeToggle={handleThemeToggle}
