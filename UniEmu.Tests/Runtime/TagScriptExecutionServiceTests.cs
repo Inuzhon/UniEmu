@@ -340,6 +340,75 @@ public sealed class TagScriptExecutionServiceTests
         Assert.Equal(321d, value.NumericValue);
     }
 
+    [Fact]
+    public async Task GenerateScriptTagAsync_DoesNotInsertDuplicateState_WhenFirstRunIsConcurrent()
+    {
+        await using var fixture = await ScriptExecutionDbFixture.CreateAsync();
+        await using var setupDb = fixture.CreateDbContext();
+        setupDb.ScriptFiles.Add(new ScriptFileEntity
+        {
+            Id = "scr-concurrent-state",
+            Name = "machine/concurrent-state.csx",
+            Scope = UniEmuJson.EnumString(ScriptScope.Emulator),
+            EmulatorId = "em-1",
+            Content =
+                """
+                var worker = await UniEmu.Rest.GetActiveWorkerAsync();
+                var runs = UniEmu.State.Get<int>("runs", 0) + 1;
+                UniEmu.State.Set("runs", runs);
+                return worker!.Id + runs;
+                """,
+            SizeBytes = System.Text.Encoding.UTF8.GetByteCount(
+                """
+                var worker = await UniEmu.Rest.GetActiveWorkerAsync();
+                var runs = UniEmu.State.Get<int>("runs", 0) + 1;
+                UniEmu.State.Set("runs", runs);
+                return worker!.Id + runs;
+                """),
+            UpdatedAt = DateTimeOffset.Parse("2026-05-11T09:30:00Z"),
+        });
+        setupDb.EmulatorTags.Add(new EmulatorTagEntity
+        {
+            Id = "tg-concurrent-state",
+            EmulatorId = "em-1",
+            Name = "Concurrent state",
+            Key = "concurrent-state",
+            Type = UniEmuJson.EnumString(TagType.Int),
+            Source = UniEmuJson.EnumString(TagSource.Script),
+            Preview = "0",
+            TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Once, TagTriggerEvent.OnStart, null, null, null)),
+            FormulaJson = UniEmuJson.Serialize(new TagFormulaConfigDto("scr-concurrent-state", null)),
+        });
+        await setupDb.SaveChangesAsync();
+
+        await using var firstDb = fixture.CreateDbContext();
+        await using var secondDb = fixture.CreateDbContext();
+        var restOperations = new BlockingRestOperations(new Worker { Id = 321, Name = "Active", Status = "Ready", IsActive = true }, 2);
+        var firstService = CreateService(firstDb, new TagRuntimeStateStore(), restOperations);
+        var secondService = CreateService(secondDb, new TagRuntimeStateStore(), restOperations);
+        var (firstEmulator, firstTag) = await LoadNoTrackingAsync(firstDb, "tg-concurrent-state");
+        var (secondEmulator, secondTag) = await LoadNoTrackingAsync(secondDb, "tg-concurrent-state");
+
+        var first = firstService.GenerateScriptTagAsync(
+            firstEmulator,
+            firstTag,
+            DateTimeOffset.Parse("2026-05-11T10:00:00Z"),
+            CancellationToken.None);
+        var second = secondService.GenerateScriptTagAsync(
+            secondEmulator,
+            secondTag,
+            DateTimeOffset.Parse("2026-05-11T10:00:00Z"),
+            CancellationToken.None);
+
+        var values = await Task.WhenAll(first, second);
+
+        Assert.All(values, value => Assert.Equal(322, value.Value));
+        await using var assertDb = fixture.CreateDbContext();
+        var state = await assertDb.ScriptRuntimeStates.SingleAsync(
+            s => s.EmulatorId == "em-1" && s.ScriptKey == "script:scr-concurrent-state");
+        Assert.Contains("\"runs\":1", state.ValuesJson);
+    }
+
     private static TagScriptExecutionService CreateService(
         UniEmuDbContext db,
         TagRuntimeStateStore stateStore,
@@ -885,6 +954,36 @@ public sealed class TagScriptExecutionServiceTests
         public Task<Worker?> GetActiveWorkerAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult<Worker?>(activeWorker);
+        }
+
+        public Task RegisterWorkerAsync(int workerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<RestCallResult> TryRegisterWorkerAsync(int workerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(RestCallResult.Ok());
+        }
+    }
+
+    private sealed class BlockingRestOperations(Worker activeWorker, int expectedWaiters) : ITagScriptRestOperations
+    {
+        private readonly TaskCompletionSource barrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int waiters;
+
+        public Task<Worker?> GetWorkerByIdAsync(int workerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Worker?>(activeWorker.Id == workerId ? activeWorker : null);
+        }
+
+        public async Task<Worker?> GetActiveWorkerAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref waiters) == expectedWaiters)
+                barrier.TrySetResult();
+
+            await barrier.Task.WaitAsync(cancellationToken);
+            return activeWorker;
         }
 
         public Task RegisterWorkerAsync(int workerId, CancellationToken cancellationToken)

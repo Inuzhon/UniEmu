@@ -234,10 +234,15 @@ public sealed class TagScriptExecutionService
         var scriptState = await RunScriptWithTimeoutAsync(compiledScript, script.Path, globals, cancellationToken);
         var result = scriptState.ReturnValue;
 
-        if (globals.UniEmu.State.IsDirty || globals.UniEmu.Tags.IsDirty)
+        if (globals.UniEmu.State.IsDirty)
         {
             state.ValuesJson = UniEmuJson.Serialize(globals.UniEmu.State.Snapshot());
             state.UpdatedAt = DateTimeOffset.UtcNow;
+            await UpsertStateAsync(state, cancellationToken);
+        }
+
+        if (globals.UniEmu.Tags.IsDirty)
+        {
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -380,18 +385,19 @@ public sealed class TagScriptExecutionService
     }
 
     /// <summary>
-    /// Возвращает persistent state для пары эмулятор-скрипт или создает новую пустую запись в текущем контексте.
+    /// Возвращает persistent state для пары эмулятор-скрипт или пустой snapshot для первого запуска.
     /// </summary>
     /// <param name="emulatorId">Идентификатор эмулятора, которому принадлежит state.</param>
     /// <param name="scriptKey">Стабильный ключ state для inline-скрипта или файла скрипта.</param>
     /// <param name="cancellationToken">Токен отмены запроса к базе данных.</param>
-    /// <returns>Сущность persistent state, отслеживаемая текущим DbContext.</returns>
+    /// <returns>Сущность persistent state из базы или неотслеживаемый новый snapshot.</returns>
     private async Task<ScriptRuntimeStateEntity> GetOrCreateStateAsync(
         string emulatorId,
         string scriptKey,
         CancellationToken cancellationToken)
     {
         var state = await db.ScriptRuntimeStates
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.EmulatorId == emulatorId && s.ScriptKey == scriptKey, cancellationToken);
 
         if (state is not null)
@@ -405,9 +411,43 @@ public sealed class TagScriptExecutionService
             ValuesJson = "{}",
             UpdatedAt = DateTimeOffset.UtcNow,
         };
-        db.ScriptRuntimeStates.Add(state);
 
         return state;
+    }
+
+    /// <summary>
+    /// Атомарно сохраняет script state, выдерживая конкурентный первый запуск одного script key.
+    /// </summary>
+    /// <param name="state">Состояние скрипта с актуальным JSON-снимком.</param>
+    /// <param name="cancellationToken">Токен отмены SQL-запроса.</param>
+    private async Task UpsertStateAsync(ScriptRuntimeStateEntity state, CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO ScriptRuntimeStates (Id, EmulatorId, ScriptKey, ValuesJson, UpdatedAt)
+            VALUES ({state.Id}, {state.EmulatorId}, {state.ScriptKey}, {state.ValuesJson}, {state.UpdatedAt})
+            ON CONFLICT(EmulatorId, ScriptKey) DO UPDATE SET
+                ValuesJson = excluded.ValuesJson,
+                UpdatedAt = excluded.UpdatedAt
+            """,
+            cancellationToken);
+
+        DetachTrackedState(state.EmulatorId, state.ScriptKey);
+    }
+
+    /// <summary>
+    /// Удаляет stale tracked-экземпляры state после raw SQL upsert.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="scriptKey">Ключ script state.</param>
+    private void DetachTrackedState(string emulatorId, string scriptKey)
+    {
+        foreach (var entry in db.ChangeTracker.Entries<ScriptRuntimeStateEntity>()
+            .Where(entry => entry.Entity.EmulatorId == emulatorId && entry.Entity.ScriptKey == scriptKey)
+            .ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
     }
 
     /// <summary>
