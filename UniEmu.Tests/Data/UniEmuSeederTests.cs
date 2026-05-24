@@ -43,6 +43,7 @@ public sealed class UniEmuSeederTests
 
             Assert.Equal(
                 [
+                    "Batch_Reactor_Mix_01",
                     "CNC_Lathe_Turn_200_02",
                     "CNC_Router_Gantry_03",
                     "CNC_VMC_650_01",
@@ -62,6 +63,12 @@ public sealed class UniEmuSeederTests
             {
                 var cncTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
                 AssertCncTagSetIsComplete(cncTags, scripts, emulator.Id);
+            }
+
+            foreach (var emulator in emulators.Where(emulator => emulator.Name.StartsWith("Batch_", StringComparison.Ordinal)))
+            {
+                var batchTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
+                AssertBatchReactorTagSetIsComplete(batchTags, scripts, emulator.Id);
             }
 
             var carburizingEmulatorId = emulators.Single(emulator => emulator.Name == "Furnace_Carburizing_01").Id;
@@ -138,6 +145,7 @@ public sealed class UniEmuSeederTests
         await using (var db = new UniEmuDbContext(options))
         {
             var scripts = await db.ScriptFiles.ToListAsync();
+            var tags = await db.EmulatorTags.ToListAsync();
             var sharedScope = UniEmuJson.EnumString(ScriptScope.Shared);
             var environment = new CsxScriptEnvironment();
             var directiveValidator = new CsxScriptDirectiveValidator();
@@ -169,6 +177,42 @@ public sealed class UniEmuSeederTests
                 Assert.True(
                     securityIssues.Count == 0,
                     $"{script.Name}:{Environment.NewLine}{string.Join(Environment.NewLine, securityIssues)}");
+            }
+
+            foreach (var tag in tags)
+            {
+                var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(tag.FormulaJson);
+                if (string.IsNullOrWhiteSpace(formula?.InlineScript))
+                    continue;
+
+                var path = TagScriptPath.Normalize($"inline/{tag.Id}.csx");
+                var visibleScriptEntities = scripts.Where(candidate =>
+                    candidate.Scope == sharedScope ||
+                    !string.IsNullOrWhiteSpace(tag.EmulatorId) && candidate.EmulatorId == tag.EmulatorId);
+                var visibleScripts = new Dictionary<string, string>(VisibleScriptResolver.ToContentMap(visibleScriptEntities), StringComparer.OrdinalIgnoreCase)
+                {
+                    [path] = formula.InlineScript!,
+                };
+
+                directiveValidator.ValidateSupportedDirectives(formula.InlineScript!);
+                directiveValidator.DetectLoadCycles(path, visibleScripts);
+
+                var compiledScript = CSharpScript.Create<object?>(
+                    formula.InlineScript!,
+                    environment.CreateScriptOptions(path, visibleScripts, typeof(TagScriptGlobals)),
+                    typeof(TagScriptGlobals));
+                var errors = compiledScript.Compile()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                    .ToList();
+
+                Assert.True(
+                    errors.Count == 0,
+                    $"{path}:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
+
+                var securityIssues = securityValidator.Validate(compiledScript.GetCompilation());
+                Assert.True(
+                    securityIssues.Count == 0,
+                    $"{path}:{Environment.NewLine}{string.Join(Environment.NewLine, securityIssues)}");
             }
         }
     }
@@ -353,5 +397,106 @@ public sealed class UniEmuSeederTests
             Assert.Equal(ScriptScope.Emulator, UniEmuJson.EnumValue<ScriptScope>(script!.Scope));
             Assert.Equal(emulatorId, script.EmulatorId);
         }
+    }
+
+    private static void AssertBatchReactorTagSetIsComplete(
+        IReadOnlyList<EmulatorTagEntity> tags,
+        IReadOnlyList<ScriptFileEntity> scripts,
+        string emulatorId)
+    {
+        string[] expectedKeys =
+        [
+            "UnitName",
+            "Area",
+            "Line",
+            "EquipmentModel",
+            "ControllerVersion",
+            "RecipeName",
+            "ProductCode",
+            "BatchId",
+            "MaterialLot",
+            "OperatorId",
+            "VesselVolumeL",
+            "TargetTemperatureC",
+            "TargetPh",
+            "BatchPhase",
+            "PhaseStep",
+            "LevelPct",
+            "TemperatureC",
+            "PressureBar",
+            "AgitatorSpeedRpm",
+            "FeedValveOpen",
+            "DrainValveOpen",
+            "CipActive",
+            "ResidenceTimeMin",
+            "BatchProgressPct",
+            "TemperatureDeviationC",
+            "PhEstimate",
+            "QualityState",
+            "EnergyKw",
+            "AlarmCode",
+            "AlarmText",
+        ];
+
+        foreach (var expectedKey in expectedKeys)
+        {
+            Assert.Contains(tags, tag => tag.Key == expectedKey);
+        }
+
+        Assert.True(tags.Count(tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Static) >= 10);
+        Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Scenario);
+        Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Generator);
+        Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Script);
+        Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.Formula);
+        Assert.Contains(tags, tag => UniEmuJson.EnumValue<TagSource>(tag.Source) == TagSource.FormulaScript);
+
+        var recipeName = tags.Single(tag => tag.Key == "RecipeName");
+        Assert.Equal(TagSource.Static, UniEmuJson.EnumValue<TagSource>(recipeName.Source));
+        Assert.Equal(SpecialParameter.PrgName, UniEmuJson.EnumValue<SpecialParameter>(recipeName.SpecialParameter!));
+
+        var batchPhase = tags.Single(tag => tag.Key == "BatchPhase");
+        Assert.Equal(TagType.String, UniEmuJson.EnumValue<TagType>(batchPhase.Type));
+        Assert.Contains(
+            UniEmuJson.Deserialize<TagScenarioConfigDto>(batchPhase.ScenarioJson)!.Segments,
+            segment => segment.Calc.Start == "Reaction");
+
+        var feedValveOpen = tags.Single(tag => tag.Key == "FeedValveOpen");
+        Assert.Equal(TagType.Bool, UniEmuJson.EnumValue<TagType>(feedValveOpen.Type));
+        Assert.Contains(
+            UniEmuJson.Deserialize<TagScenarioConfigDto>(feedValveOpen.ScenarioJson)!.Segments,
+            segment => segment.Calc.Start == "true");
+
+        var savedScriptBackedTags = tags.Where(tag =>
+        {
+            var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(tag.FormulaJson);
+            return !string.IsNullOrWhiteSpace(formula?.ScriptId);
+        }).ToList();
+        Assert.True(savedScriptBackedTags.Count >= 4);
+
+        foreach (var tag in savedScriptBackedTags)
+        {
+            var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(tag.FormulaJson);
+            var script = scripts.SingleOrDefault(script => script.Id == formula!.ScriptId);
+            Assert.NotNull(script);
+            Assert.Equal(ScriptScope.Emulator, UniEmuJson.EnumValue<ScriptScope>(script!.Scope));
+            Assert.Equal(emulatorId, script.EmulatorId);
+        }
+
+        var inlineScriptBackedTags = tags.Where(tag =>
+        {
+            var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(tag.FormulaJson);
+            return !string.IsNullOrWhiteSpace(formula?.InlineScript);
+        }).ToList();
+        Assert.True(inlineScriptBackedTags.Count >= 2);
+        Assert.Contains(inlineScriptBackedTags, tag => tag.Key == "PhEstimate");
+        Assert.Contains(inlineScriptBackedTags, tag => tag.Key == "EnergyKw");
+
+        var progress = tags.Single(tag => tag.Key == "BatchProgressPct");
+        Assert.Equal(TagSource.FormulaScript, UniEmuJson.EnumValue<TagSource>(progress.Source));
+        Assert.Equal(CalcType.Line, UniEmuJson.Deserialize<TagCalcConfigDto>(progress.CalcJson)!.Type);
+
+        var qualityState = tags.Single(tag => tag.Key == "QualityState");
+        Assert.Equal(TagType.String, UniEmuJson.EnumValue<TagType>(qualityState.Type));
+        Assert.Equal(TagSource.Script, UniEmuJson.EnumValue<TagSource>(qualityState.Source));
     }
 }

@@ -26,17 +26,21 @@ public static partial class UniEmuSeeder
         var now = DateTimeOffset.UtcNow;
         var furnaces = CreateFurnaceSpecs();
         var cncMachines = CreateCncSpecs();
+        var batchReactors = CreateBatchReactorSpecs();
 
         db.Emulators.AddRange(
             furnaces.Select(spec => CreateFurnaceEmulator(spec, now))
-                .Concat(cncMachines.Select(spec => CreateCncEmulator(spec, now))));
+                .Concat(cncMachines.Select(spec => CreateCncEmulator(spec, now)))
+                .Concat(batchReactors.Select(spec => CreateBatchReactorEmulator(spec, now))));
         db.EmulatorTags.AddRange(
             furnaces.SelectMany(CreateFurnaceTags)
-                .Concat(cncMachines.SelectMany(CreateCncTags)));
+                .Concat(cncMachines.SelectMany(CreateCncTags))
+                .Concat(batchReactors.SelectMany(CreateBatchReactorTags)));
         db.ScriptFiles.AddRange(
             CreateSharedScripts(now)
                 .Concat(furnaces.SelectMany(spec => CreateFurnaceScripts(spec, now)))
-                .Concat(cncMachines.SelectMany(spec => CreateCncScripts(spec, now))));
+                .Concat(cncMachines.SelectMany(spec => CreateCncScripts(spec, now)))
+                .Concat(batchReactors.SelectMany(spec => CreateBatchReactorScripts(spec, now))));
         db.CncPrograms.AddRange(CreateCncPrograms(cncMachines, now));
         //db.SystemEvents.AddRange(
         //    CreateFurnaceSeedEvents(furnaces, now)
@@ -275,6 +279,13 @@ public static partial class UniEmuSeeder
     /// <param name="scriptId">Идентификатор скрипта.</param>
     /// <returns>Конфигурация скриптовой формулы.</returns>
     private static TagFormulaConfigDto ScriptFormula(string scriptId) => new(scriptId, null);
+
+    /// <summary>
+    /// Создает встроенную CSX-формулу без отдельной записи в таблице скриптов.
+    /// </summary>
+    /// <param name="script">Текст встроенного CSX-скрипта.</param>
+    /// <returns>Конфигурация inline-формулы.</returns>
+    private static TagFormulaConfigDto InlineFormula(string script) => new(null, script);
 
     /// <summary>
     /// Создает плоскую линейную формулу для formula-script тега.
