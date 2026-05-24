@@ -135,7 +135,7 @@ public sealed class CsxScriptSecurityValidator
     /// <returns>Диагностика CSX с координатами проблемного участка.</returns>
     private static CsxDiagnostic CreateIssue(string code, string message, SyntaxNode node, SyntaxTree syntaxTree)
     {
-        var span = syntaxTree.GetLineSpan(node.Span);
+        var span = syntaxTree.GetMappedLineSpan(node.Span);
         return new CsxDiagnostic(
             code,
             message,
@@ -143,6 +143,7 @@ public sealed class CsxScriptSecurityValidator
             span.StartLinePosition.Line,
             span.StartLinePosition.Character,
             span.EndLinePosition.Line,
-            span.EndLinePosition.Character);
+            span.EndLinePosition.Character,
+            string.IsNullOrWhiteSpace(span.Path) ? null : TagScriptPath.Normalize(span.Path));
     }
 }

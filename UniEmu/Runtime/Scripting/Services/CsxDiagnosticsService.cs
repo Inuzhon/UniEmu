@@ -36,15 +36,14 @@ public sealed class CsxDiagnosticsService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var normalizedContent = TagScriptContentNormalizer.NormalizeEntryScriptContent(content);
-        var directiveDiagnostics = directiveValidator.GetUnsupportedDirectiveDiagnostics(entryPath, normalizedContent, visibleScripts);
+        var directiveDiagnostics = directiveValidator.GetUnsupportedDirectiveDiagnostics(entryPath, content, visibleScripts);
         if (directiveDiagnostics.Count > 0)
         {
             return Task.FromResult(directiveDiagnostics);
         }
 
         var options = environment.CreateScriptOptions(entryPath, visibleScripts, globalsType);
-        var script = CreateScript(normalizedContent, options, globalsType, expectedReturnType);
+        var script = CreateScript(CsxNullableContext.Apply(content, entryPath), options, globalsType, expectedReturnType);
 
         var compilerDiagnostics = script.Compile(cancellationToken)
             .Select(ToCsxDiagnostic)
@@ -81,22 +80,40 @@ public sealed class CsxDiagnosticsService
 
     private static CsxDiagnostic ToCsxDiagnostic(Diagnostic diagnostic)
     {
-        var span = diagnostic.Location.GetLineSpan();
+        if (!diagnostic.Location.IsInSource)
+        {
+            return new CsxDiagnostic(
+                diagnostic.Id,
+                diagnostic.GetMessage(),
+                ToSeverity(diagnostic.Severity),
+                0,
+                0,
+                0,
+                0);
+        }
+
+        var span = diagnostic.Location.GetMappedLineSpan();
         var start = span.StartLinePosition;
         var end = span.EndLinePosition;
         return new CsxDiagnostic(
             diagnostic.Id,
             diagnostic.GetMessage(),
-            diagnostic.Severity switch
-            {
-                DiagnosticSeverity.Error => CsxDiagnosticSeverity.Error,
-                DiagnosticSeverity.Warning => CsxDiagnosticSeverity.Warning,
-                DiagnosticSeverity.Info => CsxDiagnosticSeverity.Information,
-                _ => CsxDiagnosticSeverity.Hint,
-            },
+            ToSeverity(diagnostic.Severity),
             start.Line,
             start.Character,
             end.Line,
-            end.Character);
+            end.Character,
+            string.IsNullOrWhiteSpace(span.Path) ? null : TagScriptPath.Normalize(span.Path));
+    }
+
+    private static CsxDiagnosticSeverity ToSeverity(DiagnosticSeverity severity)
+    {
+        return severity switch
+        {
+            DiagnosticSeverity.Error => CsxDiagnosticSeverity.Error,
+            DiagnosticSeverity.Warning => CsxDiagnosticSeverity.Warning,
+            DiagnosticSeverity.Info => CsxDiagnosticSeverity.Information,
+            _ => CsxDiagnosticSeverity.Hint,
+        };
     }
 }

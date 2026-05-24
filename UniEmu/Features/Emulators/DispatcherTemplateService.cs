@@ -31,6 +31,7 @@ public sealed class DispatcherTemplateService(UniEmuDbContext db)
                     .OrderBy(t => t.Name)
                     .Select(t => new
                     {
+                        t.Name,
                         t.Key,
                         t.Type,
                         t.SpecialParameter,
@@ -51,7 +52,7 @@ public sealed class DispatcherTemplateService(UniEmuDbContext db)
             emulator.Tags.Select(tag => new XElement(
                 "UniversalItemXml",
                 new XElement("MatchingXmlList"),
-                new XElement("Name", tag.Key),
+                new XElement("Name", tag.Name),
                 new XElement("UniversalParam", tag.Key),
                 new XElement("SpecialParamNum", GetSpecialParameterNumber(tag.SpecialParameter)),
                 new XElement("DataTypeNum", GetDataTypeNumber(tag.Type)),

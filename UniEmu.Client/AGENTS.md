@@ -8,6 +8,7 @@
 - `npm run build` собирает production-артефакты.
 - `npm run lint` запускает ESLint.
 - `npm run format` форматирует проект через Prettier.
+- Фронтовые `.mjs` тесты должны лежать в отдельном каталоге `tests/`, а не рядом с исходниками в `src/`.
 - Не полагайтесь на `tsc --noEmit` как обязательную проверку без предварительной диагностики: в текущей конфигурации он может зависать.
 - Dev server проксирует `/api` на backend. По умолчанию target: `http://localhost:5083`; переопределение через `VITE_API_PROXY_TARGET`.
 - Для production/static hosting API вызывается относительным путем `/api`, если `VITE_API_BASE_URL` не задан.

@@ -70,7 +70,8 @@ public sealed class CsxScriptEnvironment
     public CSharpCompilationOptions CompilationOptions { get; } = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         .WithUsings(s_imports)
         .WithAllowUnsafe(false)
-        .WithOptimizationLevel(OptimizationLevel.Debug);
+        .WithOptimizationLevel(OptimizationLevel.Debug)
+        .WithNullableContextOptions(NullableContextOptions.Enable);
 
     /// <summary>
     /// Создает параметры Roslyn scripting для входного файла и доступных ему скриптов.
@@ -88,7 +89,7 @@ public sealed class CsxScriptEnvironment
             .WithReferences(CreateMetadataReferences(globalsType ?? typeof(TagScriptGlobals)))
             .WithImports(s_imports)
             .WithFilePath(TagScriptPath.Normalize(entryPath))
-            .WithSourceResolver(new DbScriptSourceResolver(visibleScripts));
+            .WithSourceResolver(new DbScriptSourceResolver(CsxNullableContext.ApplyToScripts(visibleScripts)));
     }
 
     /// <summary>

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
+using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Features.Telemetry;
@@ -38,6 +39,93 @@ public sealed class TelemetryServiceTests
             fixture.Interceptor.CommandTexts,
             command => command.Contains("TelemetryPoints", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("LIMIT", telemetryQuery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetAsync_ReturnsNull_WhenEmulatorDoesNotExist()
+    {
+        await using var fixture = await TelemetryDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new TelemetryService(db, new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+
+        var telemetry = await service.GetAsync("missing", 10, CancellationToken.None);
+
+        Assert.Null(telemetry);
+    }
+
+    [Fact]
+    public async Task GetAsync_UsesDefaultLimit_WhenRequestedPointsIsNotPositive()
+    {
+        await using var fixture = await TelemetryDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new TelemetryService(db, new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+
+        var telemetry = await service.GetAsync("em-1", 0, CancellationToken.None);
+
+        Assert.NotNull(telemetry);
+        Assert.Equal(5, telemetry.Count);
+    }
+
+    [Fact]
+    public async Task IngestAsync_CreatesTelemetryAndPublishesRuntimeUpdate()
+    {
+        await using var fixture = await TelemetryDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var broadcaster = new RecordingRuntimeUpdateBroadcaster();
+        var service = new TelemetryService(db, new RuntimeUpdateService(broadcaster));
+        var timestamp = DateTimeOffset.Parse("2026-05-10T13:00:00Z");
+
+        var telemetry = await service.IngestAsync(
+            new TelemetryIngestRequest(
+                "em-1",
+                timestamp,
+                new Dictionary<string, object?> { ["Power"] = 12.5, ["Mode"] = "Auto" }),
+            CancellationToken.None);
+
+        Assert.NotNull(telemetry);
+        Assert.Equal(timestamp, telemetry.Timestamp);
+        Assert.Equal(["Mode", "Power"], telemetry.Values.Keys.OrderBy(key => key));
+
+        var stored = await db.TelemetryPoints
+            .Where(point => point.Timestamp == timestamp)
+            .SingleAsync();
+        Assert.Contains("\"Power\":12.5", stored.ValuesJson);
+        var update = Assert.Single(broadcaster.TelemetryUpdates);
+        Assert.Equal("em-1", update.Update.EmulatorId);
+        Assert.Equal(timestamp, update.Update.Point.Timestamp);
+        Assert.Contains("emulator:em-1", update.Groups);
+    }
+
+    [Fact]
+    public async Task IngestAsync_UsesCurrentTime_WhenTimestampIsDefault()
+    {
+        await using var fixture = await TelemetryDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new TelemetryService(db, new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+        var before = DateTimeOffset.UtcNow;
+
+        var telemetry = await service.IngestAsync(
+            new TelemetryIngestRequest("em-1", default, new Dictionary<string, object?> { ["Value"] = 1 }),
+            CancellationToken.None);
+
+        Assert.NotNull(telemetry);
+        Assert.True(telemetry.Timestamp >= before);
+        Assert.True(telemetry.Timestamp <= DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task IngestAsync_ReturnsNull_WhenEmulatorDoesNotExist()
+    {
+        await using var fixture = await TelemetryDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new TelemetryService(db, new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+
+        var telemetry = await service.IngestAsync(
+            new TelemetryIngestRequest("missing", DateTimeOffset.UtcNow, new Dictionary<string, object?> { ["Value"] = 1 }),
+            CancellationToken.None);
+
+        Assert.Null(telemetry);
+        Assert.Equal(5, await db.TelemetryPoints.CountAsync());
     }
 
     private sealed class TelemetryDbFixture : IAsyncDisposable
@@ -113,6 +201,23 @@ public sealed class TelemetryServiceTests
     private sealed class NoopRuntimeUpdateBroadcaster : IRuntimeUpdateBroadcaster
     {
         public Task SendTelemetryAsync(RuntimeTelemetryUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task SendTagValueAsync(RuntimeTagValueUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task SendEmulatorUpdatedAsync(EmulatorDto emulator, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task SendEventCreatedAsync(SystemEventDto ev, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingRuntimeUpdateBroadcaster : IRuntimeUpdateBroadcaster
+    {
+        public List<(RuntimeTelemetryUpdateDto Update, IReadOnlyList<string> Groups)> TelemetryUpdates { get; } = [];
+
+        public Task SendTelemetryAsync(RuntimeTelemetryUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            TelemetryUpdates.Add((update, groups));
+            return Task.CompletedTask;
+        }
 
         public Task SendTagValueAsync(RuntimeTagValueUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
 

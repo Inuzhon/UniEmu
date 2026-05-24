@@ -41,7 +41,8 @@ namespace UniEmu.Data.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
 
                     b.Property<string>("Scope")
                         .IsRequired()
@@ -59,7 +60,15 @@ namespace UniEmu.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EmulatorId");
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CncPrograms_Shared_Name")
+                        .HasFilter("Scope = 'shared' AND EmulatorId IS NULL");
+
+                    b.HasIndex("EmulatorId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CncPrograms_EmulatorId_Name")
+                        .HasFilter("Scope = 'emulator' AND EmulatorId IS NOT NULL");
 
                     b.HasIndex("Scope", "EmulatorId", "Name")
                         .IsUnique();
@@ -200,7 +209,8 @@ namespace UniEmu.Data.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
 
                     b.Property<string>("Scope")
                         .IsRequired()
@@ -215,7 +225,15 @@ namespace UniEmu.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EmulatorId");
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ScriptFiles_Shared_Name")
+                        .HasFilter("Scope = 'shared' AND EmulatorId IS NULL");
+
+                    b.HasIndex("EmulatorId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ScriptFiles_EmulatorId_Name")
+                        .HasFilter("Scope = 'emulator' AND EmulatorId IS NOT NULL");
 
                     b.HasIndex("Scope", "EmulatorId", "Name")
                         .IsUnique();

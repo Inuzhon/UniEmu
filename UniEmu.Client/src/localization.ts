@@ -378,6 +378,9 @@ export const localization = {
           sendTagTitle: 'Отправлять тег',
           editTagTitle: 'Редактировать тег',
           deleteTagTitle: 'Удалить тег',
+          deleteTagDialogTitle: 'Удалить тег?',
+          deleteTagDialogDescription: (p0: unknown) =>
+            `Тег "${p0}" будет удалён из эмулятора. Действие необратимо.`,
           nameColumnLabel: 'Имя',
           typeColumnLabel: 'Тип',
           sourceColumnLabel: 'Источник',

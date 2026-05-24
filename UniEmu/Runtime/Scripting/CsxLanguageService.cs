@@ -616,6 +616,7 @@ public sealed record CsxAnalysisResult(
 /// <param name="StartCharacter">Начальная колонка диапазона.</param>
 /// <param name="EndLine">Конечная строка диапазона.</param>
 /// <param name="EndCharacter">Конечная колонка диапазона.</param>
+/// <param name="DocumentPath">Document path or URI that owns this diagnostic.</param>
 public sealed record CsxDiagnostic(
     string Code,
     string Message,
@@ -623,7 +624,8 @@ public sealed record CsxDiagnostic(
     int StartLine,
     int StartCharacter,
     int EndLine,
-    int EndCharacter);
+    int EndCharacter,
+    string? DocumentPath = null);
 
 /// <summary>
 /// Важность диагностического сообщения CSX-языкового сервиса.

@@ -39,6 +39,6 @@ public sealed class EventsController(EventService service) : ControllerBase
         }
 
         var ev = await service.CreateAsync(request, cancellationToken);
-        return CreatedAtAction(nameof(List), ev);
+        return ev is null ? NotFound() : CreatedAtAction(nameof(List), ev);
     }
 }

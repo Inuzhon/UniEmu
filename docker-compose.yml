@@ -18,15 +18,49 @@ services:
       dockerfile: UniEmu/Dockerfile
       args:
         BUILD_CONFIGURATION: ${BUILD_CONFIGURATION:-Release}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://localhost:5083}
+        VITE_PERSIST_STORE: ${VITE_PERSIST_STORE:-false}
     container_name: ${UNIEMU_CONTAINER_NAME:-uniemu}
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      UniEmu__Port: "5083"
+      AllowedHosts: ${UNIEMU_ALLOWED_HOSTS:-*}
+      UniEmu__Port: ${UNIEMU_PORT:-5083}
       UniEmu__TimeZone: ${UNIEMU_TIME_ZONE:-Europe/Moscow}
+      UniEmu__Culture: ${UNIEMU_CULTURE:-ru-RU}
+      UniEmu__DisableRuntime: ${UNIEMU_DISABLE_RUNTIME:-false}
+      UniEmu__SkipStartupDatabase: ${UNIEMU_SKIP_STARTUP_DATABASE:-false}
+      UniEmu__SeedData: ${UNIEMU_SEED_DATA:-false}
+      UniEmu__DisableStaticAssets: ${UNIEMU_DISABLE_STATIC_ASSETS:-false}
+      UniEmu__EnableStaticAssetCompression: ${UNIEMU_ENABLE_STATIC_ASSET_COMPRESSION:-true}
+      UniEmu__EnableStaticAssetCaching: ${UNIEMU_ENABLE_STATIC_ASSET_CACHING:-true}
+      UniEmu__DispatcherBlockCheckIntervalSeconds: ${UNIEMU_DISPATCHER_BLOCK_CHECK_INTERVAL_SECONDS:-5}
+      UniEmu__RestCatalog__DefaultClient__BaseUrl: ${UNIEMU_REST_DEFAULT_CLIENT_BASE_URL:-https://external-system.local}
+      UniEmu__RestCatalog__DefaultClient__TimeoutSeconds: ${UNIEMU_REST_DEFAULT_CLIENT_TIMEOUT_SECONDS:-5}
+      UniEmu__RestCatalog__DefaultClient__Operations__GetWorkerById__Method: ${UNIEMU_REST_OPERATION_GET_WORKER_BY_ID_METHOD:-GET}
+      UniEmu__RestCatalog__DefaultClient__Operations__GetWorkerById__Path: ${UNIEMU_REST_OPERATION_GET_WORKER_BY_ID_PATH:-/api/workers/{workerId}}
+      UniEmu__RestCatalog__DefaultClient__Operations__GetWorkerById__Response: ${UNIEMU_REST_OPERATION_GET_WORKER_BY_ID_RESPONSE:-Worker}
+      UniEmu__RestCatalog__DefaultClient__Operations__GetActiveWorker__Method: ${UNIEMU_REST_OPERATION_GET_ACTIVE_WORKER_METHOD:-GET}
+      UniEmu__RestCatalog__DefaultClient__Operations__GetActiveWorker__Path: ${UNIEMU_REST_OPERATION_GET_ACTIVE_WORKER_PATH:-/api/workers/active}
+      UniEmu__RestCatalog__DefaultClient__Operations__GetActiveWorker__Response: ${UNIEMU_REST_OPERATION_GET_ACTIVE_WORKER_RESPONSE:-Worker}
+      UniEmu__RestCatalog__DefaultClient__Operations__RegisterWorker__Method: ${UNIEMU_REST_OPERATION_REGISTER_WORKER_METHOD:-POST}
+      UniEmu__RestCatalog__DefaultClient__Operations__RegisterWorker__Path: ${UNIEMU_REST_OPERATION_REGISTER_WORKER_PATH:-/api/workers/{workerId}/register}
+      UniEmu__RestCatalog__DefaultClient__Operations__RegisterWorker__Response: ${UNIEMU_REST_OPERATION_REGISTER_WORKER_RESPONSE:-}
       ConnectionStrings__UniEmuDb: ${UNIEMU_DB_CONNECTION:-Data Source=/app/data/uniemu.db}
+      Serilog__MinimumLevel__Default: ${UNIEMU_LOG_LEVEL:-Information}
+      Serilog__MinimumLevel__Override__Microsoft: ${UNIEMU_LOG_LEVEL_MICROSOFT:-Warning}
+      Serilog__MinimumLevel__Override__Microsoft.AspNetCore: ${UNIEMU_LOG_LEVEL_MICROSOFT_ASPNETCORE:-Warning}
+      Serilog__MinimumLevel__Override__Microsoft.AspNetCore.Hosting: ${UNIEMU_LOG_LEVEL_MICROSOFT_ASPNETCORE_HOSTING:-Warning}
+      Serilog__MinimumLevel__Override__Microsoft.AspNetCore.Routing: ${UNIEMU_LOG_LEVEL_MICROSOFT_ASPNETCORE_ROUTING:-Warning}
+      Serilog__MinimumLevel__Override__Microsoft.AspNetCore.Mvc.Infrastructure: ${UNIEMU_LOG_LEVEL_MICROSOFT_ASPNETCORE_MVC_INFRASTRUCTURE:-Warning}
+      Serilog__MinimumLevel__Override__System.Net.Http.HttpClient.TelemetryPacketSender: ${UNIEMU_LOG_LEVEL_TELEMETRY_PACKET_SENDER:-Warning}
+      Serilog__MinimumLevel__Override__Quartz: ${UNIEMU_LOG_LEVEL_QUARTZ:-Information}
+      Serilog__WriteTo__1__Args__path: ${UNIEMU_LOG_FILE_PATH:-Logs/uniemu-.log}
+      Serilog__WriteTo__1__Args__retainedFileCountLimit: ${UNIEMU_LOG_FILE_RETAINED_COUNT:-14}
+      Serilog__WriteTo__1__Args__fileSizeLimitBytes: ${UNIEMU_LOG_FILE_SIZE_LIMIT_BYTES:-10485760}
     ports:
-      - "${UNIEMU_PORT:-5083}:5083"
+      - "${UNIEMU_PORT:-5083}:${UNIEMU_PORT:-5083}"
     volumes:
       - uniemu-data:/app/data
       - uniemu-logs:/app/Logs

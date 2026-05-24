@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
@@ -70,10 +70,13 @@ public sealed class CncProgramService(
         }
 
         var now = DateTimeOffset.UtcNow;
+        var name = request.Name.Trim();
+        await EnsureUniqueNameAsync(request.Scope, request.EmulatorId, name, excludedProgramId: null, cancellationToken);
+
         var entity = new CncProgramEntity
         {
             Id = $"cnc-{Guid.NewGuid():N}"[..13],
-            Name = request.Name.Trim(),
+            Name = name,
             Scope = UniEmuJson.EnumString(request.Scope),
             EmulatorId = request.Scope == CncScope.Emulator ? request.EmulatorId : null,
             Description = request.Description ?? string.Empty,
@@ -105,10 +108,19 @@ public sealed class CncProgramService(
             return null;
         }
 
+        var nextName = entity.Name;
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            entity.Name = request.Name.Trim();
+            nextName = request.Name.Trim();
+            await EnsureUniqueNameAsync(
+                UniEmuJson.EnumValue<CncScope>(entity.Scope),
+                entity.EmulatorId,
+                nextName,
+                entity.Id,
+                cancellationToken);
         }
+
+        entity.Name = nextName;
 
         if (request.Description is not null)
         {
@@ -142,6 +154,32 @@ public sealed class CncProgramService(
         }
 
         return deleted > 0;
+    }
+
+    private async Task EnsureUniqueNameAsync(
+        CncScope scope,
+        string? emulatorId,
+        string name,
+        string? excludedProgramId,
+        CancellationToken cancellationToken)
+    {
+        var scopeValue = UniEmuJson.EnumString(scope);
+        var query = db.CncPrograms
+            .AsNoTracking()
+            .Where(program => program.Scope == scopeValue && (excludedProgramId == null || program.Id != excludedProgramId));
+
+        query = scope == CncScope.Shared
+            ? query.Where(program => program.EmulatorId == null)
+            : query.Where(program => program.EmulatorId == emulatorId);
+
+        var existingNames = await query
+            .Select(program => program.Name)
+            .ToListAsync(cancellationToken);
+
+        if (existingNames.Any(existingName => string.Equals(existingName.Trim(), name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("CNC-программа с таким именем уже существует в этой области видимости.");
+        }
     }
 
 }

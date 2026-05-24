@@ -393,3 +393,7 @@ IndustryTestProject/ConnectTest.cs
 
 # UniEmu local SQLite database
 uniemu.db*
+
+# UniEmu local Docker Compose environment
+/.env
+!.env.example

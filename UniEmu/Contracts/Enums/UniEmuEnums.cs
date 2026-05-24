@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace UniEmu.Contracts.Enums;
 
@@ -69,6 +69,7 @@ public enum TagSource
 
     /// <summary>Значение, полученное из CNC-данных.</summary>
     [JsonStringEnumMemberName("cnc")]
+    [Obsolete("Не использовать. Взять Static")]
     Cnc,
 
     /// <summary>Значение, рассчитанное сценарием генерации.</summary>

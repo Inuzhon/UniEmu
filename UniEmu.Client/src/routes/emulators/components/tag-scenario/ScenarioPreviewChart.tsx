@@ -10,8 +10,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { TagScenarioConfig } from '@/types/uniemu';
-import { sampleScenario, totalDuration, formatDuration } from './scenarioMath';
+import type { TagScenarioConfig, TagType } from '@/types/uniemu';
+import { sampleScenario, scenarioTextSegments, totalDuration, formatDuration } from './scenarioMath';
 import { localization } from '@/localization';
 
 interface Props {
@@ -25,6 +25,7 @@ interface Props {
   onPointClick?: (tSec: number) => void;
   /** Индекс сегмента, который надо мягко подсветить полупрозрачной зоной */
   highlightSegmentIdx?: number;
+  tagType?: TagType;
 }
 
 const SEG_COLORS = [
@@ -35,7 +36,32 @@ const SEG_COLORS = [
   'oklch(0.82 0.16 30)',
 ];
 
-export function ScenarioPreviewChart({
+export function ScenarioPreviewChart(props: Props) {
+  const {
+    scenario,
+    height = 160,
+    cursorSec = null,
+    onPointClick,
+    highlightSegmentIdx,
+    tagType = 'double',
+  } = props;
+
+  if (tagType === 'string') {
+    return (
+      <ScenarioStringTimeline
+        scenario={scenario}
+        height={height}
+        cursorSec={cursorSec}
+        onPointClick={onPointClick}
+        highlightSegmentIdx={highlightSegmentIdx}
+      />
+    );
+  }
+
+  return <ScenarioNumericLineChart {...props} />;
+}
+
+function ScenarioNumericLineChart({
   scenario,
   height = 160,
   cursorSec = null,
@@ -164,15 +190,119 @@ export function ScenarioPreviewChart({
   );
 }
 
+function segmentColor(index: number) {
+  return SEG_COLORS[index % SEG_COLORS.length];
+}
+
+function ScenarioStringTimeline({
+  scenario,
+  height,
+  cursorSec,
+  onPointClick,
+  highlightSegmentIdx,
+}: {
+  scenario: TagScenarioConfig;
+  height: number;
+  cursorSec: number | null;
+  onPointClick?: (tSec: number) => void;
+  highlightSegmentIdx?: number;
+}) {
+  const segments = useMemo(() => scenarioTextSegments(scenario), [scenario]);
+  const total = totalDuration(scenario);
+  const cursorLeft =
+    cursorSec !== null && total > 0
+      ? `${Math.max(0, Math.min(100, (cursorSec / total) * 100))}%`
+      : null;
+
+  if (segments.length === 0) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-md border border-dashed border-border bg-muted/10 text-xs text-muted-foreground"
+        style={{ height }}
+      >
+        {localization.routes.emulators.components.tagScenario.scenarioPreviewChart.emptyPreviewMessage}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex w-full flex-col justify-center rounded-md border border-border bg-background/40 px-3 py-2"
+      style={{ height }}
+    >
+      <div className="relative h-16 overflow-hidden rounded-md border border-border bg-muted/10">
+        <div className="flex h-full">
+          {segments.map((segment) => {
+            const color = segmentColor(segment.segmentIdx);
+            const tooltip = `${formatDuration(segment.tStart)} - ${formatDuration(segment.tEnd)} · ${
+              segment.label || `#${segment.segmentIdx + 1}`
+            } · ${segment.value || '-'}`;
+            return (
+              <button
+                key={segment.id}
+                type="button"
+                title={tooltip}
+                onClick={() => onPointClick?.(segment.tStart + segment.duration / 2)}
+                className="group flex min-w-0 flex-col justify-center border-r border-background/70 px-2 text-left last:border-r-0"
+                style={{
+                  flexBasis: `${(segment.duration / Math.max(total, 1)) * 100}%`,
+                  backgroundColor: color,
+                  opacity: highlightSegmentIdx === segment.segmentIdx ? 0.88 : 0.26,
+                  cursor: onPointClick ? 'pointer' : undefined,
+                }}
+              >
+                <span className="truncate font-mono text-[11px] font-semibold text-foreground">
+                  {segment.value || '-'}
+                </span>
+                <span className="truncate text-[10px] text-muted-foreground">
+                  {formatDuration(segment.duration)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {cursorLeft && (
+          <span
+            className="pointer-events-none absolute inset-y-0 w-px bg-signal-warning shadow-[0_0_0_1px_var(--background)]"
+            style={{ left: cursorLeft }}
+          />
+        )}
+      </div>
+      <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+        <span>0с</span>
+        <span>{formatDuration(total)}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Мини-спарклайн без осей и тултипа — для встраивания в таблицу. */
 export function ScenarioSparkline({
   scenario,
   height = 28,
   width = 120,
+  tagType = 'double',
 }: {
   scenario: TagScenarioConfig;
   height?: number;
   width?: number;
+  tagType?: TagType;
+}) {
+  if (tagType === 'string') {
+    return <ScenarioStringSparkline scenario={scenario} height={height} width={width} />;
+  }
+
+  return <ScenarioNumericSparkline scenario={scenario} height={height} width={width} />;
+}
+
+function ScenarioNumericSparkline({
+  scenario,
+  height,
+  width,
+}: {
+  scenario: TagScenarioConfig;
+  height: number;
+  width: number;
 }) {
   const pts = useMemo(() => sampleScenario(scenario, 60), [scenario]);
   if (pts.length === 0) return <span className="text-muted-foreground">-</span>;
@@ -194,6 +324,47 @@ export function ScenarioSparkline({
   return (
     <svg width={width} height={height} className="overflow-visible">
       <path d={path} fill="none" stroke="oklch(0.78 0.16 195)" strokeWidth={1.5} />
+    </svg>
+  );
+}
+
+function ScenarioStringSparkline({
+  scenario,
+  height,
+  width,
+}: {
+  scenario: TagScenarioConfig;
+  height: number;
+  width: number;
+}) {
+  const segments = useMemo(() => scenarioTextSegments(scenario), [scenario]);
+  const total = totalDuration(scenario);
+  if (segments.length === 0) return <span className="text-muted-foreground">-</span>;
+
+  let x = 0;
+  const tooltip = segments
+    .map((segment) => `${segment.label || `#${segment.segmentIdx + 1}`}: ${segment.value || '-'}`)
+    .join(' · ');
+
+  return (
+    <svg width={width} height={height} className="overflow-visible" title={tooltip}>
+      {segments.map((segment) => {
+        const rectWidth = (segment.duration / Math.max(total, 1)) * width;
+        const rectX = x;
+        x += rectWidth;
+        return (
+          <rect
+            key={segment.id}
+            x={rectX}
+            y={Math.max(1, height / 2 - 4)}
+            width={Math.max(1, rectWidth - 1)}
+            height={8}
+            rx={2}
+            fill={segmentColor(segment.segmentIdx)}
+            opacity={0.72}
+          />
+        );
+      })}
     </svg>
   );
 }

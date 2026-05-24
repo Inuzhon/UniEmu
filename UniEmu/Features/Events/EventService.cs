@@ -56,9 +56,14 @@ public sealed class EventService(UniEmuDbContext db, RuntimeUpdateService runtim
     /// </summary>
     /// <param name="request">Данные создаваемого события.</param>
     /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Созданное событие.</returns>
-    public async Task<SystemEventDto> CreateAsync(PushEventRequest request, CancellationToken cancellationToken)
+    /// <returns>Созданное событие или <see langword="null"/>, если эмулятор не найден.</returns>
+    public async Task<SystemEventDto?> CreateAsync(PushEventRequest request, CancellationToken cancellationToken)
     {
+        if (!await db.Emulators.AnyAsync(e => e.Id == request.EmulatorId, cancellationToken))
+        {
+            return null;
+        }
+
         var entity = new SystemEventEntity
         {
             Id = $"ev-{Guid.NewGuid():N}"[..12],

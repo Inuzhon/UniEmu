@@ -316,6 +316,7 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
                       scenario={t.scenario!}
                       cursorSec={tCursor}
                       height={140}
+                      tagType={t.type}
                     />
                   </div>
                 );

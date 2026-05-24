@@ -205,8 +205,8 @@ public sealed class TagService(
             return;
         }
 
-        var visibleScripts = (await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken))
-            .ToDictionary(script => TagScriptPath.Normalize(script.Name), script => script.Content, StringComparer.OrdinalIgnoreCase);
+        var visibleScripts = VisibleScriptResolver.ToContentMap(
+            await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken));
 
         var result = await language.AnalyzeAsync(
             entryPath,

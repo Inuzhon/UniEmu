@@ -11,9 +11,15 @@ public static class TagScriptContentNormalizer
     public static string NormalizeEntryScriptContent(string content)
     {
         var matches = s_finalReturnStatement.Matches(content);
-        var match = matches.Count == 0 ? Match.Empty : matches[^1];
-        return match.Success
-            ? content[..match.Index] + match.Groups["expression"].Value
-            : content;
+        for (var index = matches.Count - 1; index >= 0; index--)
+        {
+            var match = matches[index];
+            if (!string.IsNullOrWhiteSpace(content[(match.Index + match.Length)..]))
+                continue;
+
+            return content[..match.Index] + match.Groups["expression"].Value;
+        }
+
+        return content;
     }
 }

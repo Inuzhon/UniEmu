@@ -1,4 +1,4 @@
-import type { TagCalcConfig, TagScenarioConfig, TagScenarioSegment } from "@/types/uniemu";
+import type { TagCalcConfig, TagScenarioConfig, TagScenarioSegment, TagType } from "@/types/uniemu";
 
 export interface ScenarioPoint {
   /** seconds from scenario start */
@@ -8,10 +8,28 @@ export interface ScenarioPoint {
   segmentIdx: number;
 }
 
-const num = (s: string | undefined, fallback = 0) => {
-  if (s === undefined || s === "") return fallback;
+export interface ScenarioTextSegment {
+  id: string;
+  tStart: number;
+  tEnd: number;
+  duration: number;
+  value: string;
+  label?: string;
+  segmentIdx: number;
+}
+
+const num = (s: string | null | undefined, fallback = 0) => {
+  if (s === null || s === undefined || s === "") return fallback;
+  const normalized = s.trim().toLowerCase();
+  if (normalized === "true") return 1;
+  if (normalized === "false") return 0;
   const n = Number(s);
   return Number.isFinite(n) ? n : fallback;
+};
+
+const text = (s: string | null | undefined, fallback = "") => {
+  if (s === null || s === undefined) return fallback;
+  return s;
 };
 
 /** Семплирует одну точку сегмента, локальное время u ∈ [0..1]. */
@@ -149,6 +167,81 @@ export function valueAt(scenario: TagScenarioConfig, tSec: number): number | nul
     acc += seg.duration;
   }
   return prev;
+}
+
+function scenarioTime(scenario: TagScenarioConfig, tSec: number): number | null {
+  const segs = scenario.segments.filter((s) => s.duration > 0);
+  if (segs.length === 0) return null;
+  const total = segs.reduce((a, b) => a + b.duration, 0);
+  const mode = scenario.continueOnFormulaEnd ?? "Repeat";
+  if (mode === "Repeat") return ((tSec % total) + total) % total;
+  if (tSec < 0) return 0;
+  if (tSec > total) {
+    if (mode === "NoSignal") return null;
+    return total;
+  }
+
+  return tSec;
+}
+
+export function scenarioTextSegments(scenario: TagScenarioConfig): ScenarioTextSegment[] {
+  const segs = scenario.segments.filter((s) => s.duration > 0);
+  let acc = 0;
+
+  return segs.map((segment, segmentIdx) => {
+    const tStart = acc;
+    const tEnd = acc + segment.duration;
+    acc = tEnd;
+
+    return {
+      id: segment.id,
+      tStart,
+      tEnd,
+      duration: segment.duration,
+      value: text(segment.calc.start),
+      label: segment.label,
+      segmentIdx,
+    };
+  });
+}
+
+export function scenarioValueAt(
+  scenario: TagScenarioConfig,
+  tagType: TagType,
+  tSec: number,
+): number | string | null {
+  if (tagType !== "string") {
+    const value = valueAt(scenario, tSec);
+    if (tagType === "bool" && value !== null) return value ? 1 : 0;
+    return value;
+  }
+
+  const t = scenarioTime(scenario, tSec);
+  if (t === null) return null;
+
+  let fallback = text(scenario.startValue);
+  for (const segment of scenarioTextSegments(scenario)) {
+    if (t <= segment.tEnd) {
+      return segment.value || fallback;
+    }
+    fallback = segment.value || fallback;
+  }
+
+  return fallback;
+}
+
+export function formatScenarioPreviewValue(
+  tagType: TagType,
+  value: number | string | null,
+): string {
+  if (value === null) return "-";
+  if (tagType === "string") return String(value || "-");
+  if (tagType === "bool") {
+    if (typeof value === "string") return value.trim().toLowerCase() === "true" ? "1" : "0";
+    return value ? "1" : "0";
+  }
+
+  return typeof value === "number" ? value.toFixed(2) : String(value);
 }
 
 export function totalDuration(scenario: TagScenarioConfig): number {

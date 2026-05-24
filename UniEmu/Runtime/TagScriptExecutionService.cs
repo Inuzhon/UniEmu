@@ -77,13 +77,15 @@ public sealed class TagScriptExecutionService
     /// <param name="scriptCache">Кэш скомпилированных CSX-скриптов.</param>
     /// <param name="restOperations">REST API, доступный пользовательским скриптам.</param>
     /// <param name="previewFlushService">Сервис отложенной записи preview static-тегов.</param>
+    /// <param name="scriptExecutionTimeout">Максимальное время ожидания выполнения пользовательского CSX-скрипта.</param>
     internal TagScriptExecutionService(
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
         TagRuntimeStateStore stateStore,
         CompiledTagScriptCache scriptCache,
         ITagScriptRestOperations? restOperations,
-        TagPreviewFlushService? previewFlushService = null)
+        TagPreviewFlushService? previewFlushService = null,
+        TimeSpan? scriptExecutionTimeout = null)
         : this(
             db,
             dataCache,
@@ -93,7 +95,8 @@ public sealed class TagScriptExecutionService
             new CsxScriptDirectiveValidator(),
             new CsxScriptSecurityValidator(),
             restOperations,
-            previewFlushService)
+            previewFlushService,
+            scriptExecutionTimeout)
     {
     }
 
@@ -109,6 +112,7 @@ public sealed class TagScriptExecutionService
     /// <param name="securityValidator">Валидатор запрещенных типов и вызовов в пользовательских скриптах.</param>
     /// <param name="restOperations">REST API, доступный пользовательским скриптам, или <see langword="null"/> для отключенного REST-контекста.</param>
     /// <param name="previewFlushService">Сервис отложенной записи preview static-тегов.</param>
+    /// <param name="scriptExecutionTimeout">Максимальное время ожидания выполнения пользовательского CSX-скрипта.</param>
     internal TagScriptExecutionService(
         UniEmuDbContext db,
         CachedUniEmuDataService dataCache,
@@ -118,7 +122,8 @@ public sealed class TagScriptExecutionService
         CsxScriptDirectiveValidator directiveValidator,
         CsxScriptSecurityValidator securityValidator,
         ITagScriptRestOperations? restOperations,
-        TagPreviewFlushService? previewFlushService = null)
+        TagPreviewFlushService? previewFlushService = null,
+        TimeSpan? scriptExecutionTimeout = null)
     {
         this.db = db;
         this.dataCache = dataCache;
@@ -129,7 +134,16 @@ public sealed class TagScriptExecutionService
         this.securityValidator = securityValidator;
         this.restOperations = restOperations;
         this.previewFlushService = previewFlushService;
+        this.scriptExecutionTimeout = scriptExecutionTimeout ?? DefaultScriptExecutionTimeout;
+
+        if (this.scriptExecutionTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(scriptExecutionTimeout), "CSX script execution timeout must be positive.");
     }
+
+    /// <summary>
+    /// Максимальное время ожидания выполнения одного пользовательского CSX-скрипта.
+    /// </summary>
+    private static readonly TimeSpan DefaultScriptExecutionTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// EF Core-контекст текущего scope, используемый для чтения и сохранения persistent state скриптов.
@@ -177,6 +191,11 @@ public sealed class TagScriptExecutionService
     private readonly TagPreviewFlushService? previewFlushService;
 
     /// <summary>
+    /// Budget ожидания выполнения Roslyn script до возврата управляемой ошибки вызывающему коду.
+    /// </summary>
+    private readonly TimeSpan scriptExecutionTimeout;
+
+    /// <summary>
     /// Компилирует и выполняет скрипт тега, обновляя persistent state при изменениях.
     /// </summary>
     /// <param name="emulator">Эмулятор, для которого выполняется скрипт.</param>
@@ -212,13 +231,18 @@ public sealed class TagScriptExecutionService
             scriptOptions,
             typeof(TagScriptGlobals),
             compiled => ValidateSecurity(compiled, cancellationToken));
-        var scriptState = await compiledScript.RunAsync(globals, cancellationToken);
+        var scriptState = await RunScriptWithTimeoutAsync(compiledScript, script.Path, globals, cancellationToken);
         var result = scriptState.ReturnValue;
 
-        if (globals.UniEmu.State.IsDirty || globals.UniEmu.Tags.IsDirty)
+        if (globals.UniEmu.State.IsDirty)
         {
             state.ValuesJson = UniEmuJson.Serialize(globals.UniEmu.State.Snapshot());
             state.UpdatedAt = DateTimeOffset.UtcNow;
+            await UpsertStateAsync(state, cancellationToken);
+        }
+
+        if (globals.UniEmu.Tags.IsDirty)
+        {
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -269,16 +293,9 @@ public sealed class TagScriptExecutionService
     private async Task<Dictionary<string, string>> LoadVisibleScriptsAsync(string emulatorId, CancellationToken cancellationToken)
     {
         var scripts = await dataCache.GetVisibleScriptsAsync(emulatorId, cancellationToken);
-
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var script in scripts)
-        {
-            var path = TagScriptPath.Normalize(script.Name);
-            directiveValidator.ValidateSupportedDirectives(script.Content);
-            result[path] = script.Content;
-        }
-
-        return result;
+        return VisibleScriptResolver.ToContentMap(
+            scripts,
+            script => directiveValidator.ValidateSupportedDirectives(script.Content));
     }
 
     /// <summary>
@@ -298,18 +315,89 @@ public sealed class TagScriptExecutionService
     }
 
     /// <summary>
-    /// Возвращает persistent state для пары эмулятор-скрипт или создает новую пустую запись в текущем контексте.
+    /// Выполняет Roslyn script с detection timeout вокруг <see cref="Script{T}.RunAsync(object?, Func{Exception, bool}?, CancellationToken)"/>.
+    /// </summary>
+    /// <param name="script">Скомпилированный Roslyn script.</param>
+    /// <param name="scriptPath">Путь входного CSX-скрипта для диагностики timeout.</param>
+    /// <param name="globals">Globals-объект выполнения скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены внешнего runtime-запроса.</param>
+    /// <returns>Состояние завершенного скрипта.</returns>
+    private async Task<ScriptState<object?>> RunScriptWithTimeoutAsync(
+        Script<object?> script,
+        string scriptPath,
+        TagScriptGlobals globals,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Roslyn не умеет безопасно прерывать CPU-bound user code. Background thread дает caller'у
+        // вернуться по timeout, но некооперативный script может продолжить работу до завершения процесса.
+        var executionTask = StartScriptRun(script, globals, cancellationToken);
+
+        try
+        {
+            return await executionTask.WaitAsync(scriptExecutionTimeout, cancellationToken);
+        }
+        catch (TimeoutException ex) when (!executionTask.IsCompleted)
+        {
+            throw new TimeoutException(
+                $"CSX script '{scriptPath}' timed out after {scriptExecutionTimeout.TotalSeconds:N1} seconds.",
+                ex);
+        }
+    }
+
+    /// <summary>
+    /// Запускает script.RunAsync на отдельном background thread, чтобы CPU-bound script не блокировал caller thread.
+    /// </summary>
+    /// <param name="script">Скомпилированный Roslyn script.</param>
+    /// <param name="globals">Globals-объект выполнения скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены, передаваемый в Roslyn script.</param>
+    /// <returns>Task, завершающийся вместе с Roslyn script.</returns>
+    private static Task<ScriptState<object?>> StartScriptRun(
+        Script<object?> script,
+        TagScriptGlobals globals,
+        CancellationToken cancellationToken)
+    {
+        var completion = new TaskCompletionSource<ScriptState<object?>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var scriptState = script.RunAsync(globals, cancellationToken).GetAwaiter().GetResult();
+                completion.TrySetResult(scriptState);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                completion.TrySetCanceled(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "UniEmu CSX script execution",
+        };
+
+        thread.Start();
+        return completion.Task;
+    }
+
+    /// <summary>
+    /// Возвращает persistent state для пары эмулятор-скрипт или пустой snapshot для первого запуска.
     /// </summary>
     /// <param name="emulatorId">Идентификатор эмулятора, которому принадлежит state.</param>
     /// <param name="scriptKey">Стабильный ключ state для inline-скрипта или файла скрипта.</param>
     /// <param name="cancellationToken">Токен отмены запроса к базе данных.</param>
-    /// <returns>Сущность persistent state, отслеживаемая текущим DbContext.</returns>
+    /// <returns>Сущность persistent state из базы или неотслеживаемый новый snapshot.</returns>
     private async Task<ScriptRuntimeStateEntity> GetOrCreateStateAsync(
         string emulatorId,
         string scriptKey,
         CancellationToken cancellationToken)
     {
         var state = await db.ScriptRuntimeStates
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.EmulatorId == emulatorId && s.ScriptKey == scriptKey, cancellationToken);
 
         if (state is not null)
@@ -323,9 +411,43 @@ public sealed class TagScriptExecutionService
             ValuesJson = "{}",
             UpdatedAt = DateTimeOffset.UtcNow,
         };
-        db.ScriptRuntimeStates.Add(state);
 
         return state;
+    }
+
+    /// <summary>
+    /// Атомарно сохраняет script state, выдерживая конкурентный первый запуск одного script key.
+    /// </summary>
+    /// <param name="state">Состояние скрипта с актуальным JSON-снимком.</param>
+    /// <param name="cancellationToken">Токен отмены SQL-запроса.</param>
+    private async Task UpsertStateAsync(ScriptRuntimeStateEntity state, CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO ScriptRuntimeStates (Id, EmulatorId, ScriptKey, ValuesJson, UpdatedAt)
+            VALUES ({state.Id}, {state.EmulatorId}, {state.ScriptKey}, {state.ValuesJson}, {state.UpdatedAt})
+            ON CONFLICT(EmulatorId, ScriptKey) DO UPDATE SET
+                ValuesJson = excluded.ValuesJson,
+                UpdatedAt = excluded.UpdatedAt
+            """,
+            cancellationToken);
+
+        DetachTrackedState(state.EmulatorId, state.ScriptKey);
+    }
+
+    /// <summary>
+    /// Удаляет stale tracked-экземпляры state после raw SQL upsert.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора.</param>
+    /// <param name="scriptKey">Ключ script state.</param>
+    private void DetachTrackedState(string emulatorId, string scriptKey)
+    {
+        foreach (var entry in db.ChangeTracker.Entries<ScriptRuntimeStateEntity>()
+            .Where(entry => entry.Entity.EmulatorId == emulatorId && entry.Entity.ScriptKey == scriptKey)
+            .ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
     }
 
     /// <summary>

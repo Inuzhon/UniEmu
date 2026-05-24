@@ -116,6 +116,35 @@ public sealed class TagServiceScriptValidationTests
     }
 
     [Fact]
+    public async Task CreateAsync_UsesEmulatorScopedLoadedScript_WhenSharedScriptHasSamePath()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var shared = await db.ScriptFiles.SingleAsync(script => script.Id == "scr-shared");
+        shared.Content = "string Value() => \"bad\";";
+        db.ScriptFiles.Add(new ScriptFileEntity
+        {
+            Id = "scr-local-common",
+            Name = "common.csx",
+            Scope = "emulator",
+            EmulatorId = "em-1",
+            Content = "double Value() => 2;",
+            SizeBytes = 21,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var created = await service.CreateAsync(
+            "em-1",
+            CreateRequest("#load \"common.csx\"\nreturn Value();"),
+            CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.Equal("Inline tag", created.Name);
+    }
+
+    [Fact]
     public async Task CreateAsync_RejectsInvalidTagCompatibility_BeforeSaving()
     {
         await using var fixture = await TagDbFixture.CreateAsync();
@@ -196,10 +225,88 @@ public sealed class TagServiceScriptValidationTests
         Assert.Equal(TagTriggerEvent.OnStop, created.Trigger.Event);
     }
 
-    private static TagService CreateService(UniEmuDbContext db)
+    [Fact]
+    public async Task ListAsync_ReturnsTagsOrderedByName_AndNullForMissingEmulator()
     {
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var dataCache = new CachedUniEmuDataService(db, cache);
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.AddRange(
+            CreateExistingTag("tg-z", "Zulu", "zulu"),
+            CreateExistingTag("tg-a", "Alpha", "alpha"));
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var tags = await service.ListAsync("em-1", CancellationToken.None);
+        var missing = await service.ListAsync("missing", CancellationToken.None);
+
+        Assert.NotNull(tags);
+        Assert.Equal(["Alpha", "Zulu"], tags.Select(tag => tag.Name));
+        Assert.Null(missing);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ClampsRoundDigitsToMaximum()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = CreateService(db);
+
+        var created = await service.CreateAsync(
+            "em-1",
+            CreateRequest("return 1;", roundDigits: 99),
+            CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.Equal(15, created.RoundDigits);
+        Assert.Equal(15, await db.EmulatorTags.Select(tag => tag.RoundDigits).SingleAsync());
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_ClampsNegativeRoundDigitsToZero()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(CreateExistingTag("tg-current", "Current", "current_key"));
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var replaced = await service.ReplaceAsync(
+            "em-1",
+            "tg-current",
+            CreateReplaceRequest("Current", "current_key", roundDigits: -7),
+            CancellationToken.None);
+
+        Assert.NotNull(replaced);
+        Assert.Equal(0, replaced.RoundDigits);
+        Assert.Equal(0, await db.EmulatorTags.Select(tag => tag.RoundDigits).SingleAsync());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RemovesTagAndRefreshesCachedEmulator()
+    {
+        await using var fixture = await TagDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        db.EmulatorTags.Add(CreateExistingTag("tg-current", "Current", "current_key"));
+        await db.SaveChangesAsync();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var cachedBeforeDelete = await dataCache.GetEmulatorWithTagsAsync("em-1", CancellationToken.None);
+        var service = CreateService(db, dataCache);
+
+        var deleted = await service.DeleteAsync("em-1", "tg-current", CancellationToken.None);
+        var deletedAgain = await service.DeleteAsync("em-1", "tg-current", CancellationToken.None);
+        var cachedAfterDelete = await dataCache.GetEmulatorWithTagsAsync("em-1", CancellationToken.None);
+
+        Assert.True(deleted);
+        Assert.False(deletedAgain);
+        Assert.NotNull(cachedBeforeDelete);
+        Assert.Contains(cachedBeforeDelete.Tags, tag => tag.Id == "tg-current");
+        Assert.NotNull(cachedAfterDelete);
+        Assert.DoesNotContain(cachedAfterDelete.Tags, tag => tag.Id == "tg-current");
+    }
+
+    private static TagService CreateService(UniEmuDbContext db, CachedUniEmuDataService? dataCache = null)
+    {
+        dataCache ??= new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
         var flushService = new TagPreviewFlushService(() => db, NullLogger<TagPreviewFlushService>.Instance);
         var scheduleService = new EmulatorScheduleService(
             db,
@@ -220,7 +327,8 @@ public sealed class TagServiceScriptValidationTests
         string inlineScript,
         TagType type = TagType.Double,
         string name = "Inline tag",
-        string key = "inline_tag") => new(
+        string key = "inline_tag",
+        int? roundDigits = null) => new(
         name,
         key,
         type,
@@ -231,7 +339,7 @@ public sealed class TagServiceScriptValidationTests
         new TagFormulaConfigDto(null, inlineScript),
         null,
         true,
-        null,
+        roundDigits,
         null,
         null);
 
@@ -250,7 +358,7 @@ public sealed class TagServiceScriptValidationTests
         specialParameter,
         null);
 
-    private static ReplaceTagRequest CreateReplaceRequest(string name, string key) => new(
+    private static ReplaceTagRequest CreateReplaceRequest(string name, string key, int? roundDigits = null) => new(
         name,
         key,
         TagType.Double,
@@ -261,7 +369,7 @@ public sealed class TagServiceScriptValidationTests
         new TagFormulaConfigDto(null, "return 1;"),
         null,
         true,
-        null,
+        roundDigits,
         null,
         null);
 

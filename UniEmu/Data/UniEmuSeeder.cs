@@ -1,4 +1,6 @@
-﻿using UniEmu.Common;
+﻿using System.Globalization;
+using System.Text;
+using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
 using UniEmu.Domain.Entities;
@@ -8,10 +10,10 @@ namespace UniEmu.Data;
 /// <summary>
 /// Создает демонстрационные данные в пустой базе UniEmu.
 /// </summary>
-public static class UniEmuSeeder
+public static partial class UniEmuSeeder
 {
     /// <summary>
-    /// Заполняет пустую базу начальными эмуляторами, тегами, скриптами, CNC-программами и событием.
+    /// Заполняет пустую базу промышленными эмуляторами, тегами, сценариями, генераторами, скриптами и событиями.
     /// </summary>
     /// <param name="db">Контекст базы данных UniEmu.</param>
     /// <param name="cancellationToken">Токен отмены операции сохранения.</param>
@@ -22,102 +24,406 @@ public static class UniEmuSeeder
             return;
 
         var now = DateTimeOffset.UtcNow;
-        var emulators = new[]
-        {
-            new EmulatorEntity
-            {
-                Id = "em-001",
-                Name = "CNC_Mill_01",
-                Status = nameof(EmulatorStatus.Stopped),
-                ProtocolId = 18,
-                TargetUrl = "https://scada.local/api/ingest",
-                IntervalSec = 5,
-                TotalRequests = 16842,
-            },
-            new EmulatorEntity
-            {
-                Id = "em-002",
-                Name = "CNC_Lathe_02",
-                Status = nameof(EmulatorStatus.Stopped),
-                ProtocolId = 19,
-                TargetUrl = "https://scada.local/api/ingest",
-                IntervalSec = 2,
-                TotalRequests = 64120,
-            },
-        };
+        var furnaces = CreateFurnaceSpecs();
+        var cncMachines = CreateCncSpecs();
+        var batchReactors = CreateBatchReactorSpecs();
 
-        db.Emulators.AddRange(emulators);
-
+        db.Emulators.AddRange(
+            furnaces.Select(spec => CreateFurnaceEmulator(spec, now))
+                .Concat(cncMachines.Select(spec => CreateCncEmulator(spec, now)))
+                .Concat(batchReactors.Select(spec => CreateBatchReactorEmulator(spec, now))));
         db.EmulatorTags.AddRange(
-            new EmulatorTagEntity
-            {
-                Id = "tg-spindle",
-                EmulatorId = "em-001",
-                Name = "SpindleRPM",
-                Key = "Custom",
-                Type = UniEmuJson.EnumString(TagType.Int),
-                Source = UniEmuJson.EnumString(TagSource.Generator),
-                Preview = "8420",
-                TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 500, TagIntervalUnit.Ms)),
-                CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(CalcType.Sinusoid, "8000", null, null, 400, 10, null, null)),
-            },
-            new EmulatorTagEntity
-            {
-                Id = "tg-temperature",
-                EmulatorId = "em-001",
-                Name = "Temperature",
-                Key = "Custom",
-                Type = UniEmuJson.EnumString(TagType.Double),
-                Source = UniEmuJson.EnumString(TagSource.Generator),
-                Preview = "45.6",
-                TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
-                CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(CalcType.Line, "20", "75", 60, null, null, null, null)),
-            },
-            new EmulatorTagEntity
-            {
-                Id = "tg-feed",
-                EmulatorId = "em-002",
-                Name = "FeedRate",
-                Key = "FeedOvr",
-                Type = UniEmuJson.EnumString(TagType.Double),
-                Source = UniEmuJson.EnumString(TagSource.Generator),
-                Preview = "1200",
-                TriggerJson = UniEmuJson.Serialize(new TagTriggerDto(TagTriggerMode.Interval, null, null, 1, TagIntervalUnit.Sec)),
-                CalcJson = UniEmuJson.Serialize(new TagCalcConfigDto(CalcType.Random, "1000", "1500", null, null, null, null, null)),
-            });
-
-        db.ScriptFiles.Add(new ScriptFileEntity
-        {
-            Id = "scr-shared-1",
-            Name = "shared/utils.csx",
-            Scope = UniEmuJson.EnumString(ScriptScope.Shared),
-            Content = "// shared/utils.csx\npublic static double Clamp(double v, double min, double max) => v < min ? min : (v > max ? max : v);\n",
-            UpdatedAt = now.AddHours(-1),
-            SizeBytes = 120,
-        });
-
-        db.CncPrograms.Add(new CncProgramEntity
-        {
-            Id = "cnc-shared-1",
-            Name = "PREAMBLE.nc",
-            Scope = UniEmuJson.EnumString(CncScope.Shared),
-            Description = "Инициализация: метрические единицы, абсолютные координаты, G54",
-            Content = "; PREAMBLE\nG21 G90 G17\nG54\nG40 G49 G80\n",
-            SizeBytes = 50,
-            UpdatedAt = now.AddDays(-2),
-            UploadedAt = now.AddDays(-14),
-        });
-
-        db.SystemEvents.Add(new SystemEventEntity
-        {
-            Id = "ev-seed-1",
-            EmulatorId = "em-001",
-            EmulatorName = "CNC_Mill_01",
-            Level = UniEmuJson.EnumString(EventLevel.Info),
-            Message = "Backend seed инициализирован",
-            Timestamp = now,
-        });
+            furnaces.SelectMany(CreateFurnaceTags)
+                .Concat(cncMachines.SelectMany(CreateCncTags))
+                .Concat(batchReactors.SelectMany(CreateBatchReactorTags)));
+        db.ScriptFiles.AddRange(
+            CreateSharedScripts(now)
+                .Concat(furnaces.SelectMany(spec => CreateFurnaceScripts(spec, now)))
+                .Concat(cncMachines.SelectMany(spec => CreateCncScripts(spec, now)))
+                .Concat(batchReactors.SelectMany(spec => CreateBatchReactorScripts(spec, now))));
+        db.CncPrograms.AddRange(CreateCncPrograms(cncMachines, now));
+        //db.SystemEvents.AddRange(
+        //    CreateFurnaceSeedEvents(furnaces, now)
+        //        .Concat(CreateCncSeedEvents(cncMachines, now)));
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Создает общие CSX-скрипты, доступные всем эмуляторам.
+    /// </summary>
+    /// <param name="now">Текущее время заполнения базы.</param>
+    /// <returns>Коллекция общих скриптов.</returns>
+    private static IEnumerable<ScriptFileEntity> CreateSharedScripts(DateTimeOffset now)
+    {
+        yield return CreateSharedScript(
+            "scr-math",
+            "math.csx",
+            """
+            double Clamp(double value, double min, double max)
+            {
+                if (value < min)
+                    return min;
+
+                if (value > max)
+                    return max;
+
+                return value;
+            }
+
+            double ToDouble(object? value, double fallback)
+            {
+                return value switch
+                {
+                    null => fallback,
+                    byte byteValue => byteValue,
+                    short shortValue => shortValue,
+                    int intValue => intValue,
+                    long longValue => longValue,
+                    float floatValue => floatValue,
+                    double doubleValue => doubleValue,
+                    decimal decimalValue => (double)decimalValue,
+                    bool boolValue => boolValue ? 1 : 0,
+                    string stringValue => double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                        ? parsed
+                        : fallback,
+                    IConvertible convertible => Convert.ToDouble(convertible, CultureInfo.InvariantCulture),
+                    _ => fallback,
+                };
+            }
+
+            string ToText(object? value, string fallback)
+            {
+                return value?.ToString() ?? fallback;
+            }
+
+            bool ToBool(object? value, bool fallback)
+            {
+                return value switch
+                {
+                    null => fallback,
+                    bool boolValue => boolValue,
+                    string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
+                    _ => ToDouble(value, fallback ? 1 : 0) != 0,
+                };
+            }
+            """,
+            now.AddHours(-2));
+
+        yield return CreateSharedScript(
+            "scr-read-tags",
+            "read-tags.csx",
+            """
+            #load "math.csx"
+
+            double ReadNumber(string key, double fallback)
+            {
+                return UniEmu.Tags.TryGetValue(key, out var tag)
+                    ? ToDouble(tag?.Value, fallback)
+                    : fallback;
+            }
+
+            string ReadText(string key, string fallback)
+            {
+                return UniEmu.Tags.TryGetValue(key, out var tag)
+                    ? ToText(tag?.Value, fallback)
+                    : fallback;
+            }
+
+            bool ReadBool(string key, bool fallback)
+            {
+                return UniEmu.Tags.TryGetValue(key, out var tag)
+                    ? ToBool(tag?.Value, fallback)
+                    : fallback;
+            }
+            """,
+            now.AddHours(-2).AddMinutes(1));
+    }
+
+    /// <summary>
+    /// Создает тег эмулятора и сериализует связанные настройки в JSON.
+    /// </summary>
+    /// <param name="emulatorId">Идентификатор эмулятора-владельца.</param>
+    /// <param name="idSuffix">Суффикс идентификатора тега.</param>
+    /// <param name="name">Отображаемое имя тега.</param>
+    /// <param name="key">Ключ тега во внешнем протоколе.</param>
+    /// <param name="type">Тип значения тега.</param>
+    /// <param name="source">Источник значения тега.</param>
+    /// <param name="preview">Начальное preview-значение.</param>
+    /// <param name="calc">Конфигурация генератора.</param>
+    /// <param name="formula">Конфигурация скрипта или formula-script.</param>
+    /// <param name="scenario">Конфигурация сценария.</param>
+    /// <param name="roundDigits">Количество знаков округления.</param>
+    /// <param name="specialParameter">Специальный параметр Dispatcher.</param>
+    /// <param name="description">Описание тега.</param>
+    /// <returns>Сущность тега.</returns>
+    private static EmulatorTagEntity CreateTag(
+        string emulatorId,
+        string idSuffix,
+        string name,
+        string key,
+        TagType type,
+        TagSource source,
+        string preview,
+        TagCalcConfigDto? calc = null,
+        TagFormulaConfigDto? formula = null,
+        TagScenarioConfigDto? scenario = null,
+        int? roundDigits = null,
+        SpecialParameter? specialParameter = null,
+        string? description = null)
+    {
+        return new EmulatorTagEntity
+        {
+            Id = $"tg-{emulatorId["em-".Length..]}-{idSuffix}",
+            EmulatorId = emulatorId,
+            Name = name,
+            Key = key,
+            Type = UniEmuJson.EnumString(type),
+            Source = UniEmuJson.EnumString(source),
+            Preview = preview,
+            TriggerJson = UniEmuJson.Serialize(IntervalTrigger(1, TagIntervalUnit.Sec)),
+            CalcJson = calc is null ? null : UniEmuJson.Serialize(calc),
+            FormulaJson = formula is null ? null : UniEmuJson.Serialize(formula),
+            ScenarioJson = scenario is null ? null : UniEmuJson.Serialize(scenario),
+            RoundDigits = roundDigits,
+            SpecialParameter = specialParameter is null ? null : UniEmuJson.EnumString(specialParameter.Value),
+            Description = description,
+        };
+    }
+
+    /// <summary>
+    /// Создает shared-скрипт с корректным размером содержимого.
+    /// </summary>
+    /// <param name="id">Идентификатор скрипта.</param>
+    /// <param name="name">Путь скрипта для редактора и директив <c>#load</c>.</param>
+    /// <param name="content">Содержимое CSX-скрипта.</param>
+    /// <param name="updatedAt">Время последнего обновления.</param>
+    /// <returns>Сущность shared-скрипта.</returns>
+    private static ScriptFileEntity CreateSharedScript(string id, string name, string content, DateTimeOffset updatedAt)
+    {
+        return new ScriptFileEntity
+        {
+            Id = id,
+            Name = name,
+            Scope = UniEmuJson.EnumString(ScriptScope.Shared),
+            Content = content,
+            UpdatedAt = updatedAt,
+            SizeBytes = Encoding.UTF8.GetByteCount(content),
+        };
+    }
+
+    /// <summary>
+    /// Создает скрипт, доступный только указанному эмулятору.
+    /// </summary>
+    /// <param name="id">Идентификатор скрипта.</param>
+    /// <param name="name">Имя скрипта для редактора и директив <c>#load</c>.</param>
+    /// <param name="emulatorId">Идентификатор эмулятора-владельца.</param>
+    /// <param name="content">Содержимое CSX-скрипта.</param>
+    /// <param name="updatedAt">Время последнего обновления.</param>
+    /// <returns>Сущность scoped-скрипта.</returns>
+    private static ScriptFileEntity CreateEmulatorScript(
+        string id,
+        string name,
+        string emulatorId,
+        string content,
+        DateTimeOffset updatedAt)
+    {
+        return new ScriptFileEntity
+        {
+            Id = id,
+            Name = name,
+            Scope = UniEmuJson.EnumString(ScriptScope.Emulator),
+            EmulatorId = emulatorId,
+            Content = content,
+            UpdatedAt = updatedAt,
+            SizeBytes = Encoding.UTF8.GetByteCount(content),
+        };
+    }
+
+    /// <summary>
+    /// Создает CNC-программу с корректным размером содержимого.
+    /// </summary>
+    /// <param name="id">Идентификатор программы.</param>
+    /// <param name="name">Имя файла программы.</param>
+    /// <param name="emulatorId">Идентификатор эмулятора-владельца.</param>
+    /// <param name="description">Описание программы.</param>
+    /// <param name="content">Текст G-code программы.</param>
+    /// <param name="timestamp">Время загрузки и обновления программы.</param>
+    /// <returns>Сущность CNC-программы.</returns>
+    private static CncProgramEntity CreateCncProgram(
+        string id,
+        string name,
+        string emulatorId,
+        string description,
+        string content,
+        DateTimeOffset timestamp)
+    {
+        return new CncProgramEntity
+        {
+            Id = id,
+            Name = name,
+            Scope = UniEmuJson.EnumString(CncScope.Emulator),
+            EmulatorId = emulatorId,
+            Description = description,
+            Content = content,
+            SizeBytes = Encoding.UTF8.GetByteCount(content),
+            UpdatedAt = timestamp,
+            UploadedAt = timestamp,
+            IsBinary = false,
+        };
+    }
+
+    /// <summary>
+    /// Создает ссылку на сохраненный CSX-скрипт.
+    /// </summary>
+    /// <param name="scriptId">Идентификатор скрипта.</param>
+    /// <returns>Конфигурация скриптовой формулы.</returns>
+    private static TagFormulaConfigDto ScriptFormula(string scriptId) => new(scriptId, null);
+
+    /// <summary>
+    /// Создает встроенную CSX-формулу без отдельной записи в таблице скриптов.
+    /// </summary>
+    /// <param name="script">Текст встроенного CSX-скрипта.</param>
+    /// <returns>Конфигурация inline-формулы.</returns>
+    private static TagFormulaConfigDto InlineFormula(string script) => new(null, script);
+
+    /// <summary>
+    /// Создает плоскую линейную формулу для formula-script тега.
+    /// </summary>
+    /// <returns>Генератор, выдающий нулевую базовую линию.</returns>
+    private static TagCalcConfigDto FlatLineCalc()
+    {
+        return new TagCalcConfigDto(
+            CalcType.Line,
+            Start: "0",
+            Finish: "0",
+            Duration: 60,
+            Amplitude: null,
+            Period: null,
+            Curvature: null,
+            Distortion: null);
+    }
+
+    /// <summary>
+    /// Создает линейный участок сценария.
+    /// </summary>
+    /// <param name="id">Идентификатор участка.</param>
+    /// <param name="label">Отображаемая подпись участка.</param>
+    /// <param name="duration">Длительность участка в секундах.</param>
+    /// <param name="start">Начальное значение.</param>
+    /// <param name="finish">Конечное значение.</param>
+    /// <returns>Участок сценария.</returns>
+    private static TagScenarioSegmentDto LineSegment(string id, string label, int duration, double start, double finish)
+    {
+        return new TagScenarioSegmentDto(
+            id,
+            duration,
+            new TagCalcConfigDto(
+                CalcType.Line,
+                Start: Invariant(start),
+                Finish: Invariant(finish),
+                Duration: duration,
+                Amplitude: null,
+                Period: null,
+                Curvature: null,
+                Distortion: null),
+            label);
+    }
+
+    /// <summary>
+    /// Создает криволинейный участок сценария.
+    /// </summary>
+    /// <param name="id">Идентификатор участка.</param>
+    /// <param name="label">Отображаемая подпись участка.</param>
+    /// <param name="duration">Длительность участка в секундах.</param>
+    /// <param name="start">Начальное значение.</param>
+    /// <param name="finish">Конечное значение.</param>
+    /// <param name="curvature">Коэффициент кривизны.</param>
+    /// <returns>Участок сценария.</returns>
+    private static TagScenarioSegmentDto CurveSegment(string id, string label, int duration, double start, double finish, double curvature)
+    {
+        return new TagScenarioSegmentDto(
+            id,
+            duration,
+            new TagCalcConfigDto(
+                CalcType.Curve,
+                Start: Invariant(start),
+                Finish: Invariant(finish),
+                Duration: duration,
+                Amplitude: null,
+                Period: null,
+                Curvature: curvature,
+                Distortion: null),
+            label);
+    }
+
+    /// <summary>
+    /// Создает синусоидальный участок сценария вокруг базового значения.
+    /// </summary>
+    /// <param name="id">Идентификатор участка.</param>
+    /// <param name="label">Отображаемая подпись участка.</param>
+    /// <param name="duration">Длительность участка в секундах.</param>
+    /// <param name="start">Базовое значение.</param>
+    /// <param name="amplitude">Амплитуда колебания.</param>
+    /// <param name="period">Период колебания.</param>
+    /// <returns>Участок сценария.</returns>
+    private static TagScenarioSegmentDto SineSegment(string id, string label, int duration, double start, double amplitude, double period)
+    {
+        return new TagScenarioSegmentDto(
+            id,
+            duration,
+            new TagCalcConfigDto(
+                CalcType.Sinusoid,
+                Start: Invariant(start),
+                Finish: null,
+                Duration: duration,
+                Amplitude: amplitude,
+                Period: period,
+                Curvature: null,
+                Distortion: 0.4),
+            label);
+    }
+
+    /// <summary>
+    /// Создает статический участок сценария.
+    /// </summary>
+    /// <param name="id">Идентификатор участка.</param>
+    /// <param name="label">Отображаемая подпись участка.</param>
+    /// <param name="duration">Длительность участка в секундах.</param>
+    /// <param name="value">Статическое значение участка.</param>
+    /// <returns>Участок сценария.</returns>
+    private static TagScenarioSegmentDto StaticSegment(string id, string label, int duration, string value)
+    {
+        return new TagScenarioSegmentDto(
+            id,
+            duration,
+            new TagCalcConfigDto(
+                CalcType.Static,
+                Start: value,
+                Finish: null,
+                Duration: duration,
+                Amplitude: null,
+                Period: null,
+                Curvature: null,
+                Distortion: null),
+            label);
+    }
+
+    /// <summary>
+    /// Создает периодический триггер тега.
+    /// </summary>
+    /// <param name="value">Значение интервала.</param>
+    /// <param name="unit">Единица измерения интервала.</param>
+    /// <returns>Настройки триггера.</returns>
+    private static TagTriggerDto IntervalTrigger(int value, TagIntervalUnit unit)
+    {
+        return new TagTriggerDto(TagTriggerMode.Interval, Event: null, Cron: null, IntervalValue: value, IntervalUnit: unit);
+    }
+
+    /// <summary>
+    /// Преобразует число в строку с инвариантной культурой.
+    /// </summary>
+    /// <param name="value">Число для сериализации в preview или формулу.</param>
+    /// <returns>Строковое представление числа.</returns>
+    private static string Invariant(double value) => value.ToString(CultureInfo.InvariantCulture);
 }

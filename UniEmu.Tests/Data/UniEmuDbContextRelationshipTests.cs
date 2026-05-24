@@ -1,5 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using UniEmu.Common;
+using UniEmu.Contracts.Enums;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 
@@ -107,5 +109,81 @@ public sealed class UniEmuDbContextRelationshipTests
             Assert.Empty(await db.SystemEvents.ToListAsync());
             Assert.Empty(await db.ScriptRuntimeStates.ToListAsync());
         }
+    }
+
+    [Fact]
+    public async Task SharedScriptNames_AreUnique_WhenEmulatorIdIsNull_InSqlite()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        db.ScriptFiles.AddRange(
+            new ScriptFileEntity
+            {
+                Id = "script-shared-1",
+                Name = "common.csx",
+                Scope = UniEmuJson.EnumString(ScriptScope.Shared),
+                Content = "return 1;",
+                UpdatedAt = now,
+                SizeBytes = 9,
+            },
+            new ScriptFileEntity
+            {
+                Id = "script-shared-2",
+                Name = "COMMON.csx",
+                Scope = UniEmuJson.EnumString(ScriptScope.Shared),
+                Content = "return 2;",
+                UpdatedAt = now,
+                SizeBytes = 9,
+            });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task SharedCncProgramNames_AreUnique_WhenEmulatorIdIsNull_InSqlite()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        db.CncPrograms.AddRange(
+            new CncProgramEntity
+            {
+                Id = "cnc-shared-1",
+                Name = "main.nc",
+                Scope = UniEmuJson.EnumString(CncScope.Shared),
+                Content = "M30",
+                Description = string.Empty,
+                UpdatedAt = now,
+                UploadedAt = now,
+                SizeBytes = 3,
+            },
+            new CncProgramEntity
+            {
+                Id = "cnc-shared-2",
+                Name = "MAIN.nc",
+                Scope = UniEmuJson.EnumString(CncScope.Shared),
+                Content = "M02",
+                Description = string.Empty,
+                UpdatedAt = now,
+                UploadedAt = now,
+                SizeBytes = 3,
+            });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 }

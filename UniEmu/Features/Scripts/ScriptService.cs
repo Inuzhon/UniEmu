@@ -66,6 +66,8 @@ public sealed class ScriptService(
         var name = request.Name.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
             ? request.Name.Trim()
             : $"{request.Name.Trim()}.csx";
+        await EnsureUniqueNameAsync(request.Scope, request.EmulatorId, name, excludedScriptId: null, cancellationToken);
+
         var content = $"// {name}{Environment.NewLine}{Environment.NewLine}return 0;{Environment.NewLine}";
         var entity = new ScriptFileEntity
         {
@@ -106,6 +108,16 @@ public sealed class ScriptService(
             nextName = request.Name.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
                 ? request.Name.Trim()
                 : $"{request.Name.Trim()}.csx";
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Name))
+        {
+            await EnsureUniqueNameAsync(
+                UniEmuJson.EnumValue<ScriptScope>(entity.Scope),
+                entity.EmulatorId,
+                nextName,
+                entity.Id,
+                cancellationToken);
         }
 
         if (request.Content is not null)
@@ -149,6 +161,34 @@ public sealed class ScriptService(
         return deleted > 0;
     }
 
+    private async Task EnsureUniqueNameAsync(
+        ScriptScope scope,
+        string? emulatorId,
+        string name,
+        string? excludedScriptId,
+        CancellationToken cancellationToken)
+    {
+        var scopeValue = UniEmuJson.EnumString(scope);
+        var query = db.ScriptFiles
+            .AsNoTracking()
+            .Where(script => script.Scope == scopeValue && (excludedScriptId == null || script.Id != excludedScriptId));
+
+        query = scope == ScriptScope.Shared
+            ? query.Where(script => script.EmulatorId == null)
+            : query.Where(script => script.EmulatorId == emulatorId);
+
+        var normalizedName = TagScriptPath.Normalize(name);
+        var existingNames = await query
+            .Select(script => script.Name)
+            .ToListAsync(cancellationToken);
+
+        if (existingNames.Any(existingName =>
+                string.Equals(TagScriptPath.Normalize(existingName), normalizedName, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Скрипт с таким именем уже существует в этой области видимости.");
+        }
+    }
+
     private async Task ValidateContentAsync(
         ScriptFileEntity entity,
         string nextName,
@@ -156,12 +196,13 @@ public sealed class ScriptService(
         CancellationToken cancellationToken)
     {
         var sharedScope = UniEmuJson.EnumString(ScriptScope.Shared);
-        var visibleScripts = await db.ScriptFiles
+        var visibleScriptEntities = await db.ScriptFiles
             .AsNoTracking()
             .Where(script => script.Id != entity.Id && (script.Scope == sharedScope || script.EmulatorId == entity.EmulatorId))
-            .ToDictionaryAsync(script => TagScriptPath.Normalize(script.Name), script => script.Content, StringComparer.OrdinalIgnoreCase, cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        visibleScripts[TagScriptPath.Normalize(nextName)] = nextContent;
+        var visibleScripts = VisibleScriptResolver.ToContentMap(visibleScriptEntities);
+        VisibleScriptResolver.AddOrReplace(visibleScripts, nextName, nextContent);
 
         var result = await language.AnalyzeAsync(nextName, nextContent, visibleScripts, typeof(TagScriptGlobals), cancellationToken);
         var errors = result.Diagnostics

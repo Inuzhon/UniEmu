@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
+using UniEmu.Contracts.Requests;
 using UniEmu.Data;
 using UniEmu.Domain.Entities;
 using UniEmu.Features.Events;
@@ -32,6 +33,70 @@ public sealed class EventServiceTests
             command => command.Contains("SystemEvents", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("WHERE", eventQuery, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("LIMIT", eventQuery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ReturnsNull_WhenEmulatorDoesNotExist()
+    {
+        await using var fixture = await EventDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new EventService(db, new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+        var request = new PushEventRequest(
+            "missing",
+            "Missing emulator",
+            EventLevel.Warn,
+            "Unexpected event",
+            DateTimeOffset.Parse("2026-05-10T12:10:00Z"));
+
+        var created = await service.CreateAsync(request, CancellationToken.None);
+
+        Assert.Null(created);
+        Assert.False(await db.SystemEvents.AnyAsync(ev => ev.EmulatorId == "missing"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_CreatesEventAndPublishesRuntimeUpdate()
+    {
+        await using var fixture = await EventDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var broadcaster = new RecordingRuntimeUpdateBroadcaster();
+        var service = new EventService(db, new RuntimeUpdateService(broadcaster));
+        var timestamp = DateTimeOffset.Parse("2026-05-10T12:10:00Z");
+        var request = new PushEventRequest(
+            "em-1",
+            "Main emulator",
+            EventLevel.Warn,
+            "Temperature warning",
+            timestamp);
+
+        var created = await service.CreateAsync(request, CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.Equal("em-1", created.EmulatorId);
+        Assert.Equal(EventLevel.Warn, created.Level);
+        Assert.Equal("Temperature warning", created.Message);
+        Assert.Equal(timestamp, created.Timestamp);
+        Assert.True(await db.SystemEvents.AnyAsync(ev => ev.Id == created.Id));
+        var update = Assert.Single(broadcaster.EventUpdates);
+        Assert.Equal(created.Id, update.Event.Id);
+        Assert.Contains("emulator:em-1", update.Groups);
+    }
+
+    [Fact]
+    public async Task CreateAsync_UsesCurrentTime_WhenTimestampIsDefault()
+    {
+        await using var fixture = await EventDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var service = new EventService(db, new RuntimeUpdateService(new NoopRuntimeUpdateBroadcaster()));
+        var before = DateTimeOffset.UtcNow;
+
+        var created = await service.CreateAsync(
+            new PushEventRequest("em-1", "Main emulator", EventLevel.Info, "Manual event", default),
+            CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.True(created.Timestamp >= before);
+        Assert.True(created.Timestamp <= DateTimeOffset.UtcNow);
     }
 
     private sealed class EventDbFixture : IAsyncDisposable
@@ -116,5 +181,22 @@ public sealed class EventServiceTests
         public Task SendEmulatorUpdatedAsync(EmulatorDto emulator, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task SendEventCreatedAsync(SystemEventDto ev, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingRuntimeUpdateBroadcaster : IRuntimeUpdateBroadcaster
+    {
+        public List<(SystemEventDto Event, IReadOnlyList<string> Groups)> EventUpdates { get; } = [];
+
+        public Task SendTelemetryAsync(RuntimeTelemetryUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task SendTagValueAsync(RuntimeTagValueUpdateDto update, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task SendEmulatorUpdatedAsync(EmulatorDto emulator, IReadOnlyList<string> groups, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task SendEventCreatedAsync(SystemEventDto ev, IReadOnlyList<string> groups, CancellationToken cancellationToken)
+        {
+            EventUpdates.Add((ev, groups));
+            return Task.CompletedTask;
+        }
     }
 }

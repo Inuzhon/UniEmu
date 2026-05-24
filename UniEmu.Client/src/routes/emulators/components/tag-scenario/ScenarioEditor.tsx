@@ -27,7 +27,13 @@ import type { TagScenarioConfig, TagScenarioSegment, TagType } from '@/types/uni
 import { getScenarioCalcTypes } from '../tag-editor/tagValidation';
 import { CalcConfigFields } from './CalcConfigFields';
 import { ScenarioPreviewChart, ScenarioSparkline } from './ScenarioPreviewChart';
-import { defaultSegment, formatDuration, totalDuration, valueAt } from './scenarioMath';
+import {
+  defaultSegment,
+  formatDuration,
+  formatScenarioPreviewValue,
+  scenarioValueAt,
+  totalDuration,
+} from './scenarioMath';
 import { localization } from '@/localization';
 import { getCalcTypeLabel } from './calcLabels';
 
@@ -149,7 +155,8 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
     setSelectedId(segments[segments.length - 1].id);
   };
 
-  const cursorValue = cursorSec !== null && segments.length > 0 ? valueAt(value, cursorSec) : null;
+  const cursorValue =
+    cursorSec !== null && segments.length > 0 ? scenarioValueAt(value, tagType, cursorSec) : null;
   const scenarioCalcTypes = useMemo(() => getScenarioCalcTypes(tagType), [tagType]);
 
   return (
@@ -169,7 +176,9 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
               <span>·</span>
               <span>
                 t=<span className="font-mono text-foreground">{formatDuration(cursorSec)}</span> v=
-                <span className="font-mono text-foreground">{cursorValue.toFixed(2)}</span>
+                <span className="font-mono text-foreground">
+                  {formatScenarioPreviewValue(tagType, cursorValue)}
+                </span>
               </span>
             </>
           )}
@@ -366,6 +375,7 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                             scenario={{ segments: [seg], continueOnFormulaEnd: 'NoSignal' }}
                             height={22}
                             width={260}
+                            tagType={tagType}
                           />
                         </div>
                       )}
@@ -386,6 +396,7 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
               cursorSec={cursorSec}
               onPointClick={handleChartClick}
               highlightSegmentIdx={selectedIdx}
+              tagType={tagType}
             />
           </div>
 
