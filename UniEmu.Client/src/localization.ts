@@ -182,7 +182,8 @@ export const localization = {
         allEmulatorsButtonLabel: 'Все эмуляторы',
         newEmulatorButtonLabel: 'Новый эмулятор',
         fleetReadinessLabel: 'Готовность парка',
-        activeCountLabel: (p0: number) => getRussianCountForm(p0, ['активен', 'активны', 'активны']),
+        activeCountLabel: (p0: number) =>
+          getRussianCountForm(p0, ['активен', 'активны', 'активны']),
         totalStatLabel: 'Всего',
         registeredHint: 'зарегистрировано',
         activeStatLabel: 'Активны',
@@ -193,7 +194,8 @@ export const localization = {
         totalRequestsStatLabel: 'Запросов всего',
         payloadTagsHint: (p0: number) => `${formatCount(p0, ['тег', 'тега', 'тегов'])} в payload`,
         statusDistributionTitle: 'Распределение по статусу',
-        devicesCountLabel: (p0: number) => formatCount(p0, ['устройство', 'устройства', 'устройств']),
+        devicesCountLabel: (p0: number) =>
+          formatCount(p0, ['устройство', 'устройства', 'устройств']),
         emulatorsSectionTitle: 'Эмуляторы',
         emulatorsSectionDescription: 'Активные сверху · быстрый старт/стоп и переход в карточку',
         searchPlaceholder: 'Поиск по имени…',
@@ -294,16 +296,22 @@ export const localization = {
           customScriptDividerLabel: '- Кастомный скрипт ниже -',
           inlineScriptLabel: 'Inline-скрипт (.csx)',
           editScriptButtonLabel: 'Редактировать',
+          storageScriptEditButtonLabel: 'Редактировать выбранный скрипт',
           cancelButtonLabel: 'Отмена',
           saveButtonLabel: 'Сохранить',
           createTagButtonLabel: 'Создать тег',
           saveTagError: 'Не удалось сохранить тег',
           inlineScriptEditorTitle: 'Редактор inline-скрипта',
-          inlineScriptEditorDescription: 'C# Script (.csx) с подсветкой, автодополнением и host-API подсказками.',
+          storageScriptEditorTitle: (name: unknown) => `Редактор скрипта ${name}`,
+          inlineScriptEditorDescription:
+            'C# Script (.csx) с подсветкой, автодополнением и host-API подсказками.',
           editorCancelButtonLabel: 'Отмена',
           applyScriptButtonLabel: 'Применить',
+          saveScriptButtonLabel: 'Сохранить скрипт',
+          saveScriptError: 'Не удалось сохранить скрипт',
           confirmCloseTitle: 'Закрыть без сохранения?',
-          confirmCloseDescription: 'В теге есть несохраненные изменения. Если закрыть редактор, они будут потеряны.',
+          confirmCloseDescription:
+            'В теге есть несохраненные изменения. Если закрыть редактор, они будут потеряны.',
           stayButtonLabel: 'Остаться',
           closeButtonLabel: 'Закрыть',
           confirmScriptEditorCloseTitle: 'Закрыть редактор скрипта?',
@@ -374,7 +382,8 @@ export const localization = {
           uptimeLabel: 'Аптайм',
           totalRequestsLabel: 'Всего запросов',
           lastRunLabel: 'Последний запуск',
-          scenarioSummary: (p0: number, p1: number, p2: number) => `сценарий · ${p0} сегм · Σ ${p1} · ${p2}`,
+          scenarioSummary: (p0: number, p1: number, p2: number) =>
+            `сценарий · ${p0} сегм · Σ ${p1} · ${p2}`,
           sendTagTitle: 'Отправлять тег',
           editTagTitle: 'Редактировать тег',
           deleteTagTitle: 'Удалить тег',
@@ -403,7 +412,8 @@ export const localization = {
           valueColumnLabel: 'Значение',
           emptyTagsMessage: 'Нет тегов',
           tagScenariosTitle: 'Сценарии тегов',
-          tagScenariosDescription: 'Профиль значений по таймлайну · красная линия - позиция курсора графика',
+          tagScenariosDescription:
+            'Профиль значений по таймлайну · красная линия - позиция курсора графика',
           segmentsSumLabel: 'сегм · Σ',
           packetHistoryTitle: 'История пакетов',
           packetHistorySummary: (p0: number, p1: number) =>
@@ -430,7 +440,8 @@ export const localization = {
           lastRunPrefix: 'Последний: ',
           emptySearchMessage: 'Ничего не найдено',
           newEmulatorTitle: 'Новый эмулятор',
-          newEmulatorDescription: 'Создайте виртуальное устройство. Запустить его можно будет позже.',
+          newEmulatorDescription:
+            'Создайте виртуальное устройство. Запустить его можно будет позже.',
           nameLabel: 'Имя',
           targetUrlLabel: 'Целевой URL',
           sendIntervalLabel: 'Интервал отправки (сек)',
@@ -448,7 +459,8 @@ export const localization = {
             distortionPercentLabel: 'Искажение (% шума)',
           },
           scenarioEditor: {
-            segmentsCountLabel: (p0: number) => formatCount(p0, ['сегмент', 'сегмента', 'сегментов']),
+            segmentsCountLabel: (p0: number) =>
+              formatCount(p0, ['сегмент', 'сегмента', 'сегментов']),
             endBehaviorLabel: 'По завершении',
             endBehaviorNoSignalLabel: 'Без сигнала',
             endBehaviorZeroLabel: 'Обнулить',
@@ -562,9 +574,11 @@ export const localization = {
           title: 'Настройки',
           description: 'Глобальные параметры приложения',
           telemetrySectionTitle: 'Телеметрия',
-          telemetryHistoryDescription: 'История отправленных пакетов, доступная во вкладке мониторинга',
+          telemetryHistoryDescription:
+            'История отправленных пакетов, доступная во вкладке мониторинга',
           packetHistoryLimitLabel: 'Сохранять последних пакетов',
-          packetHistoryLimitHint: (p0: number) => `Диапазон: 1–${p0}. Старые пакеты удаляются автоматически.`,
+          packetHistoryLimitHint: (p0: number) =>
+            `Диапазон: 1–${p0}. Старые пакеты удаляются автоматически.`,
         },
       },
       index: {

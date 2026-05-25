@@ -11,20 +11,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { localization } from '@/localization';
 
 interface Props {
   open: boolean;
   draft: string;
   documentUri: string;
+  title: string;
+  applyButtonLabel: string;
   confirmCloseOpen: boolean;
+  error?: string | null;
+  applying?: boolean;
   onOpenChange: (open: boolean) => void;
   onDraftChange: (value: string) => void;
   onApply: () => void;
@@ -36,7 +34,11 @@ export const InlineScriptEditorDrawer = memo(function InlineScriptEditorDrawer({
   open,
   draft,
   documentUri,
+  title,
+  applyButtonLabel,
   confirmCloseOpen,
+  error,
+  applying = false,
   onOpenChange,
   onDraftChange,
   onApply,
@@ -53,23 +55,22 @@ export const InlineScriptEditorDrawer = memo(function InlineScriptEditorDrawer({
           className="flex w-full flex-col gap-0 p-0 sm:max-w-3xl"
         >
           <SheetHeader className="border-b border-border px-6 py-4">
-            <SheetTitle>
-              {localization.routes.emulators.components.addTagDrawer.inlineScriptEditorTitle}
-            </SheetTitle>
+            <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
+          {error && (
+            <div className="border-b border-destructive/40 bg-destructive/10 px-6 py-2 font-mono text-xs text-destructive">
+              {error}
+            </div>
+          )}
           <div className="flex-1 overflow-hidden">
-            <MonacoCsxEditor
-              value={draft}
-              onChange={onDraftChange}
-              documentUri={documentUri}
-            />
+            <MonacoCsxEditor value={draft} onChange={onDraftChange} documentUri={documentUri} />
           </div>
           <SheetFooter className="border-t border-border px-6 py-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               {localization.routes.emulators.components.addTagDrawer.editorCancelButtonLabel}
             </Button>
-            <Button onClick={onApply}>
-              {localization.routes.emulators.components.addTagDrawer.applyScriptButtonLabel}
+            <Button onClick={onApply} disabled={applying}>
+              {applyButtonLabel}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -81,7 +82,10 @@ export const InlineScriptEditorDrawer = memo(function InlineScriptEditorDrawer({
               {localization.routes.emulators.components.addTagDrawer.confirmScriptEditorCloseTitle}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {localization.routes.emulators.components.addTagDrawer.confirmScriptEditorCloseDescription}
+              {
+                localization.routes.emulators.components.addTagDrawer
+                  .confirmScriptEditorCloseDescription
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

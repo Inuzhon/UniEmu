@@ -12,20 +12,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { localization } from '@/localization';
 import { useUniEmuStore } from '@/store/uniemu-store';
-import type {
-  EmulatorTag,
-  TagCalcConfig,
-  TagScenarioConfig,
-} from '@/types/uniemu';
+import type { EmulatorTag, TagCalcConfig, TagScenarioConfig } from '@/types/uniemu';
 import { InlineScriptEditorDrawer } from './tag-editor/InlineScriptEditorDrawer';
 import { TagBasicsSection } from './tag-editor/TagBasicsSection';
 import { TagCalcSection } from './tag-editor/TagCalcSection';
@@ -54,6 +44,7 @@ interface Props {
 export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
   const addTag = useUniEmuStore((s) => s.addTag);
   const updateTag = useUniEmuStore((s) => s.updateTag);
+  const updateScript = useUniEmuStore((s) => s.updateScript);
   const scripts = useUniEmuStore((s) => s.scripts);
   const cncPrograms = useUniEmuStore((s) => s.cncPrograms);
   const tagIdentityRows = useUniEmuStore(
@@ -63,56 +54,73 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
           existingTag.id,
           normalizeTagIdentity(existingTag.name),
           normalizeTagIdentity(existingTag.key),
-        ].join(TAG_IDENTITY_SEPARATOR),
-      ),
-    ),
+        ].join(TAG_IDENTITY_SEPARATOR)
+      )
+    )
   );
 
   const isEdit = !!tag;
   const initialSnapshotRef = useRef('');
   const [form, setForm] = useState<TagEditorFormState>(() =>
-    normalizeTagEditorForm(createEmptyTagEditorFormState()),
+    normalizeTagEditorForm(createEmptyTagEditorFormState())
   );
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDraft, setEditorDraft] = useState(DEFAULT_INLINE_SCRIPT);
   const [editorConfirmCloseOpen, setEditorConfirmCloseOpen] = useState(false);
+  const [storageScriptEditorOpen, setStorageScriptEditorOpen] = useState(false);
+  const [storageScriptEditorDraft, setStorageScriptEditorDraft] = useState('');
+  const [storageScriptEditorConfirmCloseOpen, setStorageScriptEditorConfirmCloseOpen] =
+    useState(false);
+  const [storageScriptEditorSaving, setStorageScriptEditorSaving] = useState(false);
+  const [storageScriptEditorError, setStorageScriptEditorError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
 
     const nextForm = normalizeTagEditorForm(
-      tag ? createTagEditorFormState(tag) : createEmptyTagEditorFormState(),
+      tag ? createTagEditorFormState(tag) : createEmptyTagEditorFormState()
     );
     setForm(nextForm);
     setEditorDraft(nextForm.inlineScript);
     setConfirmCloseOpen(false);
     setEditorOpen(false);
     setEditorConfirmCloseOpen(false);
+    setStorageScriptEditorOpen(false);
+    setStorageScriptEditorDraft('');
+    setStorageScriptEditorConfirmCloseOpen(false);
+    setStorageScriptEditorSaving(false);
+    setStorageScriptEditorError(null);
     setSubmitError(null);
     initialSnapshotRef.current = buildTagFormSnapshot(nextForm);
   }, [open, tag]);
 
-  const setField = useCallback(<K extends keyof TagEditorFormState,>(
-    field: K,
-    value: TagEditorFormState[K],
-  ) => {
-    setSubmitError(null);
-    setForm((current) =>
-      Object.is(current[field], value)
-        ? current
-        : normalizeTagEditorForm({ ...current, [field]: value }),
-    );
-  }, []);
+  const setField = useCallback(
+    <K extends keyof TagEditorFormState>(field: K, value: TagEditorFormState[K]) => {
+      setSubmitError(null);
+      setForm((current) =>
+        Object.is(current[field], value)
+          ? current
+          : normalizeTagEditorForm({ ...current, [field]: value })
+      );
+    },
+    []
+  );
 
-  const setCalc = useCallback((next: TagCalcConfig) => {
-    setField('calc', next);
-  }, [setField]);
+  const setCalc = useCallback(
+    (next: TagCalcConfig) => {
+      setField('calc', next);
+    },
+    [setField]
+  );
 
-  const setScenario = useCallback((next: TagScenarioConfig) => {
-    setField('scenario', next);
-  }, [setField]);
+  const setScenario = useCallback(
+    (next: TagScenarioConfig) => {
+      setField('scenario', next);
+    },
+    [setField]
+  );
 
   const resetForm = useCallback(() => {
     const nextForm = normalizeTagEditorForm(createEmptyTagEditorFormState());
@@ -124,7 +132,11 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
   const availableScripts = useMemo(
     () => scripts.filter((script) => script.scope === 'shared' || script.emulatorId === emulatorId),
-    [scripts, emulatorId],
+    [scripts, emulatorId]
+  );
+  const selectedStorageScript = useMemo(
+    () => availableScripts.find((script) => script.id === form.scriptId) ?? null,
+    [availableScripts, form.scriptId]
   );
   const visibleCncPrograms = useMemo(
     () =>
@@ -132,18 +144,18 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
         .filter(
           (program) =>
             program.scope === 'shared' ||
-            (program.scope === 'emulator' && program.emulatorId === emulatorId),
+            (program.scope === 'emulator' && program.emulatorId === emulatorId)
         )
         .sort((a, b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' })),
-    [cncPrograms, emulatorId],
+    [cncPrograms, emulatorId]
   );
   const sharedCncPrograms = useMemo(
     () => visibleCncPrograms.filter((program) => program.scope === 'shared'),
-    [visibleCncPrograms],
+    [visibleCncPrograms]
   );
   const emulatorCncPrograms = useMemo(
     () => visibleCncPrograms.filter((program) => program.scope === 'emulator'),
-    [visibleCncPrograms],
+    [visibleCncPrograms]
   );
 
   const duplicateNameError = useMemo(() => {
@@ -185,7 +197,15 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
       !duplicateKeyError &&
       validationErrors.length === 0 &&
       (!isScenario || hasScenarioDuration(form.scenario)),
-    [duplicateKeyError, duplicateNameError, form.key, form.name, form.scenario, isScenario, validationErrors.length],
+    [
+      duplicateKeyError,
+      duplicateNameError,
+      form.key,
+      form.name,
+      form.scenario,
+      isScenario,
+      validationErrors.length,
+    ]
   );
 
   const hasDirtyChanges = useCallback(
@@ -193,13 +213,16 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
       open &&
       initialSnapshotRef.current.length > 0 &&
       buildTagFormSnapshot(form) !== initialSnapshotRef.current,
-    [form, open],
+    [form, open]
   );
 
   const closeWithoutSaving = useCallback(() => {
     setConfirmCloseOpen(false);
     setEditorOpen(false);
     setEditorConfirmCloseOpen(false);
+    setStorageScriptEditorOpen(false);
+    setStorageScriptEditorConfirmCloseOpen(false);
+    setStorageScriptEditorError(null);
     resetForm();
     onOpenChange(false);
   }, [onOpenChange, resetForm]);
@@ -213,14 +236,17 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
     closeWithoutSaving();
   }, [closeWithoutSaving, hasDirtyChanges]);
 
-  const handleOpenChange = useCallback((nextOpen: boolean) => {
-    if (nextOpen) {
-      onOpenChange(true);
-      return;
-    }
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        onOpenChange(true);
+        return;
+      }
 
-    requestClose();
-  }, [onOpenChange, requestClose]);
+      requestClose();
+    },
+    [onOpenChange, requestClose]
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
@@ -236,9 +262,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
       resetForm();
       onOpenChange(false);
     } catch (error) {
-      const message = error instanceof Error
-        ? error.message
-        : localization.routes.emulators.components.addTagDrawer.saveTagError;
+      const message =
+        error instanceof Error
+          ? error.message
+          : localization.routes.emulators.components.addTagDrawer.saveTagError;
       setSubmitError(message);
     }
   }, [addTag, canSubmit, emulatorId, form, isEdit, onOpenChange, resetForm, tag, updateTag]);
@@ -251,7 +278,7 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
         scope: 'emulator',
         emulatorId,
       }),
-    [emulatorId, tag?.id],
+    [emulatorId, tag?.id]
   );
 
   const openEditor = useCallback(() => {
@@ -274,19 +301,103 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
     closeEditorWithoutSaving();
   }, [closeEditorWithoutSaving, editorDraft, editorOpen, form.inlineScript]);
 
-  const handleEditorOpenChange = useCallback((nextOpen: boolean) => {
-    if (nextOpen) {
-      setEditorOpen(true);
-      return;
-    }
+  const handleEditorOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        setEditorOpen(true);
+        return;
+      }
 
-    requestEditorClose();
-  }, [requestEditorClose]);
+      requestEditorClose();
+    },
+    [requestEditorClose]
+  );
 
   const applyEditorDraft = useCallback(() => {
     setField('inlineScript', editorDraft);
     setEditorOpen(false);
   }, [editorDraft, setField]);
+
+  const storageScriptDocumentUri = useMemo(
+    () =>
+      selectedStorageScript
+        ? buildCsxDocumentUri({
+            id: selectedStorageScript.id,
+            name: selectedStorageScript.name,
+            scope: selectedStorageScript.scope,
+            emulatorId: selectedStorageScript.emulatorId,
+          })
+        : buildCsxDocumentUri({
+            id: 'missing-storage-script',
+            name: 'storage/missing.csx',
+            scope: 'shared',
+          }),
+    [selectedStorageScript]
+  );
+
+  const openStorageScriptEditor = useCallback(() => {
+    if (!selectedStorageScript) return;
+
+    setStorageScriptEditorDraft(selectedStorageScript.content);
+    setStorageScriptEditorError(null);
+    setStorageScriptEditorOpen(true);
+  }, [selectedStorageScript]);
+
+  const closeStorageScriptEditorWithoutSaving = useCallback(() => {
+    setStorageScriptEditorConfirmCloseOpen(false);
+    setStorageScriptEditorDraft(selectedStorageScript?.content ?? '');
+    setStorageScriptEditorOpen(false);
+    setStorageScriptEditorError(null);
+  }, [selectedStorageScript?.content]);
+
+  const requestStorageScriptEditorClose = useCallback(() => {
+    if (
+      storageScriptEditorOpen &&
+      selectedStorageScript &&
+      storageScriptEditorDraft !== selectedStorageScript.content
+    ) {
+      setStorageScriptEditorConfirmCloseOpen(true);
+      return;
+    }
+
+    closeStorageScriptEditorWithoutSaving();
+  }, [
+    closeStorageScriptEditorWithoutSaving,
+    selectedStorageScript,
+    storageScriptEditorDraft,
+    storageScriptEditorOpen,
+  ]);
+
+  const handleStorageScriptEditorOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        setStorageScriptEditorOpen(true);
+        return;
+      }
+
+      requestStorageScriptEditorClose();
+    },
+    [requestStorageScriptEditorClose]
+  );
+
+  const applyStorageScriptDraft = useCallback(async () => {
+    if (!selectedStorageScript || storageScriptEditorSaving) return;
+
+    setStorageScriptEditorSaving(true);
+    setStorageScriptEditorError(null);
+    try {
+      await updateScript(selectedStorageScript.id, storageScriptEditorDraft);
+      setStorageScriptEditorOpen(false);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : localization.routes.emulators.components.addTagDrawer.saveScriptError;
+      setStorageScriptEditorError(message);
+    } finally {
+      setStorageScriptEditorSaving(false);
+    }
+  }, [selectedStorageScript, storageScriptEditorDraft, storageScriptEditorSaving, updateScript]);
 
   return (
     <>
@@ -350,21 +461,17 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
               />
             )}
 
-            {showCalc && (
-              <TagCalcSection
-                calc={form.calc}
-                tagType={form.type}
-                onChange={setCalc}
-              />
-            )}
+            {showCalc && <TagCalcSection calc={form.calc} tagType={form.type} onChange={setCalc} />}
 
             {showScript && (
               <TagScriptSection
                 availableScripts={availableScripts}
+                selectedScript={selectedStorageScript}
                 scriptId={form.scriptId}
                 inlineScript={form.inlineScript}
                 onFieldChange={setField}
                 onOpenEditor={openEditor}
+                onOpenStorageScriptEditor={openStorageScriptEditor}
               />
             )}
 
@@ -393,12 +500,35 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
             open={editorOpen}
             draft={editorDraft}
             documentUri={inlineDocumentUri}
+            title={localization.routes.emulators.components.addTagDrawer.inlineScriptEditorTitle}
+            applyButtonLabel={
+              localization.routes.emulators.components.addTagDrawer.applyScriptButtonLabel
+            }
             confirmCloseOpen={editorConfirmCloseOpen}
             onOpenChange={handleEditorOpenChange}
             onDraftChange={setEditorDraft}
             onApply={applyEditorDraft}
             onConfirmCloseOpenChange={setEditorConfirmCloseOpen}
             onCloseWithoutSaving={closeEditorWithoutSaving}
+          />
+          <InlineScriptEditorDrawer
+            open={storageScriptEditorOpen}
+            draft={storageScriptEditorDraft}
+            documentUri={storageScriptDocumentUri}
+            title={localization.routes.emulators.components.addTagDrawer.storageScriptEditorTitle(
+              selectedStorageScript?.name ?? ''
+            )}
+            applyButtonLabel={
+              localization.routes.emulators.components.addTagDrawer.saveScriptButtonLabel
+            }
+            confirmCloseOpen={storageScriptEditorConfirmCloseOpen}
+            error={storageScriptEditorError}
+            applying={storageScriptEditorSaving}
+            onOpenChange={handleStorageScriptEditorOpenChange}
+            onDraftChange={setStorageScriptEditorDraft}
+            onApply={() => void applyStorageScriptDraft()}
+            onConfirmCloseOpenChange={setStorageScriptEditorConfirmCloseOpen}
+            onCloseWithoutSaving={closeStorageScriptEditorWithoutSaving}
           />
         </SheetContent>
       </Sheet>

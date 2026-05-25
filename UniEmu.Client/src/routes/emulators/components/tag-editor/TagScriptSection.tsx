@@ -16,18 +16,22 @@ import type { SetTagEditorField } from './types';
 
 interface Props {
   availableScripts: ScriptFile[];
+  selectedScript?: ScriptFile | null;
   scriptId: string;
   inlineScript: string;
   onFieldChange: SetTagEditorField;
   onOpenEditor: () => void;
+  onOpenStorageScriptEditor: () => void;
 }
 
 export const TagScriptSection = memo(function TagScriptSection({
   availableScripts,
+  selectedScript,
   scriptId,
   inlineScript,
   onFieldChange,
   onOpenEditor,
+  onOpenStorageScriptEditor,
 }: Props) {
   const handlePreviewChange = useCallback(() => {}, []);
   const useInlineScript = !scriptId;
@@ -60,6 +64,20 @@ export const TagScriptSection = memo(function TagScriptSection({
           </SelectContent>
         </Select>
       </div>
+
+      {selectedScript && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-xs"
+            onClick={onOpenStorageScriptEditor}
+          >
+            <Pencil className="h-3 w-3" />{' '}
+            {localization.routes.emulators.components.addTagDrawer.storageScriptEditButtonLabel}
+          </Button>
+        </div>
+      )}
 
       {useInlineScript && (
         <div className="space-y-1.5">
