@@ -220,7 +220,7 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-card xl:flex xl:min-h-0 xl:flex-col">
+        <div className="relative rounded-lg border border-border bg-card xl:min-h-0 xl:overflow-hidden">
           <div className="border-b border-border p-4">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {localization.routes.emulators.components.emulatorDetailPage.tagValuesTitle}
@@ -231,7 +231,7 @@ export const EmulatorMonitoringTab = memo(function EmulatorMonitoringTab({
                 : localization.routes.emulators.components.emulatorDetailPage.latestSnapshotLabel}
             </p>
           </div>
-          <div className="max-h-[320px] overflow-auto xl:min-h-0 xl:max-h-none xl:flex-1">
+          <div className="max-h-[320px] overflow-auto xl:absolute xl:inset-x-0 xl:bottom-0 xl:top-[74px] xl:max-h-none">
             <table className="w-full text-sm">
               <thead className="sticky top-0 border-b border-border bg-card text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
