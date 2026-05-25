@@ -220,12 +220,12 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                LineSegment("temperature-heating", "Heating", 300, spec.AmbientTemperature, spec.ProcessSetpoint),
-                SineSegment("temperature-soaking", "Soaking", 360, spec.ProcessSetpoint, amplitude: 4, period: 120),
-                LineSegment("temperature-door-open", "DoorOpenPartChange", 90, spec.ProcessSetpoint, spec.DoorOpenTemperature),
-                LineSegment("temperature-high-ramp", "HighTempRamp", 180, spec.DoorOpenTemperature, spec.HighSetpoint),
-                SineSegment("temperature-high-soak", "HighTempSoak", 300, spec.HighSetpoint, amplitude: 3, period: 90),
-                LineSegment("temperature-cooling", "Cooling", 240, spec.HighSetpoint, spec.CoolingTemperature),
+                LineSegment("temperature-heating", "Нагрев", 300, spec.AmbientTemperature, spec.ProcessSetpoint),
+                SineSegment("temperature-soaking", "Выдержка", 360, spec.ProcessSetpoint, amplitude: 4, period: 120),
+                LineSegment("temperature-door-open", "Замена детали", 90, spec.ProcessSetpoint, spec.DoorOpenTemperature),
+                LineSegment("temperature-high-ramp", "Разгон до высокой температуры", 180, spec.DoorOpenTemperature, spec.HighSetpoint),
+                SineSegment("temperature-high-soak", "Высокотемпературная выдержка", 300, spec.HighSetpoint, amplitude: 3, period: 90),
+                LineSegment("temperature-cooling", "Охлаждение", 240, spec.HighSetpoint, spec.CoolingTemperature),
             ],
             ContinueOnFormulaEnd.Repeat,
             Invariant(spec.AmbientTemperature));
@@ -240,12 +240,12 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("setpoint-heating", "Heating", 300, Invariant(spec.ProcessSetpoint)),
-                StaticSegment("setpoint-soaking", "Soaking", 360, Invariant(spec.ProcessSetpoint)),
-                StaticSegment("setpoint-door-open", "DoorOpenPartChange", 90, Invariant(spec.DoorOpenTemperature)),
-                StaticSegment("setpoint-high-ramp", "HighTempRamp", 180, Invariant(spec.HighSetpoint)),
-                StaticSegment("setpoint-high-soak", "HighTempSoak", 300, Invariant(spec.HighSetpoint)),
-                StaticSegment("setpoint-cooling", "Cooling", 240, Invariant(spec.CoolingTemperature)),
+                StaticSegment("setpoint-heating", "Нагрев", 300, Invariant(spec.ProcessSetpoint)),
+                StaticSegment("setpoint-soaking", "Выдержка", 360, Invariant(spec.ProcessSetpoint)),
+                StaticSegment("setpoint-door-open", "Замена детали", 90, Invariant(spec.DoorOpenTemperature)),
+                StaticSegment("setpoint-high-ramp", "Разгон до высокой температуры", 180, Invariant(spec.HighSetpoint)),
+                StaticSegment("setpoint-high-soak", "Высокотемпературная выдержка", 300, Invariant(spec.HighSetpoint)),
+                StaticSegment("setpoint-cooling", "Охлаждение", 240, Invariant(spec.CoolingTemperature)),
             ],
             ContinueOnFormulaEnd.Repeat,
             Invariant(spec.ProcessSetpoint));
@@ -259,12 +259,12 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("mode-heating", "Heating", 300, "Heating"),
-                StaticSegment("mode-soaking", "Soaking", 360, "Soaking"),
-                StaticSegment("mode-door-open", "DoorOpenPartChange", 90, "DoorOpenPartChange"),
-                StaticSegment("mode-high-ramp", "HighTempRamp", 180, "HighTempRamp"),
-                StaticSegment("mode-high-soak", "HighTempSoak", 300, "HighTempSoak"),
-                StaticSegment("mode-cooling", "Cooling", 240, "Cooling"),
+                StaticSegment("mode-heating", "Нагрев", 300, "Heating"),
+                StaticSegment("mode-soaking", "Выдержка", 360, "Soaking"),
+                StaticSegment("mode-door-open", "Замена детали", 90, "DoorOpenPartChange"),
+                StaticSegment("mode-high-ramp", "Разгон до высокой температуры", 180, "HighTempRamp"),
+                StaticSegment("mode-high-soak", "Высокотемпературная выдержка", 300, "HighTempSoak"),
+                StaticSegment("mode-cooling", "Охлаждение", 240, "Cooling"),
             ],
             ContinueOnFormulaEnd.Repeat,
             "Heating");
@@ -278,12 +278,12 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("door-heating", "Heating", 300, "false"),
-                StaticSegment("door-soaking", "Soaking", 360, "false"),
-                StaticSegment("door-open", "DoorOpenPartChange", 90, "true"),
-                StaticSegment("door-high-ramp", "HighTempRamp", 180, "false"),
-                StaticSegment("door-high-soak", "HighTempSoak", 300, "false"),
-                StaticSegment("door-cooling", "Cooling", 240, "false"),
+                StaticSegment("door-heating", "Нагрев", 300, "false"),
+                StaticSegment("door-soaking", "Выдержка", 360, "false"),
+                StaticSegment("door-open", "Замена детали", 90, "true"),
+                StaticSegment("door-high-ramp", "Разгон до высокой температуры", 180, "false"),
+                StaticSegment("door-high-soak", "Высокотемпературная выдержка", 300, "false"),
+                StaticSegment("door-cooling", "Охлаждение", 240, "false"),
             ],
             ContinueOnFormulaEnd.Repeat,
             "false");

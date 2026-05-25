@@ -60,6 +60,9 @@ public static partial class UniEmuSeeder
             "scr-math",
             "math.csx",
             """
+            /// <summary>
+            /// Ограничивает число заданным минимальным и максимальным значением.
+            /// </summary>
             double Clamp(double value, double min, double max)
             {
                 if (value < min)
@@ -71,6 +74,9 @@ public static partial class UniEmuSeeder
                 return value;
             }
 
+            /// <summary>
+            /// Преобразует значение тега в число double или возвращает запасное значение.
+            /// </summary>
             double ToDouble(object? value, double fallback)
             {
                 return value switch
@@ -92,11 +98,17 @@ public static partial class UniEmuSeeder
                 };
             }
 
+            /// <summary>
+            /// Преобразует значение тега в строку или возвращает запасное значение.
+            /// </summary>
             string ToText(object? value, string fallback)
             {
                 return value?.ToString() ?? fallback;
             }
 
+            /// <summary>
+            /// Преобразует значение тега в bool или возвращает запасное значение.
+            /// </summary>
             bool ToBool(object? value, bool fallback)
             {
                 return value switch
@@ -116,6 +128,9 @@ public static partial class UniEmuSeeder
             """
             #load "math.csx"
 
+            /// <summary>
+            /// Читает числовой тег по ключу или возвращает запасное значение.
+            /// </summary>
             double ReadNumber(string key, double fallback)
             {
                 return UniEmu.Tags.TryGetValue(key, out var tag)
@@ -123,6 +138,9 @@ public static partial class UniEmuSeeder
                     : fallback;
             }
 
+            /// <summary>
+            /// Читает строковый тег по ключу или возвращает запасное значение.
+            /// </summary>
             string ReadText(string key, string fallback)
             {
                 return UniEmu.Tags.TryGetValue(key, out var tag)
@@ -130,6 +148,9 @@ public static partial class UniEmuSeeder
                     : fallback;
             }
 
+            /// <summary>
+            /// Читает логический тег по ключу или возвращает запасное значение.
+            /// </summary>
             bool ReadBool(string key, bool fallback)
             {
                 return UniEmu.Tags.TryGetValue(key, out var tag)

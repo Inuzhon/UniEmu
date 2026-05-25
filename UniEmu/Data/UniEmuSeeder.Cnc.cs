@@ -525,9 +525,9 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "true",
-            ("power-ready", "PowerOn", 30, "true"),
-            ("power-cycle", "Cycle", 330, "true"),
-            ("power-service", "Service", 30, "true"));
+            ("power-ready", "Питание включено", 30, "true"),
+            ("power-cycle", "Рабочий цикл", 330, "true"),
+            ("power-service", "Обслуживание", 30, "true"));
     }
 
     /// <summary>
@@ -538,11 +538,11 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "AUTO",
-            ("mode-auto-ready", "Ready", 25, "AUTO"),
-            ("mode-auto-cutting", "Cutting", 210, "AUTO"),
-            ("mode-mdi-offset", "OffsetCheck", 35, "MDI"),
-            ("mode-jog-inspection", "Inspection", 35, "JOG"),
-            ("mode-auto-finish", "Finish", 95, "AUTO"));
+            ("mode-auto-ready", "Готовность", 25, "AUTO"),
+            ("mode-auto-cutting", "Обработка", 210, "AUTO"),
+            ("mode-mdi-offset", "Проверка коррекций", 35, "MDI"),
+            ("mode-jog-inspection", "Осмотр", 35, "JOG"),
+            ("mode-auto-finish", "Завершение", 95, "AUTO"));
     }
 
     /// <summary>
@@ -553,12 +553,12 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "READY",
-            ("execution-ready", "Ready", 20, "READY"),
-            ("execution-active-roughing", "Roughing", 170, "ACTIVE"),
-            ("execution-hold", "FeedHold", 25, "HOLD"),
-            ("execution-active-finishing", "Finishing", 130, "ACTIVE"),
-            ("execution-alarm", "AlarmCheck", 15, "ALARM"),
-            ("execution-stopped", "Stopped", 30, "STOPPED"));
+            ("execution-ready", "Готовность", 20, "READY"),
+            ("execution-active-roughing", "Черновая обработка", 170, "ACTIVE"),
+            ("execution-hold", "Удержание подачи", 25, "HOLD"),
+            ("execution-active-finishing", "Чистовая обработка", 130, "ACTIVE"),
+            ("execution-alarm", "Проверка аварии", 15, "ALARM"),
+            ("execution-stopped", "Остановлено", 30, "STOPPED"));
     }
 
     /// <summary>
@@ -569,11 +569,11 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "Reset",
-            ("cycle-reset", "Reset", 20, "Reset"),
-            ("cycle-start-roughing", "Cycle Start", 170, "Cycle Start"),
-            ("cycle-feed-hold", "Feed Hold", 25, "Feed Hold"),
-            ("cycle-start-finishing", "Cycle Start", 130, "Cycle Start"),
-            ("cycle-reset-alarm", "Reset", 45, "Reset"));
+            ("cycle-reset", "Сброс", 20, "Reset"),
+            ("cycle-start-roughing", "Пуск цикла", 170, "Cycle Start"),
+            ("cycle-feed-hold", "Удержание подачи", 25, "Feed Hold"),
+            ("cycle-start-finishing", "Пуск цикла", 130, "Cycle Start"),
+            ("cycle-reset-alarm", "Сброс", 45, "Reset"));
     }
 
     /// <summary>
@@ -584,9 +584,9 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "true",
-            ("door-setup", "Setup", 18, "false"),
-            ("door-cycle", "Cycle", 345, "true"),
-            ("door-unload", "Unload", 27, "false"));
+            ("door-setup", "Подготовка", 18, "false"),
+            ("door-cycle", "Рабочий цикл", 345, "true"),
+            ("door-unload", "Выгрузка", 27, "false"));
     }
 
     /// <summary>
@@ -597,9 +597,9 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "true",
-            ("fixture-loading", "Loading", 20, "false"),
-            ("fixture-clamped", "Clamped", 335, "true"),
-            ("fixture-unclamp", "Unclamp", 35, "false"));
+            ("fixture-loading", "Загрузка", 20, "false"),
+            ("fixture-clamped", "Зажато", 335, "true"),
+            ("fixture-unclamp", "Разжим", 35, "false"));
     }
 
     /// <summary>
@@ -610,9 +610,9 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "true",
-            ("servo-ready-start", "Ready", 345, "true"),
-            ("servo-fault-check", "FaultCheck", 15, "false"),
-            ("servo-ready-recover", "Recover", 30, "true"));
+            ("servo-ready-start", "Готовность", 345, "true"),
+            ("servo-fault-check", "Проверка отказа", 15, "false"),
+            ("servo-ready-recover", "Восстановление", 30, "true"));
     }
 
     /// <summary>
@@ -627,11 +627,11 @@ public static partial class UniEmuSeeder
         var middle = start + (finish - start) * 0.45;
         return new TagScenarioConfigDto(
             [
-                LineSegment($"{axis}-rapid-approach", "RapidApproach", 45, start, middle),
-                SineSegment($"{axis}-cutting-wave", "Cutting", 150, middle, Math.Max(0.5, Math.Abs(finish - start) * 0.015), 24),
-                CurveSegment($"{axis}-finish-pass", "FinishPass", 90, middle, finish, 1.8),
-                StaticSegment($"{axis}-measure", "Measure", 35, Invariant(finish)),
-                LineSegment($"{axis}-return", "Return", 70, finish, start),
+                LineSegment($"{axis}-rapid-approach", "Быстрый подвод", 45, start, middle),
+                SineSegment($"{axis}-cutting-wave", "Обработка", 150, middle, Math.Max(0.5, Math.Abs(finish - start) * 0.015), 24),
+                CurveSegment($"{axis}-finish-pass", "Чистовой проход", 90, middle, finish, 1.8),
+                StaticSegment($"{axis}-measure", "Измерение", 35, Invariant(finish)),
+                LineSegment($"{axis}-return", "Возврат", 70, finish, start),
             ],
             ContinueOnFormulaEnd.Repeat,
             Invariant(start));
@@ -646,11 +646,11 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                LineSegment("dtg-approach", "RapidApproach", 45, spec.DistanceMax, spec.DistanceMax * 0.55),
-                LineSegment("dtg-cutting", "Cutting", 150, spec.DistanceMax * 0.55, spec.DistanceMax * 0.12),
-                LineSegment("dtg-finish", "FinishPass", 90, spec.DistanceMax * 0.12, 0),
-                StaticSegment("dtg-measure", "Measure", 35, "0"),
-                LineSegment("dtg-return", "Return", 70, spec.DistanceMax * 0.35, 0),
+                LineSegment("dtg-approach", "Быстрый подвод", 45, spec.DistanceMax, spec.DistanceMax * 0.55),
+                LineSegment("dtg-cutting", "Обработка", 150, spec.DistanceMax * 0.55, spec.DistanceMax * 0.12),
+                LineSegment("dtg-finish", "Чистовой проход", 90, spec.DistanceMax * 0.12, 0),
+                StaticSegment("dtg-measure", "Измерение", 35, "0"),
+                LineSegment("dtg-return", "Возврат", 70, spec.DistanceMax * 0.35, 0),
             ],
             ContinueOnFormulaEnd.Repeat,
             Invariant(spec.DistanceMax));
@@ -665,11 +665,11 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("spindle-stop-setup", "Setup", 20, "0"),
-                LineSegment("spindle-acceleration", "Acceleration", 30, 0, spec.SpindleCommand),
-                StaticSegment("spindle-cutting", "Cutting", 250, Invariant(spec.SpindleCommand)),
-                StaticSegment("spindle-hold", "Hold", 25, Invariant(spec.SpindleCommand * 0.6)),
-                StaticSegment("spindle-stop", "Stop", 65, "0"),
+                StaticSegment("spindle-stop-setup", "Подготовка", 20, "0"),
+                LineSegment("spindle-acceleration", "Разгон", 30, 0, spec.SpindleCommand),
+                StaticSegment("spindle-cutting", "Обработка", 250, Invariant(spec.SpindleCommand)),
+                StaticSegment("spindle-hold", "Удержание", 25, Invariant(spec.SpindleCommand * 0.6)),
+                StaticSegment("spindle-stop", "Останов", 65, "0"),
             ],
             ContinueOnFormulaEnd.Repeat,
             Invariant(spec.SpindleCommand));
@@ -683,10 +683,10 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "CW",
-            ("spindle-dir-stop-setup", "Setup", 20, "STOPPED"),
-            ("spindle-dir-cw", "Clockwise", 280, "CW"),
-            ("spindle-dir-ccw", "ReverseTap", 25, "CCW"),
-            ("spindle-dir-stop", "Stop", 65, "STOPPED"));
+            ("spindle-dir-stop-setup", "Подготовка", 20, "STOPPED"),
+            ("spindle-dir-cw", "По часовой стрелке", 280, "CW"),
+            ("spindle-dir-ccw", "Реверс для резьбы", 25, "CCW"),
+            ("spindle-dir-stop", "Останов", 65, "STOPPED"));
     }
 
     /// <summary>
@@ -698,11 +698,11 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("feed-rapid", "Rapid", 45, Invariant(spec.CommandFeed * 1.8)),
-                StaticSegment("feed-roughing", "Roughing", 150, Invariant(spec.CommandFeed)),
-                StaticSegment("feed-hold", "Hold", 25, "0"),
-                StaticSegment("feed-finishing", "Finishing", 90, Invariant(spec.CommandFeed * 0.55)),
-                StaticSegment("feed-return", "Return", 80, Invariant(spec.CommandFeed * 1.2)),
+                StaticSegment("feed-rapid", "Быстрый ход", 45, Invariant(spec.CommandFeed * 1.8)),
+                StaticSegment("feed-roughing", "Черновая обработка", 150, Invariant(spec.CommandFeed)),
+                StaticSegment("feed-hold", "Удержание", 25, "0"),
+                StaticSegment("feed-finishing", "Чистовая обработка", 90, Invariant(spec.CommandFeed * 0.55)),
+                StaticSegment("feed-return", "Возврат", 80, Invariant(spec.CommandFeed * 1.2)),
             ],
             ContinueOnFormulaEnd.Repeat,
             Invariant(spec.CommandFeed));
@@ -716,12 +716,12 @@ public static partial class UniEmuSeeder
     {
         return CreateStaticScenario(
             "G00",
-            ("motion-rapid", "Rapid", 45, "G00"),
-            ("motion-linear", "Linear", 150, "G01"),
-            ("motion-hold", "Hold", 25, "G01"),
-            ("motion-arc-cw", "ArcCW", 60, "G02"),
-            ("motion-arc-ccw", "ArcCCW", 30, "G03"),
-            ("motion-return", "Return", 80, "G00"));
+            ("motion-rapid", "Быстрый ход", 45, "G00"),
+            ("motion-linear", "Линейная подача", 150, "G01"),
+            ("motion-hold", "Удержание", 25, "G01"),
+            ("motion-arc-cw", "Дуга G02", 60, "G02"),
+            ("motion-arc-ccw", "Дуга G03", 30, "G03"),
+            ("motion-return", "Возврат", 80, "G00"));
     }
 
     /// <summary>
@@ -734,10 +734,10 @@ public static partial class UniEmuSeeder
         var finishingTool = spec.ActiveTool + 1;
         return CreateStaticScenario(
             Invariant(spec.ActiveTool),
-            ("tool-setup", "Setup", 45, Invariant(spec.ActiveTool)),
-            ("tool-roughing", "Roughing", 170, Invariant(spec.ActiveTool)),
-            ("tool-change", "ToolChange", 25, Invariant(finishingTool)),
-            ("tool-finishing", "Finishing", 150, Invariant(finishingTool)));
+            ("tool-setup", "Подготовка", 45, Invariant(spec.ActiveTool)),
+            ("tool-roughing", "Черновая обработка", 170, Invariant(spec.ActiveTool)),
+            ("tool-change", "Смена инструмента", 25, Invariant(finishingTool)),
+            ("tool-finishing", "Чистовая обработка", 150, Invariant(finishingTool)));
     }
 
     /// <summary>

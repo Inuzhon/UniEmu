@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text.RegularExpressions;
 using UniEmu.Common;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Enums;
@@ -80,11 +81,11 @@ public sealed class UniEmuSeederTests
             var scenario = UniEmuJson.Deserialize<TagScenarioConfigDto>(carburizingTemperature.ScenarioJson)!;
 
             Assert.Equal(ContinueOnFormulaEnd.Repeat, scenario.ContinueOnFormulaEnd);
-            Assert.Contains(scenario.Segments, segment => segment.Label == "Heating");
-            Assert.Contains(scenario.Segments, segment => segment.Label == "Soaking");
-            Assert.Contains(scenario.Segments, segment => segment.Label == "DoorOpenPartChange");
-            Assert.Contains(scenario.Segments, segment => segment.Label == "HighTempSoak");
-            Assert.Contains(scenario.Segments, segment => segment.Label == "Cooling");
+            Assert.Contains(scenario.Segments, segment => segment.Label == "Нагрев");
+            Assert.Contains(scenario.Segments, segment => segment.Label == "Выдержка");
+            Assert.Contains(scenario.Segments, segment => segment.Label == "Замена детали");
+            Assert.Contains(scenario.Segments, segment => segment.Label == "Высокотемпературная выдержка");
+            Assert.Contains(scenario.Segments, segment => segment.Label == "Охлаждение");
 
             Assert.Contains(scripts, script => script.Id == "scr-math" && script.Name == "math.csx");
             Assert.Contains(scripts, script => script.Id == "scr-read-tags" && script.Name == "read-tags.csx");
@@ -220,6 +221,102 @@ public sealed class UniEmuSeederTests
     }
 
     [Fact]
+    public async Task SeedAsync_SharedScriptsDocumentEditorHelperMethods()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            await db.Database.MigrateAsync();
+
+            await UniEmuSeeder.SeedAsync(db);
+        }
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            var mathScript = await db.ScriptFiles.SingleAsync(script => script.Name == "math.csx");
+            var readTagsScript = await db.ScriptFiles.SingleAsync(script => script.Name == "read-tags.csx");
+
+            AssertMethodSummary(
+                mathScript.Content,
+                "double Clamp(double value, double min, double max)",
+                "Ограничивает число заданным минимальным и максимальным значением.");
+            AssertMethodSummary(
+                mathScript.Content,
+                "double ToDouble(object? value, double fallback)",
+                "Преобразует значение тега в число double или возвращает запасное значение.");
+            AssertMethodSummary(
+                mathScript.Content,
+                "string ToText(object? value, string fallback)",
+                "Преобразует значение тега в строку или возвращает запасное значение.");
+            AssertMethodSummary(
+                mathScript.Content,
+                "bool ToBool(object? value, bool fallback)",
+                "Преобразует значение тега в bool или возвращает запасное значение.");
+            AssertMethodSummary(
+                readTagsScript.Content,
+                "double ReadNumber(string key, double fallback)",
+                "Читает числовой тег по ключу или возвращает запасное значение.");
+            AssertMethodSummary(
+                readTagsScript.Content,
+                "string ReadText(string key, string fallback)",
+                "Читает строковый тег по ключу или возвращает запасное значение.");
+            AssertMethodSummary(
+                readTagsScript.Content,
+                "bool ReadBool(string key, bool fallback)",
+                "Читает логический тег по ключу или возвращает запасное значение.");
+        }
+    }
+
+    [Fact]
+    public async Task SeedAsync_UsesRussianScenarioSegmentLabels()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            await db.Database.MigrateAsync();
+
+            await UniEmuSeeder.SeedAsync(db);
+        }
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            var tags = await db.EmulatorTags
+                .Include(tag => tag.Emulator)
+                .Where(tag =>
+                    tag.ScenarioJson != null &&
+                    tag.Emulator != null &&
+                    tag.Emulator.ProtocolId >= 31 &&
+                    tag.Emulator.ProtocolId <= 43)
+                .ToListAsync();
+
+            Assert.NotEmpty(tags);
+
+            foreach (var tag in tags)
+            {
+                var scenario = UniEmuJson.Deserialize<TagScenarioConfigDto>(tag.ScenarioJson)!;
+                foreach (var segment in scenario.Segments)
+                {
+                    Assert.True(
+                        Regex.IsMatch(segment.Label ?? string.Empty, @"\p{IsCyrillic}"),
+                        $"{tag.Key}/{segment.Id}: '{segment.Label}'");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public async Task SeedAsync_BatchReactorScriptsExecuteThroughRuntimeService()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -284,6 +381,12 @@ public sealed class UniEmuSeederTests
             var diagnostics = string.Join(Environment.NewLine, ex.Diagnostics.Select(diagnostic => diagnostic.ToString()));
             throw new InvalidOperationException($"{tag.Key}:{Environment.NewLine}{diagnostics}", ex);
         }
+    }
+
+    private static void AssertMethodSummary(string content, string signature, string summary)
+    {
+        var pattern = $@"/// <summary>\s*/// {Regex.Escape(summary)}\s*/// </summary>\s*{Regex.Escape(signature)}";
+        Assert.Matches(pattern, content);
     }
 
     private static void AssertFurnaceTagSetIsComplete(
