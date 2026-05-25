@@ -1,17 +1,25 @@
 import { memo } from 'react';
 import { localization } from '@/localization';
-import type { TagScenarioConfig, TagType } from '@/types/uniemu';
+import type { CncProgram, SpecialParameter, TagScenarioConfig, TagType } from '@/types/uniemu';
 import { ScenarioEditor } from '../tag-scenario/ScenarioEditor';
 
 interface Props {
   scenario: TagScenarioConfig;
   tagType: TagType;
+  specialParameter: SpecialParameter;
+  visibleCncPrograms: CncProgram[];
+  sharedCncPrograms: CncProgram[];
+  emulatorCncPrograms: CncProgram[];
   onChange: (next: TagScenarioConfig) => void;
 }
 
 export const TagScenarioSection = memo(function TagScenarioSection({
   scenario,
   tagType,
+  specialParameter,
+  visibleCncPrograms,
+  sharedCncPrograms,
+  emulatorCncPrograms,
   onChange,
 }: Props) {
   return (
@@ -24,7 +32,15 @@ export const TagScenarioSection = memo(function TagScenarioSection({
           {localization.routes.emulators.components.addTagDrawer.scenarioTimelineTriggerHint}
         </span>
       </div>
-      <ScenarioEditor value={scenario} onChange={onChange} tagType={tagType} />
+      <ScenarioEditor
+        value={scenario}
+        onChange={onChange}
+        tagType={tagType}
+        specialParameter={specialParameter}
+        visibleCncPrograms={visibleCncPrograms}
+        sharedCncPrograms={sharedCncPrograms}
+        emulatorCncPrograms={emulatorCncPrograms}
+      />
     </section>
   );
 });

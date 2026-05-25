@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { Check, ChevronsUpDown, FileText, Folder, Sparkles } from 'lucide-react';
+import { Check, ChevronsUpDown, FileText, Folder, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -145,6 +145,27 @@ export const TagBasicsSection = memo(function TagBasicsSection({
             <CommandEmpty>
               {localization.routes.emulators.components.addTagDrawer.programPickerEmpty}
             </CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="clear-program-selection"
+                onSelect={() => {
+                  onFieldChange('staticValue', '');
+                  setProgramPickerOpen(false);
+                }}
+                className="items-center gap-2 py-2"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-xs">
+                  {localization.routes.emulators.components.addTagDrawer.programPickerClearSelection}
+                </span>
+                <Check
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    !staticValue ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+              </CommandItem>
+            </CommandGroup>
             {staticValue && !selectedCncProgram && (
               <CommandGroup
                 heading={localization.routes.emulators.components.addTagDrawer.programPickerCurrentGroup}

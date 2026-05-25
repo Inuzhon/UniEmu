@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -150,6 +151,27 @@ export function EmulatorTagsTab({
               <CommandEmpty>
                 {localization.routes.emulators.components.addTagDrawer.programPickerEmpty}
               </CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value="clear-program-selection"
+                  onSelect={() => {
+                    void updateTag(emulatorId, tag.id, { ...tag, preview: '' });
+                    setProgramPreviewPickerOpenId(null);
+                  }}
+                  className="items-center gap-2 py-2"
+                >
+                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {localization.routes.emulators.components.addTagDrawer.programPickerClearSelection}
+                  </span>
+                  <Check
+                    className={cn(
+                      'h-3.5 w-3.5',
+                      !tag.preview ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                </CommandItem>
+              </CommandGroup>
               {tag.preview && !selectedCncProgram && (
                 <CommandGroup
                   heading={localization.routes.emulators.components.addTagDrawer.programPickerCurrentGroup}

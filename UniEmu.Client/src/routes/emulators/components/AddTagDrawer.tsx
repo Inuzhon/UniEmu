@@ -447,6 +447,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                 scenario={form.scenario}
                 onChange={setScenario}
                 tagType={form.type}
+                specialParameter={form.specialParameter}
+                visibleCncPrograms={visibleCncPrograms}
+                sharedCncPrograms={sharedCncPrograms}
+                emulatorCncPrograms={emulatorCncPrograms}
               />
             )}
 

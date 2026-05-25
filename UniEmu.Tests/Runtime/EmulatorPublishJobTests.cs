@@ -231,6 +231,70 @@ public sealed class EmulatorPublishJobTests
     }
 
     [Fact]
+    public async Task BuildValuesAsync_CalculatesFrameNumberAndTextFromScenarioProgramName()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new UniEmuDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.CncPrograms.Add(CreateProgram("cnc-main", "Cycle.nc", CncScope.Shared, null, "N10\nN20\nN30"));
+        await db.SaveChangesAsync();
+
+        var stateStore = new TagRuntimeStateStore();
+        var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+        var startedAt = DateTimeOffset.Parse("2026-05-10T12:00:00Z");
+        var timestamp = startedAt.AddSeconds(5);
+        var programNameTag = CreateSpecialTag(
+            "tg-prg",
+            "Program",
+            "PrgName",
+            TagType.String,
+            TagSource.Scenario,
+            "",
+            SpecialParameter.PrgName);
+        programNameTag.ScenarioJson = UniEmuJson.Serialize(new TagScenarioConfigDto(
+            [
+                new TagScenarioSegmentDto(
+                    "program",
+                    30,
+                    new TagCalcConfigDto(CalcType.Static, "Cycle.nc", null, null, null, null, null, null),
+                    "Program"),
+            ],
+            ContinueOnFormulaEnd.Stretch,
+            null));
+        programNameTag.TriggerJson = UniEmuJson.Serialize(
+            new TagTriggerDto(TagTriggerMode.Interval, null, null, 2, TagIntervalUnit.Sec));
+
+        var emulator = new EmulatorEntity
+        {
+            Id = "emu-1",
+            Status = nameof(EmulatorStatus.Running),
+            IntervalSec = 2,
+            StartedAt = startedAt,
+            Tags =
+            [
+                programNameTag,
+                CreateSpecialTag("tg-frame-num", "Frame number", "FrameNum", TagType.Int, TagSource.Static, "0", SpecialParameter.FrameNum),
+                CreateSpecialTag("tg-frame-text", "Frame text", "FrameText", TagType.String, TagSource.Static, "", SpecialParameter.FrameText),
+            ],
+        };
+        var job = CreateJob(db, dataCache, stateStore);
+
+        var values = await InvokeBuildValuesAsync(job, emulator, timestamp);
+
+        Assert.Equal("Cycle.nc", values.Single(value => value.SpecialParameter == SpecialParameter.PrgName).Value);
+        Assert.Equal(2, values.Single(value => value.SpecialParameter == SpecialParameter.FrameNum).Value);
+        Assert.Equal("N30", values.Single(value => value.SpecialParameter == SpecialParameter.FrameText).Value);
+        Assert.Equal("Cycle.nc", programNameTag.Preview);
+        Assert.Equal("2", emulator.Tags.Single(tag => tag.Id == "tg-frame-num").Preview);
+        Assert.Equal("N30", emulator.Tags.Single(tag => tag.Id == "tg-frame-text").Preview);
+    }
+
+    [Fact]
     public async Task BuildValuesAsync_DoesNotWaitForScheduledFrameTags()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

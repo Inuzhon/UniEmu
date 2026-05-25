@@ -237,6 +237,7 @@ export const localization = {
           programPickerSelectPlaceholder: 'Выберите УП',
           programPickerSearchPlaceholder: 'Найти УП...',
           programPickerEmpty: 'УП не найдены',
+          programPickerClearSelection: 'Без УП',
           programPickerCurrentGroup: 'Текущее значение',
           programPickerCurrentMissing: 'Нет в текущем списке УП',
           programPickerSharedGroup: 'Общие УП',

@@ -33,6 +33,8 @@ test('tag table uses CNC program picker for program name special parameters', as
   assert.match(source, /const renderProgramPreviewPicker = \(tag: EmulatorTag\) =>/);
   assert.match(source, /renderProgramPreviewPicker\(tag\)/);
   assert.match(source, /preview: program\.name/);
+  assert.match(source, /programPickerClearSelection/);
+  assert.match(source, /preview: ''/);
   assert.match(source, /onWheel=\{\(event\) =>/);
   assert.match(source, /event\.currentTarget\.scrollTop \+= event\.deltaY/);
 });

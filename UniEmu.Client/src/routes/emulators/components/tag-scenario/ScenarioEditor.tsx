@@ -23,7 +23,13 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { TagScenarioConfig, TagScenarioSegment, TagType } from '@/types/uniemu';
+import type {
+  CncProgram,
+  SpecialParameter,
+  TagScenarioConfig,
+  TagScenarioSegment,
+  TagType,
+} from '@/types/uniemu';
 import { getScenarioCalcTypes } from '../tag-editor/tagValidation';
 import { CalcConfigFields } from './CalcConfigFields';
 import { ScenarioPreviewChart, ScenarioSparkline } from './ScenarioPreviewChart';
@@ -41,6 +47,10 @@ interface Props {
   value: TagScenarioConfig;
   onChange: (next: TagScenarioConfig) => void;
   tagType: TagType;
+  specialParameter: SpecialParameter;
+  visibleCncPrograms: CncProgram[];
+  sharedCncPrograms: CncProgram[];
+  emulatorCncPrograms: CncProgram[];
 }
 
 type DurUnit = 'sec' | 'min';
@@ -67,7 +77,18 @@ const nextSegmentLabel = (segments: TagScenarioSegment[]) => {
   return maxAutoIndex + 1;
 };
 
-export function ScenarioEditor({ value, onChange, tagType }: Props) {
+const isProgramNameParameter = (specialParameter: SpecialParameter) =>
+  specialParameter === 'PrgName' || specialParameter === 'Subprogram';
+
+export function ScenarioEditor({
+  value,
+  onChange,
+  tagType,
+  specialParameter,
+  visibleCncPrograms,
+  sharedCncPrograms,
+  emulatorCncPrograms,
+}: Props) {
   const segments = value.segments;
 
   const [selectedId, setSelectedId] = useState<string | null>(segments[0]?.id ?? null);
@@ -108,11 +129,18 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
     update({ segments: next });
   };
   const add = () => {
+    const segment = defaultSegment();
+    const calc =
+      tagType === 'string' && isProgramNameParameter(specialParameter)
+        ? { ...segment.calc, type: 'Static' as const, start: '' }
+        : segment.calc;
     const seg = {
-      ...defaultSegment(),
-      label: localization.routes.emulators.components.tagScenario.scenarioEditor.defaultSegmentLabel(
-        nextSegmentLabel(segments),
-      ),
+      ...segment,
+      calc,
+      label:
+        localization.routes.emulators.components.tagScenario.scenarioEditor.defaultSegmentLabel(
+          nextSegmentLabel(segments)
+        ),
     };
     update({ segments: [...segments, seg] });
     setSelectedId(seg.id);
@@ -165,7 +193,9 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/10 px-3 py-2">
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
           <span>
-            {localization.routes.emulators.components.tagScenario.scenarioEditor.segmentsCountLabel(segments.length)}
+            {localization.routes.emulators.components.tagScenario.scenarioEditor.segmentsCountLabel(
+              segments.length
+            )}
           </span>
           <span>·</span>
           <span>
@@ -197,16 +227,28 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="NoSignal" className="text-xs">
-                {localization.routes.emulators.components.tagScenario.scenarioEditor.endBehaviorNoSignalLabel}
+                {
+                  localization.routes.emulators.components.tagScenario.scenarioEditor
+                    .endBehaviorNoSignalLabel
+                }
               </SelectItem>
               <SelectItem value="Zero" className="text-xs">
-                {localization.routes.emulators.components.tagScenario.scenarioEditor.endBehaviorZeroLabel}
+                {
+                  localization.routes.emulators.components.tagScenario.scenarioEditor
+                    .endBehaviorZeroLabel
+                }
               </SelectItem>
               <SelectItem value="Repeat" className="text-xs">
-                {localization.routes.emulators.components.tagScenario.scenarioEditor.endBehaviorRepeatLabel}
+                {
+                  localization.routes.emulators.components.tagScenario.scenarioEditor
+                    .endBehaviorRepeatLabel
+                }
               </SelectItem>
               <SelectItem value="Stretch" className="text-xs">
-                {localization.routes.emulators.components.tagScenario.scenarioEditor.endBehaviorHoldLabel}
+                {
+                  localization.routes.emulators.components.tagScenario.scenarioEditor
+                    .endBehaviorHoldLabel
+                }
               </SelectItem>
             </SelectContent>
           </Select>
@@ -224,7 +266,8 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={
-                  localization.routes.emulators.components.tagScenario.scenarioEditor.searchPlaceholder
+                  localization.routes.emulators.components.tagScenario.scenarioEditor
+                    .searchPlaceholder
                 }
                 className="h-8 pl-7 text-xs"
               />
@@ -237,8 +280,10 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                 onClick={() => setAllOpen((v) => !v)}
                 title={
                   allOpen
-                    ? localization.routes.emulators.components.tagScenario.scenarioEditor.collapseAllButtonLabel
-                    : localization.routes.emulators.components.tagScenario.scenarioEditor.expandAllButtonLabel
+                    ? localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .collapseAllButtonLabel
+                    : localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .expandAllButtonLabel
                 }
               >
                 {allOpen ? (
@@ -247,12 +292,17 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                   <ChevronRight className="h-3 w-3" />
                 )}
                 {allOpen
-                  ? localization.routes.emulators.components.tagScenario.scenarioEditor.collapseAllTooltip
-                  : localization.routes.emulators.components.tagScenario.scenarioEditor.expandAllTooltip}
+                  ? localization.routes.emulators.components.tagScenario.scenarioEditor
+                      .collapseAllTooltip
+                  : localization.routes.emulators.components.tagScenario.scenarioEditor
+                      .expandAllTooltip}
               </Button>
               <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={add}>
                 <Plus className="h-3 w-3" />{' '}
-                {localization.routes.emulators.components.tagScenario.scenarioEditor.addSegmentButtonLabel}
+                {
+                  localization.routes.emulators.components.tagScenario.scenarioEditor
+                    .addSegmentButtonLabel
+                }
               </Button>
             </div>
           </div>
@@ -261,7 +311,10 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
             <ul className="p-1.5">
               {filtered.length === 0 && (
                 <li className="px-2 py-6 text-center text-[11px] text-muted-foreground">
-                  {localization.routes.emulators.components.tagScenario.scenarioEditor.emptySearchMessage}
+                  {
+                    localization.routes.emulators.components.tagScenario.scenarioEditor
+                      .emptySearchMessage
+                  }
                 </li>
               )}
               {filtered.map(({ seg, idx }) => {
@@ -418,7 +471,8 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                     className="h-7 w-7"
                     onClick={() => duplicateSeg(selectedIdx)}
                     title={
-                      localization.routes.emulators.components.tagScenario.scenarioEditor.duplicateMenuLabel
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .duplicateMenuLabel
                     }
                   >
                     <Copy className="h-3.5 w-3.5" />
@@ -430,7 +484,8 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                     onClick={() => move(selectedIdx, -1)}
                     disabled={selectedIdx === 0}
                     title={
-                      localization.routes.emulators.components.tagScenario.scenarioEditor.moveUpMenuLabel
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .moveUpMenuLabel
                     }
                   >
                     <ArrowUp className="h-3.5 w-3.5" />
@@ -442,7 +497,8 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                     onClick={() => move(selectedIdx, 1)}
                     disabled={selectedIdx === segments.length - 1}
                     title={
-                      localization.routes.emulators.components.tagScenario.scenarioEditor.moveDownMenuLabel
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .moveDownMenuLabel
                     }
                   >
                     <ArrowDown className="h-3.5 w-3.5" />
@@ -453,7 +509,8 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                     className="h-7 w-7 hover:text-signal-offline"
                     onClick={() => removeSeg(selectedIdx)}
                     title={
-                      localization.routes.emulators.components.tagScenario.scenarioEditor.deleteMenuLabel
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .deleteMenuLabel
                     }
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -464,20 +521,27 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
               <div className="mb-3 grid grid-cols-3 gap-2">
                 <div className="col-span-1 space-y-1">
                   <Label className="text-[11px]">
-                    {localization.routes.emulators.components.tagScenario.scenarioEditor.labelFieldLabel}
+                    {
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .labelFieldLabel
+                    }
                   </Label>
                   <Input
                     value={selected.label ?? ''}
                     onChange={(e) => updateSeg(selectedIdx, { label: e.target.value })}
                     placeholder={
-                      localization.routes.emulators.components.tagScenario.scenarioEditor.labelPlaceholder
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .labelPlaceholder
                     }
                     className="h-8 text-xs"
                   />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px]">
-                    {localization.routes.emulators.components.tagScenario.scenarioEditor.durationLabel}
+                    {
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .durationLabel
+                    }
                   </Label>
                   <Input
                     type="number"
@@ -493,7 +557,10 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px]">
-                    {localization.routes.emulators.components.tagScenario.scenarioEditor.durationUnitLabel}
+                    {
+                      localization.routes.emulators.components.tagScenario.scenarioEditor
+                        .durationUnitLabel
+                    }
                   </Label>
                   <Select
                     value={splitDuration(selected.duration).u}
@@ -507,10 +574,16 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="sec">
-                        {localization.routes.emulators.components.tagScenario.scenarioEditor.secondsUnitLabel}
+                        {
+                          localization.routes.emulators.components.tagScenario.scenarioEditor
+                            .secondsUnitLabel
+                        }
                       </SelectItem>
                       <SelectItem value="min">
-                        {localization.routes.emulators.components.tagScenario.scenarioEditor.minutesUnitLabel}
+                        {
+                          localization.routes.emulators.components.tagScenario.scenarioEditor
+                            .minutesUnitLabel
+                        }
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -521,6 +594,10 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
                 value={selected.calc}
                 onChange={(calc) => updateSeg(selectedIdx, { calc })}
                 tagType={tagType}
+                specialParameter={specialParameter}
+                visibleCncPrograms={visibleCncPrograms}
+                sharedCncPrograms={sharedCncPrograms}
+                emulatorCncPrograms={emulatorCncPrograms}
                 calcTypes={scenarioCalcTypes}
                 hideDuration
                 compact
@@ -528,7 +605,10 @@ export function ScenarioEditor({ value, onChange, tagType }: Props) {
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-border bg-muted/10 p-6 text-center text-xs text-muted-foreground">
-              {localization.routes.emulators.components.tagScenario.scenarioEditor.emptyTimelineMessage}
+              {
+                localization.routes.emulators.components.tagScenario.scenarioEditor
+                  .emptyTimelineMessage
+              }
             </div>
           )}
         </div>

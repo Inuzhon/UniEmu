@@ -1,6 +1,18 @@
+import { useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, FileText, Folder, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -8,15 +20,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { CalcType, TagCalcConfig, TagType } from '@/types/uniemu';
+import type {
+  CalcType,
+  CncProgram,
+  SpecialParameter,
+  TagCalcConfig,
+  TagType,
+} from '@/types/uniemu';
 import { localization } from '@/localization';
+import { cn } from '@/lib/utils';
 import { getCalcTypeLabel } from './calcLabels';
 
 const sanitizeStaticValue = (tagType: TagType, value: string) => {
   if (tagType === 'int') {
-    return value
-      .replace(/[^\d-]/g, '')
-      .replace(/(?!^)-/g, '');
+    return value.replace(/[^\d-]/g, '').replace(/(?!^)-/g, '');
   }
 
   if (tagType === 'double') {
@@ -36,18 +53,44 @@ interface Props {
   value: TagCalcConfig;
   onChange: (next: TagCalcConfig) => void;
   tagType: TagType;
+  specialParameter?: SpecialParameter;
+  visibleCncPrograms?: CncProgram[];
+  sharedCncPrograms?: CncProgram[];
+  emulatorCncPrograms?: CncProgram[];
   calcTypes: readonly CalcType[];
   /** Скрыть поле «Duration» (актуально внутри сегмента сценария — длительность задаётся отдельно). */
   hideDuration?: boolean;
   compact?: boolean;
 }
 
-export function CalcConfigFields({ value, onChange, tagType, calcTypes, hideDuration, compact }: Props) {
+export function CalcConfigFields({
+  value,
+  onChange,
+  tagType,
+  specialParameter = 'None',
+  visibleCncPrograms = [],
+  sharedCncPrograms = [],
+  emulatorCncPrograms = [],
+  calcTypes,
+  hideDuration,
+  compact,
+}: Props) {
+  const [programPickerOpen, setProgramPickerOpen] = useState(false);
   const set = (patch: Partial<TagCalcConfig>) => onChange({ ...value, ...patch });
   const numField = (v: number | undefined) => (v ?? 0).toString();
   const labelCls = compact ? 'text-[11px]' : 'text-xs';
   const inputCls = compact ? 'h-8 font-mono text-xs' : 'font-mono';
   const isStatic = value.type === 'Static';
+  const isProgramNameParameter =
+    specialParameter === 'PrgName' || specialParameter === 'Subprogram';
+  const selectedCncProgram = useMemo(
+    () =>
+      visibleCncPrograms.find(
+        (program) =>
+          program.name.localeCompare(value.start ?? '', undefined, { sensitivity: 'accent' }) === 0
+      ),
+    [value.start, visibleCncPrograms]
+  );
 
   const showStartFinish =
     value.type === 'Line' ||
@@ -70,6 +113,10 @@ export function CalcConfigFields({ value, onChange, tagType, calcTypes, hideDura
     value.type === 'Sinusoid' || value.type === 'Square' || value.type === 'Sawtooth';
 
   const renderStaticInput = () => {
+    if (tagType === 'string' && isProgramNameParameter) {
+      return renderProgramNamePicker();
+    }
+
     if (tagType === 'bool') {
       return (
         <div className="flex h-8 items-center rounded-md border border-border bg-background px-3">
@@ -91,6 +138,142 @@ export function CalcConfigFields({ value, onChange, tagType, calcTypes, hideDura
       />
     );
   };
+
+  const renderProgramOption = (program: CncProgram) => (
+    <CommandItem
+      key={program.id}
+      value={`${program.scope}:${program.name}:${program.description}`}
+      onSelect={() => {
+        set({ start: program.name });
+        setProgramPickerOpen(false);
+      }}
+      className="items-start gap-2 py-2"
+    >
+      <FileText className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-mono text-xs">{program.name}</div>
+        {program.description && (
+          <div className="truncate text-[10px] text-muted-foreground">{program.description}</div>
+        )}
+      </div>
+      <Check
+        className={cn(
+          'mt-0.5 h-3.5 w-3.5',
+          value.start === program.name ? 'opacity-100' : 'opacity-0'
+        )}
+      />
+    </CommandItem>
+  );
+
+  const renderProgramNamePicker = () => (
+    <Popover open={programPickerOpen} onOpenChange={setProgramPickerOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          className={cn('w-full justify-between gap-2 font-mono text-xs', compact ? 'h-8' : 'h-9')}
+        >
+          <span className={cn('truncate', !value.start && 'font-sans text-muted-foreground')}>
+            {value.start ||
+              localization.routes.emulators.components.addTagDrawer.programPickerSelectPlaceholder}
+          </span>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput
+            placeholder={
+              localization.routes.emulators.components.addTagDrawer.programPickerSearchPlaceholder
+            }
+          />
+          <CommandList
+            onWheel={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              event.currentTarget.scrollTop += event.deltaY;
+            }}
+          >
+            <CommandEmpty>
+              {localization.routes.emulators.components.addTagDrawer.programPickerEmpty}
+            </CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="clear-program-selection"
+                onSelect={() => {
+                  set({ start: '' });
+                  setProgramPickerOpen(false);
+                }}
+                className="items-center gap-2 py-2"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-xs">
+                  {
+                    localization.routes.emulators.components.addTagDrawer
+                      .programPickerClearSelection
+                  }
+                </span>
+                <Check className={cn('h-3.5 w-3.5', !value.start ? 'opacity-100' : 'opacity-0')} />
+              </CommandItem>
+            </CommandGroup>
+            {value.start && !selectedCncProgram && (
+              <CommandGroup
+                heading={
+                  localization.routes.emulators.components.addTagDrawer.programPickerCurrentGroup
+                }
+              >
+                <CommandItem
+                  value={`current:${value.start}`}
+                  onSelect={() => setProgramPickerOpen(false)}
+                  className="items-start gap-2 py-2"
+                >
+                  <FileText className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-mono text-xs">{value.start}</div>
+                    <div className="truncate text-[10px] text-muted-foreground">
+                      {
+                        localization.routes.emulators.components.addTagDrawer
+                          .programPickerCurrentMissing
+                      }
+                    </div>
+                  </div>
+                  <Check className="mt-0.5 h-3.5 w-3.5" />
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {sharedCncPrograms.length > 0 && (
+              <CommandGroup
+                heading={
+                  <span className="flex items-center gap-1.5">
+                    <Folder className="h-3 w-3" />
+                    {localization.routes.emulators.components.addTagDrawer.programPickerSharedGroup}
+                  </span>
+                }
+              >
+                {sharedCncPrograms.map((program) => renderProgramOption(program))}
+              </CommandGroup>
+            )}
+            {emulatorCncPrograms.length > 0 && (
+              <CommandGroup
+                heading={
+                  <span className="flex items-center gap-1.5">
+                    <Folder className="h-3 w-3" />
+                    {
+                      localization.routes.emulators.components.addTagDrawer
+                        .programPickerEmulatorGroup
+                    }
+                  </span>
+                }
+              >
+                {emulatorCncPrograms.map((program) => renderProgramOption(program))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <div className="space-y-3">
@@ -117,11 +300,13 @@ export function CalcConfigFields({ value, onChange, tagType, calcTypes, hideDura
           <div className="space-y-1">
             <Label className={labelCls}>
               {value.type === 'Sequence'
-                ? localization.routes.emulators.components.tagScenario.calcConfigFields.sequenceJsonLabel
+                ? localization.routes.emulators.components.tagScenario.calcConfigFields
+                    .sequenceJsonLabel
                 : value.type === 'Random'
                   ? localization.routes.emulators.components.addTagDrawer.minLabel
                   : isStatic
-                    ? localization.routes.emulators.components.tagScenario.calcConfigFields.valueLabel
+                    ? localization.routes.emulators.components.tagScenario.calcConfigFields
+                        .valueLabel
                     : localization.routes.emulators.components.addTagDrawer.startLabel}
             </Label>
             {isStatic ? (
@@ -177,7 +362,10 @@ export function CalcConfigFields({ value, onChange, tagType, calcTypes, hideDura
           </div>
           <div className="space-y-1">
             <Label className={labelCls}>
-              {localization.routes.emulators.components.tagScenario.calcConfigFields.periodSecondsLabel}
+              {
+                localization.routes.emulators.components.tagScenario.calcConfigFields
+                  .periodSecondsLabel
+              }
             </Label>
             <Input
               type="number"
@@ -207,7 +395,10 @@ export function CalcConfigFields({ value, onChange, tagType, calcTypes, hideDura
       {showDurationField && (
         <div className="space-y-1">
           <Label className={labelCls}>
-            {localization.routes.emulators.components.tagScenario.calcConfigFields.durationSecondsLabel}
+            {
+              localization.routes.emulators.components.tagScenario.calcConfigFields
+                .durationSecondsLabel
+            }
           </Label>
           <Input
             type="number"
@@ -222,7 +413,10 @@ export function CalcConfigFields({ value, onChange, tagType, calcTypes, hideDura
       {!isStatic && (
         <div className="space-y-1">
           <Label className={labelCls}>
-            {localization.routes.emulators.components.tagScenario.calcConfigFields.distortionPercentLabel}
+            {
+              localization.routes.emulators.components.tagScenario.calcConfigFields
+                .distortionPercentLabel
+            }
           </Label>
           <Input
             type="number"
