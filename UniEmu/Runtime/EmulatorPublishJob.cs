@@ -129,12 +129,12 @@ public sealed class EmulatorPublishJob(
     {
         var valuesByTagId = new Dictionary<string, GeneratedTagValue>(StringComparer.Ordinal);
 
-        foreach (var tag in emulator.Tags.Where(tag => !ShouldCalculateScriptAtPublish(emulator, tag)))
+        foreach (var tag in emulator.Tags.Where(tag => !IsScriptBackedTag(tag)))
         {
             valuesByTagId[tag.Id] = await BuildTagValueAsync(emulator, tag, timestamp, scheduledAt, cancellationToken);
         }
 
-        foreach (var tag in emulator.Tags.Where(tag => ShouldCalculateScriptAtPublish(emulator, tag)))
+        foreach (var tag in emulator.Tags.Where(IsScriptBackedTag))
         {
             valuesByTagId[tag.Id] = await BuildTagValueAsync(emulator, tag, timestamp, scheduledAt, cancellationToken);
         }
@@ -179,7 +179,7 @@ public sealed class EmulatorPublishJob(
             }
         }
 
-        if (stateStore.TryGet(emulator.Id, tag.Id, out var runtimeValue) && ShouldUseStoredValue(emulator, tag))
+        if (stateStore.TryGet(emulator.Id, tag.Id, out var runtimeValue) && ShouldUseStoredValue(emulator, tag, runtimeValue, scheduledAt))
         {
             return FromRuntimeValue(tag, runtimeValue);
         }
@@ -394,8 +394,14 @@ public sealed class EmulatorPublishJob(
     /// </summary>
     /// <param name="emulator">Эмулятор, задающий интервал публикации.</param>
     /// <param name="tag">Конфигурация тега.</param>
+    /// <param name="runtimeValue">Последнее сохраненное runtime-значение тега.</param>
+    /// <param name="scheduledAt">Плановое время текущей публикации.</param>
     /// <returns><see langword="true"/>, если значение должно браться из runtime-хранилища.</returns>
-    private static bool ShouldUseStoredValue(EmulatorEntity emulator, EmulatorTagEntity tag)
+    private static bool ShouldUseStoredValue(
+        EmulatorEntity emulator,
+        EmulatorTagEntity tag,
+        TagRuntimeValue runtimeValue,
+        DateTimeOffset scheduledAt)
     {
         var trigger = GetTrigger(tag);
 
@@ -406,7 +412,13 @@ public sealed class EmulatorPublishJob(
 
         var tagInterval = ToTimeSpan(trigger);
         var publishInterval = TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec));
-        return Math.Abs((tagInterval - publishInterval).TotalMilliseconds) > 0.5;
+        if (Math.Abs((tagInterval - publishInterval).TotalMilliseconds) <= 0.5)
+        {
+            return false;
+        }
+
+        var age = scheduledAt - runtimeValue.Timestamp;
+        return age <= tagInterval.Add(TimeSpan.FromMilliseconds(50));
     }
 
     /// <summary>
@@ -447,8 +459,7 @@ public sealed class EmulatorPublishJob(
     /// <returns><see langword="true"/>, если скрипт должен рассчитываться в текущем снимке публикации.</returns>
     private static bool ShouldCalculateScriptAtPublish(EmulatorEntity emulator, EmulatorTagEntity tag)
     {
-        var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
-        if (source is not (TagSource.Script or TagSource.Formula or TagSource.FormulaScript))
+        if (!IsScriptBackedTag(tag))
         {
             return false;
         }
@@ -462,6 +473,17 @@ public sealed class EmulatorPublishJob(
         var tagInterval = ToTimeSpan(trigger);
         var publishInterval = TimeSpan.FromSeconds(Math.Max(1, emulator.IntervalSec));
         return Math.Abs((tagInterval - publishInterval).TotalMilliseconds) <= 0.5;
+    }
+
+    /// <summary>
+    /// Проверяет, выполняется ли тег через CSX-скрипт или формулу, зависящую от снимка других тегов.
+    /// </summary>
+    /// <param name="tag">Конфигурация тега.</param>
+    /// <returns><see langword="true"/>, если тег нужно рассчитывать после базовых источников.</returns>
+    private static bool IsScriptBackedTag(EmulatorTagEntity tag)
+    {
+        var source = UniEmuJson.EnumValue<TagSource>(tag.Source);
+        return source is TagSource.Script or TagSource.Formula or TagSource.FormulaScript;
     }
 
     /// <summary>
