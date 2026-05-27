@@ -13,7 +13,7 @@ test('special parameter select renders human-readable labels', async () => {
   assert.match(optionsSource, /value: 'PrgName', label: 'Имя УП'/);
   assert.match(optionsSource, /value: 'FrameNum', label: 'Номер кадра УП'/);
   assert.match(optionsSource, /value: 'FrameText', label: 'Текст кадра УП'/);
-  assert.doesNotMatch(optionsSource, /value: 'Subprogram', label: 'Имя подпрограммы'/);
+  assert.match(optionsSource, /value: 'Subprogram', label: 'Имя подпрограммы'/);
   assert.doesNotMatch(optionsSource, /value: 'PartCounter'/);
   assert.match(componentSource, /SPECIAL_PARAMETER_OPTIONS\.map\(\(option\) =>/);
   assert.match(componentSource, /value=\{option\.value\}/);
