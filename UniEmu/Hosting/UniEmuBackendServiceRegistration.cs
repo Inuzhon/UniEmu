@@ -1,5 +1,6 @@
 using Autofac;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using UniEmu.Data;
 using UniEmu.Features.CncPrograms;
 using UniEmu.Features.Common;
@@ -52,7 +53,8 @@ public static class UniEmuBackendServiceRegistration
                 context.Resolve<CsxScriptDirectiveValidator>(),
                 context.Resolve<CsxScriptSecurityValidator>(),
                 context.ResolveOptional<ITagScriptRestOperations>(),
-                context.Resolve<TagPreviewFlushService>()))
+                context.Resolve<TagPreviewFlushService>(),
+                TimeSpan.FromSeconds(context.Resolve<IOptions<UniEmuOptions>>().Value.ScriptExecutionTimeoutSeconds)))
             .AsSelf()
             .InstancePerLifetimeScope();
         container.RegisterType<TagRuntimeStatePersistenceService>().AsSelf().InstancePerLifetimeScope();

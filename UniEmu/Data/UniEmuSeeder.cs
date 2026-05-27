@@ -207,7 +207,7 @@ public static partial class UniEmuSeeder
             FormulaJson = formula is null ? null : UniEmuJson.Serialize(formula),
             ScenarioJson = scenario is null ? null : UniEmuJson.Serialize(scenario),
             RoundDigits = roundDigits,
-            SpecialParameter = specialParameter is null ? null : UniEmuJson.EnumString(specialParameter.Value),
+            SpecialParameter = UniEmuJson.EnumString(specialParameter ?? SpecialParameter.None),
             Description = description,
         };
     }

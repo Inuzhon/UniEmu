@@ -43,6 +43,14 @@ public sealed class UniEmuSeederTests
                 .ToListAsync();
             var tags = await db.EmulatorTags.ToListAsync();
             var scripts = await db.ScriptFiles.ToListAsync();
+            var noneSpecialParameter = UniEmuJson.EnumString(SpecialParameter.None);
+
+            Assert.All(
+                tags,
+                tag => Assert.False(
+                    string.IsNullOrWhiteSpace(tag.SpecialParameter),
+                    $"{tag.EmulatorId}/{tag.Key} has empty special parameter."));
+            Assert.Contains(tags, tag => tag.SpecialParameter == noneSpecialParameter);
 
             Assert.Equal(
                 [
