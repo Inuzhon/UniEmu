@@ -48,3 +48,14 @@ test('scripts and cnc pages consume the shared storage primitives', async () => 
     assert.match(source, /StorageEmptyHint/);
   }
 });
+
+test('shared storage create requests keep nullable scope fields in the JSON payload', async () => {
+  const apiSource = await readFile(join(srcDir, 'api', 'uniemu-api.ts'), 'utf8');
+
+  assert.match(apiSource, /type CreateScriptRequest = \{ name: string; scope: ScriptScope; emulatorId\?: string \| null \}/);
+  assert.match(apiSource, /emulatorId\?: string \| null/);
+  assert.match(apiSource, /normalizeScriptRequest/);
+  assert.match(apiSource, /normalizeCncProgramRequest/);
+  assert.match(apiSource, /emulatorId: body\.scope === 'shared' \? null : body\.emulatorId \?\? null/);
+  assert.match(apiSource, /JSON\.stringify\(normalizeCncProgramRequest\(body\)\)/);
+});

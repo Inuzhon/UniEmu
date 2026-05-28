@@ -16,16 +16,16 @@ type CreateEmulatorRequest = Pick<Emulator, 'name' | 'targetUrl' | 'intervalSec'
 type PatchEmulatorRequest = Partial<CreateEmulatorRequest>;
 type CreateTagRequest = Omit<EmulatorTag, 'id'>;
 type ReplaceTagRequest = Omit<EmulatorTag, 'id'>;
-type CreateScriptRequest = { name: string; scope: ScriptScope; emulatorId?: string };
+type CreateScriptRequest = { name: string; scope: ScriptScope; emulatorId?: string | null };
 type PatchScriptRequest = { name?: string; content?: string };
 type CreateCncProgramRequest = {
   name: string;
   scope: CncScope;
-  emulatorId?: string;
+  emulatorId?: string | null;
   content: string;
   sizeBytes: number;
-  isBinary?: boolean;
-  description?: string;
+  isBinary?: boolean | null;
+  description?: string | null;
 };
 type PatchCncProgramRequest = Partial<Pick<CncProgram, 'content' | 'description' | 'name'>>;
 type PushEventRequest = {
@@ -186,10 +186,27 @@ function getApiFieldLabel(field: string): string {
   const labels: Record<string, string> = {
     event: 'событие',
     cron: 'CRON-выражение',
+    emulatorId: 'ID эмулятора',
     intervalValue: 'значение интервала',
     intervalUnit: 'единица интервала',
   };
   return labels[field] ?? field;
+}
+
+function normalizeScriptRequest(body: CreateScriptRequest): CreateScriptRequest {
+  return {
+    ...body,
+    emulatorId: body.scope === 'shared' ? null : body.emulatorId ?? null,
+  };
+}
+
+function normalizeCncProgramRequest(body: CreateCncProgramRequest): CreateCncProgramRequest {
+  return {
+    ...body,
+    emulatorId: body.scope === 'shared' ? null : body.emulatorId ?? null,
+    isBinary: body.isBinary ?? null,
+    description: body.description ?? null,
+  };
 }
 
 const query = (params: Record<string, string | number | undefined>) => {
@@ -250,7 +267,10 @@ export const uniEmuApi = {
   scripts: {
     list: () => request<ScriptFile[]>('/api/scripts'),
     create: (body: CreateScriptRequest) =>
-      request<ScriptFile>('/api/scripts', { method: 'POST', body: JSON.stringify(body) }),
+      request<ScriptFile>('/api/scripts', {
+        method: 'POST',
+        body: JSON.stringify(normalizeScriptRequest(body)),
+      }),
     patch: (scriptId: string, body: PatchScriptRequest) =>
       request<ScriptFile>(`/api/scripts/${encodeURIComponent(scriptId)}`, {
         method: 'PATCH',
@@ -262,11 +282,14 @@ export const uniEmuApi = {
   cncPrograms: {
     list: () => request<CncProgram[]>('/api/cnc-programs'),
     create: (body: CreateCncProgramRequest) =>
-      request<CncProgram>('/api/cnc-programs', { method: 'POST', body: JSON.stringify(body) }),
+      request<CncProgram>('/api/cnc-programs', {
+        method: 'POST',
+        body: JSON.stringify(normalizeCncProgramRequest(body)),
+      }),
     createForEmulator: (emulatorId: string, body: CreateCncProgramRequest) =>
       request<CncProgram>(`/api/emulators/${encodeURIComponent(emulatorId)}/cnc-programs`, {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(normalizeCncProgramRequest({ ...body, scope: 'emulator', emulatorId })),
       }),
     patch: (programId: string, body: PatchCncProgramRequest) =>
       request<CncProgram>(`/api/cnc-programs/${encodeURIComponent(programId)}`, {

@@ -13,15 +13,8 @@ public static class UniEmuJson
     /// </summary>
     public static readonly JsonSerializerOptions s_options = new(JsonSerializerDefaults.Web)
     {
-        AllowDuplicateProperties = false,
-        RespectNullableAnnotations = true,
-        RespectRequiredConstructorParameters = true,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         Converters = { new JsonStringEnumConverter() },
     };
-
-    // Persisted tag configs may come from older versions with omitted optional constructor members.
-    private static readonly JsonSerializerOptions s_deserializeOptions = CreateDeserializeOptions();
 
     /// <summary>
     /// Добавляет в переданные настройки обязательные для UniEmu JSON-конвертеры.
@@ -29,11 +22,6 @@ public static class UniEmuJson
     /// <param name="options">Настройки сериализации, которые нужно дополнить.</param>
     public static void Apply(JsonSerializerOptions options)
     {
-        options.AllowDuplicateProperties = false;
-        options.RespectNullableAnnotations = true;
-        options.RespectRequiredConstructorParameters = true;
-        options.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
-
         if (!options.Converters.Any(converter => converter is JsonStringEnumConverter))
         {
             options.Converters.Add(new JsonStringEnumConverter());
@@ -56,7 +44,7 @@ public static class UniEmuJson
     /// <returns>Десериализованное значение либо значение по умолчанию для пустой строки.</returns>
     public static T? Deserialize<T>(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? default : JsonSerializer.Deserialize<T>(value, s_deserializeOptions);
+        return string.IsNullOrWhiteSpace(value) ? default : JsonSerializer.Deserialize<T>(value, s_options);
     }
 
     /// <summary>
@@ -81,13 +69,5 @@ public static class UniEmuJson
         where T : struct, Enum
     {
         return JsonSerializer.Deserialize<T>($"\"{value}\"", s_options);
-    }
-
-    private static JsonSerializerOptions CreateDeserializeOptions()
-    {
-        return new JsonSerializerOptions(s_options)
-        {
-            RespectRequiredConstructorParameters = false,
-        };
     }
 }
