@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -53,7 +53,9 @@ public sealed class TagsControllerTests
     [Fact]
     public async Task Create_ReturnsBadRequest_WhenNameOrKeyIsMissing()
     {
-        var controller = new TagsController(null!);
+        await using var fixture = await TagsControllerDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var controller = new TagsController(fixture.CreateService(db));
 
         var result = await controller.Create(
             "em-1",
@@ -61,7 +63,7 @@ public sealed class TagsControllerTests
             CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("Name and key are required.", badRequest.Value);
+        Assert.Equal("Имя тега обязательно.", badRequest.Value);
     }
 
     [Fact]

@@ -62,30 +62,30 @@ export type TagIntervalUnit = 'ms' | 'sec' | 'min';
 
 export interface TagTrigger {
   mode: TagTriggerMode;
-  event?: TagTriggerEvent;        // для mode === "once"
-  cron?: string;                  // для mode === "cron", напр. "0 0 * * *"
-  intervalValue?: number;         // для mode === "interval"
-  intervalUnit?: TagIntervalUnit; // для mode === "interval"
+  event?: TagTriggerEvent | null;        // для mode === "once"
+  cron?: string | null;                  // для mode === "cron", напр. "0 0 * * *"
+  intervalValue?: number | null;         // для mode === "interval"
+  intervalUnit?: TagIntervalUnit | null; // для mode === "interval"
 }
 
 /** Параметры формулы расчёта значения. */
 export interface TagCalcConfig {
   type: CalcType;
-  start?: string;       // строковое представление (число/строка/JSON-массив для Sequence)
-  finish?: string;
-  duration?: number;    // сек
-  amplitude?: number;
-  period?: number;      // сек
-  curvature?: number;
-  distortion?: number;  // 0..100 (%)
+  start?: string | null;       // строковое представление (число/строка/JSON-массив для Sequence)
+  finish?: string | null;
+  duration?: number | null;    // сек
+  amplitude?: number | null;
+  period?: number | null;      // сек
+  curvature?: number | null;
+  distortion?: number | null;  // 0..100 (%)
 }
 
 /** Описание формульного источника (script | formula | formulaScript). */
 export interface TagFormulaConfig {
   /** Подключённый существующий .csx-скрипт из общего хранилища. */
-  scriptId?: string;
+  scriptId?: string | null;
   /** Кастомный inline-скрипт, если scriptId не выбран. */
-  inlineScript?: string;
+  inlineScript?: string | null;
 }
 
 /** Один сегмент таймлайн-сценария: формула + длительность. */
@@ -93,7 +93,7 @@ export interface TagScenarioSegment {
   id: string;
   duration: number;        // секунды
   calc: TagCalcConfig;
-  label?: string;
+  label?: string | null;
 }
 
 /**
@@ -110,7 +110,7 @@ export interface TagScenarioConfig {
   segments: TagScenarioSegment[];
   continueOnFormulaEnd: ContinueOnFormulaEnd;
   /** Опциональное стартовое значение до первого сегмента. */
-  startValue?: string;
+  startValue?: string | null;
 }
 
 /**
@@ -171,12 +171,12 @@ export interface EmulatorTag {
   source: TagSource;
   preview: string;
   trigger: TagTrigger;
-  calc?: TagCalcConfig;          // для source === "generator" | "formula" | "formulaScript"
-  formula?: TagFormulaConfig;    // для source === "formula" | "script" | "formulaScript"
-  scenario?: TagScenarioConfig;  // для source === "scenario"
+  calc?: TagCalcConfig | null;          // для source === "generator" | "formula" | "formulaScript"
+  formula?: TagFormulaConfig | null;    // для source === "formula" | "script" | "formulaScript"
+  scenario?: TagScenarioConfig | null;  // для source === "scenario"
   /** Специализированный параметр UniEmu protocol (отдельное поле). */
-  specialParameter?: SpecialParameter;
-  description?: string;
+  specialParameter?: SpecialParameter | null;
+  description?: string | null;
   /** Если false — тег не отправляется в SCADA-payload. По умолчанию true. */
   enabled?: boolean;
   roundDigits?: number | null;

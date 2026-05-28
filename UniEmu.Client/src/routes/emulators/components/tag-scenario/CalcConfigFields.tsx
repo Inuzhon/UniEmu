@@ -29,6 +29,13 @@ import type {
 } from '@/types/uniemu';
 import { localization } from '@/localization';
 import { cn } from '@/lib/utils';
+import {
+  clampCurvature,
+  clampDistortionPercent,
+  clampDurationSeconds,
+  clampNonNegativeMagnitude,
+  clampPeriodSeconds,
+} from '../tag-editor/tagValidation';
 import { getCalcTypeLabel } from './calcLabels';
 
 const sanitizeStaticValue = (tagType: TagType, value: string) => {
@@ -356,7 +363,10 @@ export function CalcConfigFields({
             <Input
               type="number"
               value={numField(value.amplitude)}
-              onChange={(e) => set({ amplitude: Number(e.target.value) || 0 })}
+              min={0}
+              onChange={(e) =>
+                set({ amplitude: clampNonNegativeMagnitude(Number(e.target.value) || 0) })
+              }
               className={inputCls}
             />
           </div>
@@ -371,7 +381,7 @@ export function CalcConfigFields({
               type="number"
               min={1}
               value={numField(value.period)}
-              onChange={(e) => set({ period: Math.max(1, Number(e.target.value) || 1) })}
+              onChange={(e) => set({ period: clampPeriodSeconds(Number(e.target.value) || 1) })}
               className={inputCls}
             />
           </div>
@@ -385,8 +395,11 @@ export function CalcConfigFields({
           </Label>
           <Input
             type="number"
+            min={0.1}
+            max={20}
+            step={0.1}
             value={numField(value.curvature)}
-            onChange={(e) => set({ curvature: Number(e.target.value) || 0 })}
+            onChange={(e) => set({ curvature: clampCurvature(Number(e.target.value) || 2) })}
             className={inputCls}
           />
         </div>
@@ -402,9 +415,10 @@ export function CalcConfigFields({
           </Label>
           <Input
             type="number"
-            min={0}
+            min={1}
+            max={86400}
             value={numField(value.duration)}
-            onChange={(e) => set({ duration: Number(e.target.value) || 0 })}
+            onChange={(e) => set({ duration: clampDurationSeconds(Number(e.target.value) || 1) })}
             className={inputCls}
           />
         </div>
@@ -423,7 +437,9 @@ export function CalcConfigFields({
             min={0}
             max={100}
             value={numField(value.distortion)}
-            onChange={(e) => set({ distortion: Number(e.target.value) || 0 })}
+            onChange={(e) =>
+              set({ distortion: clampDistortionPercent(Number(e.target.value) || 0) })
+            }
             className={inputCls}
           />
         </div>

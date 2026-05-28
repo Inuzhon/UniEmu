@@ -30,7 +30,7 @@ import type {
   TagScenarioSegment,
   TagType,
 } from '@/types/uniemu';
-import { getScenarioCalcTypes } from '../tag-editor/tagValidation';
+import { clampDurationSeconds, getScenarioCalcTypes } from '../tag-editor/tagValidation';
 import { CalcConfigFields } from './CalcConfigFields';
 import { ScenarioPreviewChart, ScenarioSparkline } from './ScenarioPreviewChart';
 import {
@@ -545,12 +545,15 @@ export function ScenarioEditor({
                   </Label>
                   <Input
                     type="number"
-                    min={0}
+                    min={1}
+                    max={86400}
                     value={splitDuration(selected.duration).v}
                     onChange={(e) => {
-                      const nv = Number(e.target.value) || 0;
+                      const nv = Number(e.target.value) || 1;
                       const u = splitDuration(selected.duration).u;
-                      updateSeg(selectedIdx, { duration: u === 'min' ? nv * 60 : nv });
+                      updateSeg(selectedIdx, {
+                        duration: clampDurationSeconds(u === 'min' ? nv * 60 : nv),
+                      });
                     }}
                     className="h-8 font-mono text-xs"
                   />
@@ -566,7 +569,9 @@ export function ScenarioEditor({
                     value={splitDuration(selected.duration).u}
                     onValueChange={(nu) => {
                       const cur = splitDuration(selected.duration).v;
-                      updateSeg(selectedIdx, { duration: nu === 'min' ? cur * 60 : cur });
+                      updateSeg(selectedIdx, {
+                        duration: clampDurationSeconds(nu === 'min' ? cur * 60 : cur),
+                      });
                     }}
                   >
                     <SelectTrigger className="h-8 text-xs">

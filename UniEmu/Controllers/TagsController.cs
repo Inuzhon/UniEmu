@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using UniEmu.Contracts.Dtos;
 using UniEmu.Contracts.Requests;
 using UniEmu.Runtime.Scripting;
@@ -35,11 +35,6 @@ public sealed class TagsController(TagService service) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<EmulatorTagDto>> Create(string emulatorId, CreateTagRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Key))
-        {
-            return BadRequest("Name and key are required.");
-        }
-
         try
         {
             var tag = await service.CreateAsync(emulatorId, request, cancellationToken);

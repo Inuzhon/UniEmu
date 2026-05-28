@@ -41,7 +41,7 @@ class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly body: string,
+    public readonly body: string
   ) {
     super(message);
   }
@@ -59,7 +59,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new ApiError(extractApiErrorMessage(body, response.status, response.statusText), response.status, body);
+    throw new ApiError(
+      extractApiErrorMessage(body, response.status, response.statusText),
+      response.status,
+      body
+    );
   }
 
   if (response.status === 204) {
@@ -78,7 +82,11 @@ async function requestFile(path: string, fallbackFileName: string): Promise<Down
 
   if (!response.ok) {
     const body = await response.text();
-    throw new ApiError(extractApiErrorMessage(body, response.status, response.statusText), response.status, body);
+    throw new ApiError(
+      extractApiErrorMessage(body, response.status, response.statusText),
+      response.status,
+      body
+    );
   }
 
   const contentDisposition = response.headers.get('content-disposition');
@@ -107,6 +115,9 @@ function extractApiErrorMessage(body: string, status: number, statusText: string
     const parsed = JSON.parse(trimmed) as unknown;
     if (typeof parsed === 'string' && parsed.trim()) return parsed;
     if (parsed && typeof parsed === 'object') {
+      const validationErrors = extractValidationErrors(parsed);
+      if (validationErrors.length > 0) return validationErrors.join('\n');
+
       const message = 'message' in parsed ? parsed.message : undefined;
       if (typeof message === 'string' && message.trim()) return message;
 
@@ -118,6 +129,67 @@ function extractApiErrorMessage(body: string, status: number, statusText: string
   }
 
   return trimmed || fallback;
+}
+
+function extractValidationErrors(parsed: object): string[] {
+  const errors = 'errors' in parsed ? parsed.errors : undefined;
+  if (!errors || typeof errors !== 'object') return [];
+
+  const messages = Object.entries(errors)
+    .flatMap(([path, value]) => {
+      const rawMessages = Array.isArray(value) ? value : [value];
+      return rawMessages
+        .filter(
+          (message): message is string => typeof message === 'string' && message.trim().length > 0
+        )
+        .map((message) => humanizeValidationError(path, message));
+    })
+    .filter((message) => message.trim().length > 0);
+
+  const usefulMessages = messages.filter(
+    (message) => message !== 'Тело запроса не передано или не распознано.'
+  );
+  return usefulMessages.length > 0 ? usefulMessages : messages;
+}
+
+function humanizeValidationError(path: string, message: string): string {
+  if (/The request field is required\./i.test(message)) {
+    return 'Тело запроса не передано или не распознано.';
+  }
+
+  const missingPropertiesMatch = /missing required properties including:\s*(.+)\.?$/i.exec(message);
+  if (missingPropertiesMatch) {
+    const fields = Array.from(missingPropertiesMatch[1].matchAll(/'([^']+)'/g))
+      .map((match) => getApiFieldLabel(match[1]))
+      .join(', ');
+    return fields
+      ? `${getApiPathLabel(path)} заполнен не полностью: не переданы ${fields}.`
+      : `${getApiPathLabel(path)} заполнен не полностью.`;
+  }
+
+  if (/JSON deserialization/i.test(message)) {
+    return `${getApiPathLabel(path)} содержит некорректные данные.`;
+  }
+
+  return path ? `${getApiPathLabel(path)}: ${message}` : message;
+}
+
+function getApiPathLabel(path: string): string {
+  if (path === '$.trigger') return 'Триггер вычисления';
+  if (path === '$.calc') return 'Формула расчета';
+  if (path === '$.scenario') return 'Сценарий';
+  if (path === '$.formula') return 'Скрипт';
+  return 'Запрос';
+}
+
+function getApiFieldLabel(field: string): string {
+  const labels: Record<string, string> = {
+    event: 'событие',
+    cron: 'CRON-выражение',
+    intervalValue: 'значение интервала',
+    intervalUnit: 'единица интервала',
+  };
+  return labels[field] ?? field;
 }
 
 const query = (params: Record<string, string | number | undefined>) => {
@@ -132,7 +204,8 @@ const query = (params: Record<string, string | number | undefined>) => {
 export const uniEmuApi = {
   emulators: {
     list: () => request<Emulator[]>('/api/emulators'),
-    get: (emulatorId: string) => request<Emulator>(`/api/emulators/${encodeURIComponent(emulatorId)}`),
+    get: (emulatorId: string) =>
+      request<Emulator>(`/api/emulators/${encodeURIComponent(emulatorId)}`),
     create: (body: CreateEmulatorRequest) =>
       request<Emulator>('/api/emulators', { method: 'POST', body: JSON.stringify(body) }),
     patch: (emulatorId: string, body: PatchEmulatorRequest) =>
@@ -148,7 +221,7 @@ export const uniEmuApi = {
     downloadDispatcherTemplate: (emulatorId: string) =>
       requestFile(
         `/api/emulators/${encodeURIComponent(emulatorId)}/dispatcher-template`,
-        `Universal_template_machineID_${emulatorId}.xml`,
+        `Universal_template_machineID_${emulatorId}.xml`
       ),
     delete: (emulatorId: string) =>
       request<void>(`/api/emulators/${encodeURIComponent(emulatorId)}`, { method: 'DELETE' }),
@@ -164,12 +237,15 @@ export const uniEmuApi = {
     replace: (emulatorId: string, tagId: string, body: ReplaceTagRequest) =>
       request<EmulatorTag>(
         `/api/emulators/${encodeURIComponent(emulatorId)}/tags/${encodeURIComponent(tagId)}`,
-        { method: 'PATCH', body: JSON.stringify(body) },
+        { method: 'PATCH', body: JSON.stringify(body) }
       ),
     delete: (emulatorId: string, tagId: string) =>
-      request<void>(`/api/emulators/${encodeURIComponent(emulatorId)}/tags/${encodeURIComponent(tagId)}`, {
-        method: 'DELETE',
-      }),
+      request<void>(
+        `/api/emulators/${encodeURIComponent(emulatorId)}/tags/${encodeURIComponent(tagId)}`,
+        {
+          method: 'DELETE',
+        }
+      ),
   },
   scripts: {
     list: () => request<ScriptFile[]>('/api/scripts'),
@@ -180,7 +256,8 @@ export const uniEmuApi = {
         method: 'PATCH',
         body: JSON.stringify(body),
       }),
-    delete: (scriptId: string) => request<void>(`/api/scripts/${encodeURIComponent(scriptId)}`, { method: 'DELETE' }),
+    delete: (scriptId: string) =>
+      request<void>(`/api/scripts/${encodeURIComponent(scriptId)}`, { method: 'DELETE' }),
   },
   cncPrograms: {
     list: () => request<CncProgram[]>('/api/cnc-programs'),
@@ -201,7 +278,9 @@ export const uniEmuApi = {
   },
   telemetry: {
     list: (emulatorId: string, points = 60) =>
-      request<TelemetryPoint[]>(`/api/emulators/${encodeURIComponent(emulatorId)}/telemetry${query({ points })}`),
+      request<TelemetryPoint[]>(
+        `/api/emulators/${encodeURIComponent(emulatorId)}/telemetry${query({ points })}`
+      ),
   },
   events: {
     list: (limit = 200) => request<SystemEvent[]>(`/api/events${query({ limit })}`),
