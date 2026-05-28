@@ -27,20 +27,24 @@ public static partial class UniEmuSeeder
         var furnaces = CreateFurnaceSpecs();
         var cncMachines = CreateCncSpecs();
         var batchReactors = CreateBatchReactorSpecs();
+        var legacyOvens = CreateLegacyOvenSpecs();
 
         db.Emulators.AddRange(
             furnaces.Select(spec => CreateFurnaceEmulator(spec, now))
                 .Concat(cncMachines.Select(spec => CreateCncEmulator(spec, now)))
-                .Concat(batchReactors.Select(spec => CreateBatchReactorEmulator(spec, now))));
+                .Concat(batchReactors.Select(spec => CreateBatchReactorEmulator(spec, now)))
+                .Concat(legacyOvens.Select(spec => CreateLegacyOvenEmulator(spec, now))));
         db.EmulatorTags.AddRange(
             furnaces.SelectMany(CreateFurnaceTags)
                 .Concat(cncMachines.SelectMany(CreateCncTags))
-                .Concat(batchReactors.SelectMany(CreateBatchReactorTags)));
+                .Concat(batchReactors.SelectMany(CreateBatchReactorTags))
+                .Concat(legacyOvens.SelectMany(CreateLegacyOvenTags)));
         db.ScriptFiles.AddRange(
             CreateSharedScripts(now)
                 .Concat(furnaces.SelectMany(spec => CreateFurnaceScripts(spec, now)))
                 .Concat(cncMachines.SelectMany(spec => CreateCncScripts(spec, now)))
-                .Concat(batchReactors.SelectMany(spec => CreateBatchReactorScripts(spec, now))));
+                .Concat(batchReactors.SelectMany(spec => CreateBatchReactorScripts(spec, now)))
+                .Concat(legacyOvens.SelectMany(spec => CreateLegacyOvenScripts(spec, now))));
         db.CncPrograms.AddRange(CreateCncPrograms(cncMachines, now));
         //db.SystemEvents.AddRange(
         //    CreateFurnaceSeedEvents(furnaces, now)

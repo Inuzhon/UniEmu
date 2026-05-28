@@ -54,6 +54,7 @@ public sealed class UniEmuSeederTests
 
             Assert.Equal(
                 [
+                    "Индустриальная печь Oven1",
                     "Печь отпуска 2",
                     "Печь пайки 3",
                     "Печь цементации 1",
@@ -81,6 +82,12 @@ public sealed class UniEmuSeederTests
                 var batchTags = tags.Where(tag => tag.EmulatorId == emulator.Id).ToList();
                 AssertBatchReactorTagSetIsComplete(batchTags, scripts, emulator.Id);
             }
+
+            var legacyOven = emulators.Single(emulator => emulator.ProtocolId == 13);
+            AssertLegacyOvenTagSetIsComplete(
+                tags.Where(tag => tag.EmulatorId == legacyOven.Id).ToList(),
+                scripts,
+                legacyOven.Id);
 
             var carburizingEmulatorId = emulators.Single(emulator => emulator.Name == "Печь цементации 1").Id;
             var carburizingTemperature = tags.Single(tag =>
@@ -370,6 +377,55 @@ public sealed class UniEmuSeederTests
                 Assert.Equal(tag.Key, value.Key);
                 Assert.NotNull(value.Value);
             }
+        }
+    }
+
+    [Fact]
+    public async Task SeedAsync_LegacyOvenControllerScriptUpdatesStaticTags()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            await db.Database.MigrateAsync();
+
+            await UniEmuSeeder.SeedAsync(db);
+        }
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            var emulator = await db.Emulators
+                .Include(e => e.Tags)
+                .SingleAsync(e => e.Name == "Индустриальная печь Oven1");
+            var stateStore = new TagRuntimeStateStore();
+            var dataCache = new CachedUniEmuDataService(db, new MemoryCache(new MemoryCacheOptions()));
+            var service = new TagScriptExecutionService(db, dataCache, stateStore, new CompiledTagScriptCache());
+            var scriptTag = emulator.Tags.Single(tag => tag.Key == "Script");
+
+            var first = await GenerateScriptTagWithDiagnosticsAsync(
+                service,
+                emulator,
+                scriptTag,
+                DateTimeOffset.Parse("2026-05-24T12:00:00Z"));
+            var second = await GenerateScriptTagWithDiagnosticsAsync(
+                service,
+                emulator,
+                scriptTag,
+                DateTimeOffset.Parse("2026-05-24T12:00:01Z"));
+
+            Assert.Equal(0, first.Value);
+            Assert.Equal(1, second.Value);
+            Assert.False(scriptTag.Enabled);
+            Assert.Equal("1", emulator.Tags.Single(tag => tag.Key == "Count").Preview);
+            Assert.Equal("20", emulator.Tags.Single(tag => tag.Key == "Temperature").Preview);
+            Assert.Equal("150", emulator.Tags.Single(tag => tag.Key == "Setpoint").Preview);
+            Assert.Equal("1", emulator.Tags.Single(tag => tag.Key == "PowerOn").Preview);
+            Assert.Equal("132", emulator.Tags.Single(tag => tag.Key == "DowntimeReason").Preview);
         }
     }
 
@@ -678,5 +734,70 @@ public sealed class UniEmuSeederTests
         var qualityState = tags.Single(tag => tag.Key == "QualityState");
         Assert.Equal(TagType.String, UniEmuJson.EnumValue<TagType>(qualityState.Type));
         Assert.Equal(TagSource.Script, UniEmuJson.EnumValue<TagSource>(qualityState.Source));
+    }
+
+    private static void AssertLegacyOvenTagSetIsComplete(
+        IReadOnlyList<EmulatorTagEntity> tags,
+        IReadOnlyList<ScriptFileEntity> scripts,
+        string emulatorId)
+    {
+        string[] expectedKeys =
+        [
+            "Count",
+            "Temperature",
+            "Setpoint",
+            "ActualParts",
+            "PowerOn",
+            "Cooling",
+            "WorkByProg",
+            "Holding",
+            "LoadingDSE",
+            "DetailComplete",
+            "Worker_ID",
+            "Worker_Count",
+            "DowntimeReason",
+            "Script",
+            "PrgName",
+            "Heating",
+            "Overheating",
+        ];
+
+        foreach (var expectedKey in expectedKeys)
+        {
+            Assert.Contains(tags, tag => tag.Key == expectedKey);
+        }
+
+        var controller = tags.Single(tag => tag.Key == "Script");
+        Assert.Equal(TagSource.Script, UniEmuJson.EnumValue<TagSource>(controller.Source));
+        Assert.False(controller.Enabled);
+
+        foreach (var tag in tags.Where(tag => tag.Key != "Script"))
+        {
+            Assert.Equal(TagSource.Static, UniEmuJson.EnumValue<TagSource>(tag.Source));
+            Assert.True(tag.Enabled, $"{tag.Key} should be published.");
+        }
+
+        Assert.Equal(TagType.Double, UniEmuJson.EnumValue<TagType>(tags.Single(tag => tag.Key == "Temperature").Type));
+        Assert.Equal(TagType.String, UniEmuJson.EnumValue<TagType>(tags.Single(tag => tag.Key == "PrgName").Type));
+        Assert.Equal(SpecialParameter.PrgName, UniEmuJson.EnumValue<SpecialParameter>(tags.Single(tag => tag.Key == "PrgName").SpecialParameter!));
+        Assert.Equal(SpecialParameter.PartCounter, UniEmuJson.EnumValue<SpecialParameter>(tags.Single(tag => tag.Key == "ActualParts").SpecialParameter!));
+
+        var formula = UniEmuJson.Deserialize<TagFormulaConfigDto>(controller.FormulaJson);
+        Assert.Equal("scr-legacy-oven-main", formula?.ScriptId);
+
+        string[] expectedScripts =
+        [
+            "legacy-oven-constants.csx",
+            "legacy-oven-state.csx",
+            "legacy-oven-main.csx",
+        ];
+
+        foreach (var scriptName in expectedScripts)
+        {
+            var script = scripts.SingleOrDefault(script => script.Name == scriptName);
+            Assert.NotNull(script);
+            Assert.Equal(ScriptScope.Emulator, UniEmuJson.EnumValue<ScriptScope>(script!.Scope));
+            Assert.Equal(emulatorId, script.EmulatorId);
+        }
     }
 }
