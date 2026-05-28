@@ -12,9 +12,7 @@ import type { TagEditorFormState } from './types';
 
 export const sanitizeStaticValue = (type: TagType, value: string) => {
   if (type === 'int') {
-    return value
-      .replace(/[^\d-]/g, '')
-      .replace(/(?!^)-/g, '');
+    return value.replace(/[^\d-]/g, '').replace(/(?!^)-/g, '');
   }
 
   if (type === 'double') {
@@ -32,8 +30,7 @@ export const sanitizeStaticValue = (type: TagType, value: string) => {
 
 export const normalizeTagIdentity = (value: string) => value.trim().toLocaleLowerCase('ru-RU');
 
-export const clampRoundDigits = (value: number) =>
-  Math.max(0, Math.min(15, Math.round(value)));
+export const clampRoundDigits = (value: number) => Math.max(0, Math.min(15, Math.round(value)));
 
 export const createDefaultScenario = (): TagScenarioConfig => ({
   segments: [],
@@ -57,7 +54,7 @@ export const createEmptyTagEditorFormState = (): TagEditorFormState => ({
   name: '',
   type: 'int',
   source: 'static',
-  staticValue: '',
+  staticValue: '0',
   description: '',
   enabled: true,
   roundEnabled: false,
@@ -92,7 +89,8 @@ export const createTagEditorFormState = (tag: EmulatorTag): TagEditorFormState =
     staticValue: tag.source === 'static' ? tag.preview : '',
     description: tag.description ?? '',
     enabled: tag.enabled ?? true,
-    roundEnabled: tag.type === 'double' && tag.roundDigits !== null && tag.roundDigits !== undefined,
+    roundEnabled:
+      tag.type === 'double' && tag.roundDigits !== null && tag.roundDigits !== undefined,
     roundDigits: tag.roundDigits ?? 2,
     triggerMode: tag.trigger.mode,
     triggerEvent: tag.trigger.event ?? 'onStart',
@@ -130,13 +128,20 @@ export const buildTagFormSnapshot = (form: TagEditorFormState) =>
   });
 
 export const hasScenarioDuration = (scenario: TagScenarioConfig) =>
-  scenario.segments.some((segment) => segment.duration > 0);
+  scenario.segments.length > 0 &&
+  scenario.segments.every((segment) => Number.isFinite(segment.duration) && segment.duration > 0);
 
 export const buildTagPayload = (form: TagEditorFormState): Omit<EmulatorTag, 'id'> => {
   const isScenario = form.source === 'scenario';
   const trigger: TagTrigger = isScenario
-    ? { mode: 'interval', intervalValue: 1, intervalUnit: 'sec' }
-    : { mode: form.triggerMode };
+    ? { mode: 'interval', event: null, cron: null, intervalValue: 1, intervalUnit: 'sec' }
+    : {
+        mode: form.triggerMode,
+        event: null,
+        cron: null,
+        intervalValue: null,
+        intervalUnit: null,
+      };
 
   if (!isScenario) {
     if (form.triggerMode === 'once') trigger.event = form.triggerEvent;
@@ -147,14 +152,16 @@ export const buildTagPayload = (form: TagEditorFormState): Omit<EmulatorTag, 'id
     }
   }
 
-  let calc: TagCalcConfig | undefined;
+  let calc: TagCalcConfig | null = null;
   if (form.source === 'generator' || form.source === 'formula' || form.source === 'formulaScript') {
-    calc = form.calc;
+    calc = buildCalcPayload(form.calc);
   }
 
-  let formula: TagFormulaConfig | undefined;
+  let formula: TagFormulaConfig | null = null;
   if (form.source === 'formula' || form.source === 'script' || form.source === 'formulaScript') {
-    formula = form.scriptId ? { scriptId: form.scriptId } : { inlineScript: form.inlineScript };
+    formula = form.scriptId
+      ? { scriptId: form.scriptId, inlineScript: null }
+      : { scriptId: null, inlineScript: form.inlineScript };
   }
 
   const preview =
@@ -165,27 +172,51 @@ export const buildTagPayload = (form: TagEditorFormState): Omit<EmulatorTag, 'id
         : isScenario
           ? localization.routes.emulators.components.addTagDrawer.scenarioPreviewLabel
           : calc?.type === 'Static'
-            ? calc.start ?? ''
+            ? (calc.start ?? '')
             : localization.routes.emulators.components.addTagDrawer.computedPreviewLabel;
   const normalizedPreview =
     form.source === 'static' && form.type === 'bool'
-      ? form.staticValue === 'true' ? 'true' : 'false'
+      ? form.staticValue === 'true'
+        ? 'true'
+        : 'false'
       : preview;
 
   return {
     name: form.name.trim(),
-    key: form.key,
+    key: form.key.trim(),
     type: form.type,
     source: form.source,
     preview: normalizedPreview,
     trigger,
     calc,
     formula,
-    scenario: isScenario ? form.scenario : undefined,
-    specialParameter: form.specialParameter !== 'None' ? form.specialParameter : undefined,
-    description: form.description.trim() || undefined,
+    scenario: isScenario ? buildScenarioPayload(form.scenario) : null,
+    specialParameter: form.specialParameter !== 'None' ? form.specialParameter : null,
+    description: form.description.trim() || null,
     enabled: form.enabled,
     roundDigits:
       form.type === 'double' && form.roundEnabled ? clampRoundDigits(form.roundDigits) : null,
   };
 };
+
+const buildCalcPayload = (calc: TagCalcConfig): TagCalcConfig => ({
+  type: calc.type,
+  start: calc.start ?? null,
+  finish: calc.finish ?? null,
+  duration: calc.duration ?? null,
+  amplitude: calc.amplitude ?? null,
+  period: calc.period ?? null,
+  curvature: calc.curvature ?? null,
+  distortion: calc.distortion ?? null,
+});
+
+const buildScenarioPayload = (scenario: TagScenarioConfig): TagScenarioConfig => ({
+  segments: scenario.segments.map((segment) => ({
+    id: segment.id,
+    duration: segment.duration,
+    calc: buildCalcPayload(segment.calc),
+    label: segment.label ?? null,
+  })),
+  continueOnFormulaEnd: scenario.continueOnFormulaEnd,
+  startValue: scenario.startValue ?? null,
+});

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/select';
 import { localization } from '@/localization';
 import type { TagIntervalUnit, TagTriggerEvent, TagTriggerMode } from '@/types/uniemu';
+import { clampIntervalValue } from './tagValidation';
 import type { SetTagEditorField } from './types';
 
 interface Props {
@@ -44,6 +45,9 @@ export const TagTriggerSection = memo(function TagTriggerSection({
         <SelectContent>
           <SelectItem value="once">
             {localization.routes.emulators.components.addTagDrawer.triggerModeOnceLabel}
+          </SelectItem>
+          <SelectItem value="cron">
+            {localization.routes.emulators.components.addTagDrawer.triggerModeCronLabel}
           </SelectItem>
           <SelectItem value="interval">
             {localization.routes.emulators.components.addTagDrawer.triggerModeIntervalLabel}
@@ -105,7 +109,9 @@ export const TagTriggerSection = memo(function TagTriggerSection({
               type="number"
               min={1}
               value={intervalValue}
-              onChange={(event) => onFieldChange('intervalValue', Math.max(1, Number(event.target.value) || 1))}
+              onChange={(event) =>
+                onFieldChange('intervalValue', clampIntervalValue(Number(event.target.value) || 1))
+              }
               className="font-mono"
             />
           </div>

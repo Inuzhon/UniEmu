@@ -184,6 +184,10 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
 
   const isScenario = form.source === 'scenario';
   const validationErrors = useMemo(() => getTagValidationErrors(form), [form]);
+  const formErrorMessages = useMemo(
+    () => [...validationErrors, ...splitErrorMessage(submitError)],
+    [submitError, validationErrors]
+  );
   const showCalc =
     form.source === 'generator' || form.source === 'formula' || form.source === 'formulaScript';
   const showScript =
@@ -422,6 +426,17 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
             </SheetTitle>
           </SheetHeader>
 
+          {formErrorMessages.length > 0 && (
+            <div
+              role="alert"
+              className="sticky top-0 z-20 mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive shadow-sm backdrop-blur"
+            >
+              {formErrorMessages.map((error, index) => (
+                <p key={`${index}-${error}`}>{error}</p>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-5 py-6">
             <TagBasicsSection
               name={form.name}
@@ -477,15 +492,6 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
                 onOpenEditor={openEditor}
                 onOpenStorageScriptEditor={openStorageScriptEditor}
               />
-            )}
-
-            {(validationErrors.length > 0 || submitError) && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {validationErrors.map((error) => (
-                  <p key={error}>{error}</p>
-                ))}
-                {submitError && <p>{submitError}</p>}
-              </div>
             )}
           </div>
 
@@ -558,4 +564,13 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
       </AlertDialog>
     </>
   );
+}
+
+function splitErrorMessage(message: string | null): string[] {
+  return message
+    ? message
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : [];
 }
