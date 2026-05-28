@@ -12,78 +12,87 @@ public static class UniEmuApplicationStartup
 {
     private static readonly TimeSpan StaticAssetCacheDuration = TimeSpan.FromDays(30);
 
-    public static async Task InitializeUniEmuDatabaseAsync(this WebApplication app)
+    extension(WebApplication app)
     {
-        var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
-
-        if (options.SkipStartupDatabase)
-            return;
-
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<UniEmuDbContext>();
-        await db.Database.MigrateAsync();
-
-        if (options.SeedData)
-            await UniEmuSeeder.SeedAsync(db);
-
-        if (!options.DisableRuntime)
+        public async Task InitializeUniEmuDatabaseAsync()
         {
-            var statePersistence = scope.ServiceProvider.GetRequiredService<TagRuntimeStatePersistenceService>();
-            await statePersistence.HydrateFromTagPreviewsAsync();
+            var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
 
-            var scheduler = scope.ServiceProvider.GetRequiredService<EmulatorScheduleService>();
-            await scheduler.ScheduleRunningEmulatorsAsync();
-        }
-    }
+            if (options.SkipStartupDatabase)
+                return;
 
-    public static void PersistRuntimeStateOnShutdown(this WebApplication app)
-    {
-        var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
-
-        if (options.DisableRuntime)
-            return;
-
-        app.Lifetime.ApplicationStopping.Register(() =>
-        {
             using var scope = app.Services.CreateScope();
-            var statePersistence = scope.ServiceProvider.GetRequiredService<TagRuntimeStatePersistenceService>();
-            statePersistence.PersistToTagPreviewsAsync().GetAwaiter().GetResult();
-        });
-    }
+            var db = scope.ServiceProvider.GetRequiredService<UniEmuDbContext>();
+            await db.Database.MigrateAsync();
 
-    public static void UseUniEmuStaticAssets(this WebApplication app)
-    {
-        var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
+            if (options.SeedData)
+                await UniEmuSeeder.SeedAsync(db);
 
-        if (options.DisableStaticAssets)
-            return;
+            if (!options.DisableRuntime)
+            {
+                var statePersistence = scope.ServiceProvider.GetRequiredService<TagRuntimeStatePersistenceService>();
+                await statePersistence.HydrateFromTagPreviewsAsync();
 
-        var staticFileOptions = CreateStaticFileOptions(options);
+                var scheduler = scope.ServiceProvider.GetRequiredService<EmulatorScheduleService>();
+                await scheduler.ScheduleRunningEmulatorsAsync();
+            }
+        }
 
-        app.UseDefaultFiles();
-        app.UseStaticFiles(staticFileOptions);
-        app.MapStaticAssets();
-    }
-
-    public static void UseUniEmuStaticAssetCompression(this WebApplication app)
-    {
-        var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
-
-        if (!ShouldUseStaticAssetCompression(app.Environment, options))
-            return;
-
-        app.UseWhen(ShouldCompressStaticAssetRequest, branch =>
+        public void PersistRuntimeStateOnShutdown()
         {
-            branch.UseResponseCompression();
-        });
-    }
+            var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
 
-    public static void MapUniEmuFallback(this WebApplication app)
-    {
-        var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
+            if (options.DisableRuntime)
+                return;
 
-        if (!options.DisableStaticAssets)
-            app.MapFallbackToFile("/index.html", CreateStaticFileOptions(options));
+            app.Lifetime.ApplicationStopping.Register(() =>
+            {
+                using var scope = app.Services.CreateScope();
+                var statePersistence = scope.ServiceProvider.GetRequiredService<TagRuntimeStatePersistenceService>();
+                statePersistence.PersistToTagPreviewsAsync().GetAwaiter().GetResult();
+            });
+        }
+
+        public void UseUniEmuStaticAssets()
+        {
+            var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
+
+            if (options.DisableStaticAssets)
+                return;
+
+            var staticFileOptions = CreateStaticFileOptions(options);
+
+            app.UseDefaultFiles();
+            app.UseStaticFiles(staticFileOptions);
+            app.MapStaticAssets();
+        }
+
+        public void UseUniEmuStaticAssetCompression()
+        {
+            var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
+
+            if (!ShouldUseStaticAssetCompression(app.Environment, options))
+                return;
+
+            app.UseWhen(ShouldCompressStaticAssetRequest, branch =>
+            {
+                branch.UseResponseCompression();
+            });
+        }
+
+        public void MapUniEmuFallback()
+        {
+            var options = app.Services.GetRequiredService<IOptions<UniEmuOptions>>().Value;
+
+            if (!options.DisableStaticAssets)
+                app.MapFallbackToFile("/index.html", CreateStaticFileOptions(options));
+        }
+
+        public void MapUniEmuOpenApi()
+        {
+            app.MapOpenApi();
+            app.MapOpenApi("/openapi/{documentName}.yaml");
+        }
     }
 
     internal static void ApplyStaticAssetCacheHeaders(

@@ -124,7 +124,7 @@ public sealed class TelemetryPacketSender
         do
         {
             var chunkLength = Math.Min(ProgramChunkSize, program.Bytes.Length - offset);
-            var chunk = program.Bytes.AsSpan(offset, chunkLength).ToArray();
+            var chunk = program.Bytes.AsSpan(offset, chunkLength);
             offset += chunkLength;
             var isEof = offset >= program.Bytes.Length;
             var values = new List<UniversalValue>();
