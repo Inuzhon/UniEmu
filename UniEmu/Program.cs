@@ -43,7 +43,7 @@ app.UseUniEmuStaticAssets();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapUniEmuOpenApi();
 }
 
 app.UseHttpsRedirection();

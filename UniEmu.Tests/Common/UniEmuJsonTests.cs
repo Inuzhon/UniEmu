@@ -33,6 +33,39 @@ public sealed class UniEmuJsonTests
     }
 
     [Fact]
+    public void Apply_RejectsDuplicateAndUnmappedJsonProperties()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        UniEmuJson.Apply(options);
+
+        Assert.False(options.AllowDuplicateProperties);
+        Assert.True(options.RespectNullableAnnotations);
+        Assert.True(options.RespectRequiredConstructorParameters);
+
+        Assert.Throws<JsonException>(() =>
+            JsonSerializer.Deserialize<JsonProbe>("""{"value":1,"value":2}""", options));
+        Assert.Throws<JsonException>(() =>
+            JsonSerializer.Deserialize<JsonProbe>("""{"value":1,"extra":2}""", options));
+    }
+
+    [Fact]
+    public void Deserialize_RejectsDuplicateJsonProperties()
+    {
+        Assert.Throws<JsonException>(() =>
+            UniEmuJson.Deserialize<JsonProbe>("""{"value":1,"value":2}"""));
+    }
+
+    [Fact]
+    public void Deserialize_AllowsLegacyTriggerJsonWithMissingConstructorProperties()
+    {
+        var trigger = UniEmuJson.Deserialize<TagTriggerDto>("{}");
+
+        Assert.NotNull(trigger);
+        Assert.Equal(TagTriggerMode.Once, trigger.Mode);
+        Assert.Null(trigger.Event);
+    }
+
+    [Fact]
     public void SpecialParameter_MatchesUniversalProtocolContract()
     {
         var expected = new (SpecialParameter Parameter, int Value)[]
@@ -73,4 +106,6 @@ public sealed class UniEmuJsonTests
 
         Assert.Equal(expected, actual);
     }
+
+    private sealed record JsonProbe(int Value);
 }

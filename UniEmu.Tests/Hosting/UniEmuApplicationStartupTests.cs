@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using UniEmu.Hosting;
@@ -86,6 +88,27 @@ public sealed class UniEmuApplicationStartupTests
         UniEmuApplicationStartup.ApplyStaticAssetCacheHeaders(context.Response, "index.html", options);
 
         Assert.Equal("no-cache", context.Response.Headers.CacheControl);
+    }
+
+    [Fact]
+    public async Task MapUniEmuOpenApi_MapsJsonAndYamlDocuments()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Development,
+        });
+        await using var app = builder.Build();
+
+        app.MapUniEmuOpenApi();
+
+        var patterns = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToArray();
+
+        Assert.Contains("/openapi/{documentName}.json", patterns);
+        Assert.Contains("/openapi/{documentName}.yaml", patterns);
     }
 
     private sealed class TestHostEnvironment(string environmentName) : IHostEnvironment

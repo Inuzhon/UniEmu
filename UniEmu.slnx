@@ -2,16 +2,13 @@
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
-    <File Path="Directory.Packages.props" />
   </Folder>
   <Project Path="UniEmu.Client/UniEmu.Client.esproj">
     <Build />
     <Deploy />
   </Project>
   <Project Path="UniEmu.DispatcherMock/UniEmu.DispatcherMock.csproj" />
-  <Project Path="UniEmu.Scripting.Api/UniEmu.Scripting.Api.csproj">
-    <Build Solution="Debug|*" Project="false" />
-  </Project>
+  <Project Path="UniEmu.Scripting.Api/UniEmu.Scripting.Api.csproj" />
   <Project Path="UniEmu.Tests/UniEmu.Tests.csproj" />
   <Project Path="UniEmu/UniEmu.csproj" />
 </Solution>

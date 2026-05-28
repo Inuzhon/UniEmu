@@ -36,4 +36,24 @@ public sealed class UniEmuOptionsTests
         Assert.True(options.EnableStaticAssetCaching);
         Assert.Equal(9, options.DispatcherBlockCheckIntervalSeconds);
     }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public void AddUniEmuOptions_ClampsDispatcherBlockCheckIntervalToAtLeastOne(string interval)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["UniEmu:DispatcherBlockCheckIntervalSeconds"] = interval,
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddUniEmuOptions(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<UniEmuOptions>>().Value;
+        Assert.Equal(1, options.DispatcherBlockCheckIntervalSeconds);
+    }
 }
