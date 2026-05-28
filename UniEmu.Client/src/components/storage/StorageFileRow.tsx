@@ -57,14 +57,14 @@ export function StorageFileRow({
 
   return (
     <div
-      className={`group flex items-center gap-1 rounded-l px-2 py-1 transition-colors ${
+      className={`group flex min-w-0 items-center gap-1 overflow-hidden rounded-l px-2 py-1 transition-colors ${
         active
           ? 'bg-primary/15 text-primary'
           : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
       }`}
     >
       {editingName ? (
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <Icon className={iconClassName} />
           <input
             autoFocus
@@ -83,10 +83,12 @@ export function StorageFileRow({
       ) : (
         <button
           onClick={onSelect}
-          className="flex min-w-0 flex-1 items-center gap-2 truncate text-left"
+          className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"
         >
           <Icon className={iconClassName} />
-          <span className="truncate">{name}</span>
+          <span title={name} className="min-w-0 flex-1 truncate">
+            {name}
+          </span>
           {meta}
         </button>
       )}
@@ -97,7 +99,7 @@ export function StorageFileRow({
             setDraftName(name);
             setEditingName(true);
           }}
-          className="rounded p-1 opacity-0 transition-opacity hover:text-primary group-hover:opacity-100"
+          className="shrink-0 rounded p-1 opacity-0 transition-opacity hover:text-primary group-hover:opacity-100"
           title="Rename"
         >
           <Pencil className="h-3 w-3" />
@@ -112,7 +114,7 @@ export function StorageFileRow({
               e.stopPropagation();
               action.onClick();
             }}
-            className={`rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+            className={`shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 ${
               action.className ?? 'hover:text-primary'
             }`}
             title={action.title}
@@ -126,7 +128,7 @@ export function StorageFileRow({
           e.stopPropagation();
           if (!confirmDeleteMessage || confirm(confirmDeleteMessage)) onDelete();
         }}
-        className="rounded p-1 opacity-0 transition-opacity hover:text-signal-offline group-hover:opacity-100"
+        className="shrink-0 rounded p-1 opacity-0 transition-opacity hover:text-signal-offline group-hover:opacity-100"
         title={deleteTitle}
       >
         <Trash2 className="h-3 w-3" />

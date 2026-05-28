@@ -57,36 +57,38 @@ export function StorageTreeGroup({
         e.preventDefault();
         if (e.dataTransfer.files?.length) onDrop?.(e.dataTransfer.files);
       }}
-      className={`mx-1 rounded transition-colors ${
+      className={`mx-1 min-w-0 overflow-hidden rounded transition-colors ${
         dragActive ? 'bg-primary/10 ring-1 ring-primary/40' : ''
       }`}
       data-group={groupKey}
     >
-      <div className="group/row flex items-center gap-1 px-1 py-1">
+      <div className="group/row flex min-w-0 items-center gap-1 px-1 py-1">
         <button
           onClick={onToggle}
-          className="flex flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left transition-colors hover:bg-muted/40"
+          className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden rounded px-1.5 py-1 text-left transition-colors hover:bg-muted/40"
         >
           {open ? (
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
           ) : (
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
           )}
-          <Icon className={`h-3.5 w-3.5 ${accent}`} />
-          <span className="truncate text-foreground">{label}</span>
-          <span className="ml-auto rounded bg-muted/60 px-1.5 py-px font-mono text-[10px] text-muted-foreground">
+          <Icon className={`h-3.5 w-3.5 shrink-0 ${accent}`} />
+          <span title={label} className="min-w-0 flex-1 truncate text-foreground">
+            {label}
+          </span>
+          <span className="ml-auto shrink-0 rounded bg-muted/60 px-1.5 py-px font-mono text-[10px] text-muted-foreground">
             {count}
           </span>
         </button>
         <button
           onClick={onAdd}
-          className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted/60 hover:text-foreground group-hover/row:opacity-100"
+          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted/60 hover:text-foreground group-hover/row:opacity-100"
           title={addTitle}
         >
           <Plus className="h-3 w-3" />
         </button>
       </div>
-      {open && <div className="ml-4">{children}</div>}
+      {open && <div className="ml-4 min-w-0 overflow-hidden">{children}</div>}
     </div>
   );
 }

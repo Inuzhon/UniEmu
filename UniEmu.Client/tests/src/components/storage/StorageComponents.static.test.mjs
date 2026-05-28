@@ -48,3 +48,23 @@ test('scripts and cnc pages consume the shared storage primitives', async () => 
     assert.match(source, /StorageEmptyHint/);
   }
 });
+
+test('storage sidebar keeps long file and group names inside the pane', async () => {
+  const [layout, row, group] = await Promise.all([
+    readFile(join(storageDir, 'StorageExplorerLayout.tsx'), 'utf8'),
+    readFile(join(storageDir, 'StorageFileRow.tsx'), 'utf8'),
+    readFile(join(storageDir, 'StorageTreeGroup.tsx'), 'utf8'),
+  ]);
+
+  assert.match(layout, /overflow-y-auto overflow-x-hidden/);
+
+  assert.match(row, /className=\{`group flex min-w-0 items-center gap-1 overflow-hidden/);
+  assert.match(row, /<button[\s\S]*className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"/);
+  assert.match(row, /<span title=\{name\} className="min-w-0 flex-1 truncate">/);
+
+  assert.match(group, /className="group\/row flex min-w-0 items-center gap-1 px-1 py-1"/);
+  assert.match(group, /className="flex min-w-0 flex-1 items-center gap-1\.5 overflow-hidden/);
+  assert.match(group, /<span title=\{label\} className="min-w-0 flex-1 truncate text-foreground">/);
+  assert.match(group, /className="ml-auto shrink-0 rounded bg-muted\/60/);
+  assert.match(group, /<div className="ml-4 min-w-0 overflow-hidden">/);
+});

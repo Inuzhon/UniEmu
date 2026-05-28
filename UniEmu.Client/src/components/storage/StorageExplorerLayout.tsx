@@ -45,7 +45,7 @@ export function StorageExplorerLayout({
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[300px_1fr] divide-x divide-border">
-        <aside className="flex min-h-0 flex-col bg-card/30">
+        <aside className="flex min-h-0 min-w-0 flex-col bg-card/30">
           <div className="border-b border-border p-3">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -58,7 +58,9 @@ export function StorageExplorerLayout({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-2 font-mono text-[13px]">{sidebar}</div>
+          <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden py-2 font-mono text-[13px]">
+            {sidebar}
+          </div>
         </aside>
 
         <section className="flex min-h-0 flex-col bg-background">{children}</section>
