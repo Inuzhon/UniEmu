@@ -19,6 +19,8 @@ public sealed class UniEmuOptions
 
     public bool EnableStaticAssetCaching { get; set; }
 
+    public int ScriptExecutionTimeoutSeconds { get; set; } = 5;
+
     public int DispatcherBlockCheckIntervalSeconds
     {
         get;

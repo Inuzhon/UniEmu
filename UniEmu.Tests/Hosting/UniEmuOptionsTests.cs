@@ -20,6 +20,7 @@ public sealed class UniEmuOptionsTests
                 ["UniEmu:EnableStaticAssetCompression"] = "true",
                 ["UniEmu:EnableStaticAssetCaching"] = "true",
                 ["UniEmu:DispatcherBlockCheckIntervalSeconds"] = "9",
+                ["UniEmu:ScriptExecutionTimeoutSeconds"] = "7",
             })
             .Build();
         var services = new ServiceCollection();
@@ -35,6 +36,7 @@ public sealed class UniEmuOptionsTests
         Assert.True(options.EnableStaticAssetCompression);
         Assert.True(options.EnableStaticAssetCaching);
         Assert.Equal(9, options.DispatcherBlockCheckIntervalSeconds);
+        Assert.Equal(7, options.ScriptExecutionTimeoutSeconds);
     }
 
     [Theory]

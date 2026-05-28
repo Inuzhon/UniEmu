@@ -158,6 +158,7 @@ export const SPECIAL_PARAMETERS: SpecialParameter[] = [
 export const SPECIAL_PARAMETER_OPTIONS: { value: SpecialParameter; label: string }[] = [
   { value: 'None', label: 'Отсутствует' },
   { value: 'PrgName', label: 'Имя УП' },
+  { value: 'Subprogram', label: 'Имя подпрограммы' },
   { value: 'FrameNum', label: 'Номер кадра УП' },
   { value: 'FrameText', label: 'Текст кадра УП' },
 ];
