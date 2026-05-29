@@ -128,7 +128,7 @@ export function EmulatorTagsTab({
             type="button"
             variant="outline"
             role="combobox"
-            className="h-7 w-48 max-w-[18rem] justify-between gap-2 px-2 py-1 font-mono text-xs"
+            className="h-7 w-full min-w-0 max-w-[18rem] justify-between gap-2 px-2 py-1 font-mono text-xs"
           >
             <span className={cn('truncate', !tag.preview && 'font-sans text-muted-foreground')}>
               {tag.preview || localization.routes.emulators.components.addTagDrawer.programPickerSelectPlaceholder}
@@ -228,31 +228,37 @@ export function EmulatorTagsTab({
       key={tag.id}
       className="border-b border-border/60 transition-colors hover:bg-muted/20"
     >
-      <td className="px-4 py-3 font-mono">{tag.name}</td>
-      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-        {tag.key === 'Custom' ? '-' : tag.key}
+      <td className="px-3 py-3 align-middle font-mono">
+        <span title={tag.name} className="block max-w-full truncate">
+          {tag.name}
+        </span>
       </td>
-      <td className="px-4 py-3">
-        <span className="rounded bg-muted px-2 py-0.5 font-mono text-[10px] uppercase">
+      <td className="px-3 py-3 align-middle font-mono text-xs text-muted-foreground">
+        <span title={tag.key === 'Custom' ? '-' : tag.key} className="block max-w-full truncate">
+          {tag.key === 'Custom' ? '-' : tag.key}
+        </span>
+      </td>
+      <td className="px-3 py-3 align-middle">
+        <span className="inline-block rounded bg-muted px-2 py-0.5 font-mono text-[10px] uppercase leading-tight">
           {getTagTypeLabel(tag.type)}
         </span>
       </td>
-      <td className="px-4 py-3 text-xs text-muted-foreground">
+      <td className="px-3 py-3 align-middle break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
         {getTagSourceLabel(tag.source)}
       </td>
-      <td className="px-4 py-3 text-xs text-muted-foreground">
+      <td className="px-3 py-3 align-middle break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
         {formatTrigger(tag.trigger, tag.source)}
       </td>
-      <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
+      <td className="px-3 py-3 align-middle break-words font-mono text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
         {tag.source === 'scenario' && tag.scenario
           ? localization.routes.emulators.components.emulatorDetailPage.scenarioSummary(
-              tag.scenario.segments.length,
-              formatDuration(totalDuration(tag.scenario)),
-              getContinueOnFormulaEndLabel(tag.scenario.continueOnFormulaEnd ?? 'Repeat')
-            )
+            tag.scenario.segments.length,
+            formatDuration(totalDuration(tag.scenario)),
+            getContinueOnFormulaEndLabel(tag.scenario.continueOnFormulaEnd ?? 'Repeat')
+          )
           : getCalcTypeLabel(tag.calc?.type ?? 'None')}
       </td>
-      <td className="px-4 py-3 font-mono text-xs text-primary">
+      <td className="px-3 py-3 align-middle font-mono text-xs text-primary">
         {tag.source === 'scenario' && tag.scenario ? (
           <ScenarioSparkline scenario={tag.scenario} tagType={tag.type} />
         ) : tag.source === 'static' ? (
@@ -280,15 +286,15 @@ export function EmulatorTagsTab({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
               }}
-              className="h-7 w-48 max-w-[18rem] px-2 py-1 font-mono text-xs"
+              className="h-7 w-full min-w-0 max-w-[18rem] px-2 py-1 font-mono text-xs"
             />
           )
         ) : (
           tag.preview
         )}
       </td>
-      <td className="px-4 py-3 text-right">
-        <div className="flex items-center justify-end gap-2">
+      <td className="px-3 py-3 text-right align-middle">
+        <div className="flex w-full items-center justify-end gap-2 whitespace-nowrap">
           <Switch
             checked={tag.enabled !== false}
             onCheckedChange={(v) => void updateTag(emulatorId, tag.id, { ...tag, enabled: v })}
@@ -318,44 +324,56 @@ export function EmulatorTagsTab({
   );
 
   const renderTable = (rows: EmulatorTag[], emptyText: string, muted = false) => (
-    <table className={`w-full text-sm ${muted ? 'opacity-70' : ''}`}>
-      <thead className="border-b border-border bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-        <tr>
-          <th className="px-4 py-2 font-medium">
-            {localization.routes.emulators.components.emulatorDetailPage.nameColumnLabel}
-          </th>
-          <th className="px-4 py-2 font-medium">
-            {localization.routes.emulators.components.emulatorDetailPage.keyColumnLabel}
-          </th>
-          <th className="px-4 py-2 font-medium">
-            {localization.routes.emulators.components.emulatorDetailPage.typeColumnLabel}
-          </th>
-          <th className="px-4 py-2 font-medium">
-            {localization.routes.emulators.components.emulatorDetailPage.sourceColumnLabel}
-          </th>
-          <th className="px-4 py-2 font-medium">
-            {localization.routes.emulators.components.emulatorDetailPage.triggerColumnLabel}
-          </th>
-          <th className="px-4 py-2 font-medium">
-            {localization.routes.emulators.components.emulatorDetailPage.calcColumnLabel}
-          </th>
-          <th className="px-4 py-2 font-medium">
-            {localization.routes.emulators.components.emulatorDetailPage.previewColumnLabel}
-          </th>
-          <th className="px-4 py-2"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.length === 0 && (
+    <div className="overflow-x-auto">
+      <table className={`w-full min-w-[62rem] table-fixed text-sm ${muted ? 'opacity-70' : ''}`}>
+        <colgroup>
+          <col className="w-[clamp(7rem,11vw,8.75rem)]" />
+          <col className="w-[clamp(7rem,11vw,8.75rem)]" />
+          <col className="w-[6rem]" />
+          <col className="w-[6.5rem]" />
+          <col className="w-[6.5rem]" />
+          <col className="w-[clamp(10rem,18vw,12rem)]" />
+          <col className="w-[clamp(10rem,18vw,12rem)]" />
+          <col className="w-[8.75rem]" />
+        </colgroup>
+        <thead className="border-b border-border bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
           <tr>
-            <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-              {emptyText}
-            </td>
+            <th className="px-3 py-2 font-medium">
+              {localization.routes.emulators.components.emulatorDetailPage.nameColumnLabel}
+            </th>
+            <th className="px-3 py-2 font-medium">
+              {localization.routes.emulators.components.emulatorDetailPage.keyColumnLabel}
+            </th>
+            <th className="px-3 py-2 font-medium">
+              {localization.routes.emulators.components.emulatorDetailPage.typeColumnLabel}
+            </th>
+            <th className="px-3 py-2 font-medium">
+              {localization.routes.emulators.components.emulatorDetailPage.sourceColumnLabel}
+            </th>
+            <th className="px-3 py-2 font-medium">
+              {localization.routes.emulators.components.emulatorDetailPage.triggerColumnLabel}
+            </th>
+            <th className="px-3 py-2 font-medium">
+              {localization.routes.emulators.components.emulatorDetailPage.calcColumnLabel}
+            </th>
+            <th className="px-3 py-2 font-medium">
+              {localization.routes.emulators.components.emulatorDetailPage.previewColumnLabel}
+            </th>
+            <th className="px-3 py-2"></th>
           </tr>
-        )}
-        {rows.map(renderRow)}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                {emptyText}
+              </td>
+            </tr>
+          )}
+          {rows.map(renderRow)}
+        </tbody>
+      </table>
+    </div>
   );
 
   return (
@@ -421,8 +439,8 @@ export function EmulatorTagsTab({
             <AlertDialogDescription>
               {deleteCandidateTag
                 ? localization.routes.emulators.components.emulatorDetailPage.deleteTagDialogDescription(
-                    deleteCandidateTag.name
-                  )
+                  deleteCandidateTag.name
+                )
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
