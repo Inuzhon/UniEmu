@@ -308,12 +308,7 @@ public sealed class UniEmuSeederTests
         await using (var db = new UniEmuDbContext(options))
         {
             var tags = await db.EmulatorTags
-                .Include(tag => tag.Emulator)
-                .Where(tag =>
-                    tag.ScenarioJson != null &&
-                    tag.Emulator != null &&
-                    tag.Emulator.ProtocolId >= 31 &&
-                    tag.Emulator.ProtocolId <= 43)
+                .Where(tag => tag.ScenarioJson != null)
                 .ToListAsync();
 
             Assert.NotEmpty(tags);
@@ -326,6 +321,63 @@ public sealed class UniEmuSeederTests
                     Assert.True(
                         Regex.IsMatch(segment.Label ?? string.Empty, @"\p{IsCyrillic}"),
                         $"{tag.Key}/{segment.Id}: '{segment.Label}'");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SeedAsync_UsesTimelineScenariosAndIntervalTriggersInsteadOfSequenceAndCron()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            await db.Database.MigrateAsync();
+
+            await UniEmuSeeder.SeedAsync(db);
+        }
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            var tags = await db.EmulatorTags.ToListAsync();
+            var sequenceTags = tags
+                .Where(tag => UniEmuJson.Deserialize<TagCalcConfigDto>(tag.CalcJson)?.Type == CalcType.Sequence)
+                .Select(tag => $"{tag.EmulatorId}/{tag.Key}")
+                .ToList();
+            var cronTags = tags
+                .Where(tag => UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)?.Mode == TagTriggerMode.Cron)
+                .Select(tag => $"{tag.EmulatorId}/{tag.Key}")
+                .ToList();
+
+            Assert.True(sequenceTags.Count == 0, $"Sequence tags remain: {string.Join(", ", sequenceTags)}");
+            Assert.True(cronTags.Count == 0, $"CRON triggers remain: {string.Join(", ", cronTags)}");
+
+            foreach (var key in new[] { "SpindleOverridePct", "FeedOverridePct", "RapidOverridePct" })
+            {
+                var overrideTags = tags.Where(tag => tag.Key == key).ToList();
+
+                Assert.NotEmpty(overrideTags);
+                foreach (var tag in overrideTags)
+                {
+                    var trigger = UniEmuJson.Deserialize<TagTriggerDto>(tag.TriggerJson)!;
+                    var scenario = UniEmuJson.Deserialize<TagScenarioConfigDto>(tag.ScenarioJson);
+
+                    Assert.Equal(TagTriggerMode.Interval, trigger.Mode);
+                    Assert.Null(trigger.Cron);
+                    Assert.Equal(TagSource.Scenario, UniEmuJson.EnumValue<TagSource>(tag.Source));
+                    Assert.Null(tag.CalcJson);
+                    Assert.NotNull(scenario);
+                    Assert.All(scenario!.Segments, segment =>
+                    {
+                        Assert.Equal(CalcType.Static, segment.Calc.Type);
+                        Assert.Matches(@"\p{IsCyrillic}", segment.Label ?? string.Empty);
+                    });
                 }
             }
         }

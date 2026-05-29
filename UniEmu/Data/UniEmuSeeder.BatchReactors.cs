@@ -152,12 +152,12 @@ public static partial class UniEmuSeeder
     {
         return CreateBatchStaticScenario(
             "Setup",
-            ("phase-setup", "Setup", 45, "Setup"),
-            ("phase-filling", "Filling", 150, "Filling"),
-            ("phase-heatup", "HeatUp", 240, "HeatUp"),
-            ("phase-reaction", "Reaction", 420, "Reaction"),
-            ("phase-transfer", "Transfer", 120, "Transfer"),
-            ("phase-cip", "CIP", 180, "CIP"));
+            ("phase-setup", "Подготовка", 45, "Setup"),
+            ("phase-filling", "Заполнение", 150, "Filling"),
+            ("phase-heatup", "Нагрев", 240, "HeatUp"),
+            ("phase-reaction", "Реакция", 420, "Reaction"),
+            ("phase-transfer", "Слив продукта", 120, "Transfer"),
+            ("phase-cip", "Промывка CIP", 180, "CIP"));
     }
 
     /// <summary>
@@ -168,12 +168,12 @@ public static partial class UniEmuSeeder
     {
         return CreateBatchStaticScenario(
             "0",
-            ("step-setup", "Setup", 45, "0"),
-            ("step-filling", "Filling", 150, "10"),
-            ("step-heatup", "HeatUp", 240, "20"),
-            ("step-reaction", "Reaction", 420, "30"),
-            ("step-transfer", "Transfer", 120, "40"),
-            ("step-cip", "CIP", 180, "90"));
+            ("step-setup", "Подготовка", 45, "0"),
+            ("step-filling", "Заполнение", 150, "10"),
+            ("step-heatup", "Нагрев", 240, "20"),
+            ("step-reaction", "Реакция", 420, "30"),
+            ("step-transfer", "Слив продукта", 120, "40"),
+            ("step-cip", "Промывка CIP", 180, "90"));
     }
 
     /// <summary>
@@ -184,12 +184,12 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("level-setup", "Setup", 45, "0"),
-                LineSegment("level-filling", "Filling", 150, 0, 75),
-                StaticSegment("level-heatup", "HeatUp", 240, "75"),
-                SineSegment("level-reaction", "Reaction", 420, 76, amplitude: 2, period: 90),
-                LineSegment("level-transfer", "Transfer", 120, 76, 15),
-                LineSegment("level-cip", "CIP", 180, 15, 0),
+                StaticSegment("level-setup", "Подготовка", 45, "0"),
+                LineSegment("level-filling", "Заполнение", 150, 0, 75),
+                StaticSegment("level-heatup", "Нагрев", 240, "75"),
+                SineSegment("level-reaction", "Реакция", 420, 76, amplitude: 2, period: 90),
+                LineSegment("level-transfer", "Слив продукта", 120, 76, 15),
+                LineSegment("level-cip", "Промывка CIP", 180, 15, 0),
             ],
             ContinueOnFormulaEnd.Repeat,
             "0");
@@ -204,12 +204,12 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("temperature-setup", "Setup", 45, "24"),
-                LineSegment("temperature-filling", "Filling", 150, 24, 32),
-                CurveSegment("temperature-heatup", "HeatUp", 240, 32, spec.TargetTemperatureC, curvature: 0.35),
-                SineSegment("temperature-reaction", "Reaction", 420, spec.TargetTemperatureC, amplitude: 1.8, period: 105),
-                LineSegment("temperature-transfer", "Transfer", 120, spec.TargetTemperatureC, 48),
-                LineSegment("temperature-cip", "CIP", 180, 48, 32),
+                StaticSegment("temperature-setup", "Подготовка", 45, "24"),
+                LineSegment("temperature-filling", "Заполнение", 150, 24, 32),
+                CurveSegment("temperature-heatup", "Нагрев", 240, 32, spec.TargetTemperatureC, curvature: 0.35),
+                SineSegment("temperature-reaction", "Реакция", 420, spec.TargetTemperatureC, amplitude: 1.8, period: 105),
+                LineSegment("temperature-transfer", "Слив продукта", 120, spec.TargetTemperatureC, 48),
+                LineSegment("temperature-cip", "Промывка CIP", 180, 48, 32),
             ],
             ContinueOnFormulaEnd.Repeat,
             "24");
@@ -224,12 +224,12 @@ public static partial class UniEmuSeeder
     {
         return new TagScenarioConfigDto(
             [
-                StaticSegment("agitator-setup", "Setup", 45, "0"),
-                LineSegment("agitator-filling", "Filling", 150, 0, 180),
-                LineSegment("agitator-heatup", "HeatUp", 240, 180, spec.ReactionSpeedRpm),
-                SineSegment("agitator-reaction", "Reaction", 420, spec.ReactionSpeedRpm, amplitude: 25, period: 75),
-                LineSegment("agitator-transfer", "Transfer", 120, spec.ReactionSpeedRpm, 220),
-                LineSegment("agitator-cip", "CIP", 180, 220, 80),
+                StaticSegment("agitator-setup", "Подготовка", 45, "0"),
+                LineSegment("agitator-filling", "Заполнение", 150, 0, 180),
+                LineSegment("agitator-heatup", "Нагрев", 240, 180, spec.ReactionSpeedRpm),
+                SineSegment("agitator-reaction", "Реакция", 420, spec.ReactionSpeedRpm, amplitude: 25, period: 75),
+                LineSegment("agitator-transfer", "Слив продукта", 120, spec.ReactionSpeedRpm, 220),
+                LineSegment("agitator-cip", "Промывка CIP", 180, 220, 80),
             ],
             ContinueOnFormulaEnd.Repeat,
             "0");
@@ -243,12 +243,12 @@ public static partial class UniEmuSeeder
     {
         return CreateBatchStaticScenario(
             "false",
-            ("feed-setup", "Setup", 45, "false"),
-            ("feed-filling", "Filling", 150, "true"),
-            ("feed-heatup", "HeatUp", 240, "false"),
-            ("feed-reaction", "Reaction", 420, "false"),
-            ("feed-transfer", "Transfer", 120, "false"),
-            ("feed-cip", "CIP", 180, "false"));
+            ("feed-setup", "Подготовка", 45, "false"),
+            ("feed-filling", "Заполнение", 150, "true"),
+            ("feed-heatup", "Нагрев", 240, "false"),
+            ("feed-reaction", "Реакция", 420, "false"),
+            ("feed-transfer", "Слив продукта", 120, "false"),
+            ("feed-cip", "Промывка CIP", 180, "false"));
     }
 
     /// <summary>
@@ -259,12 +259,12 @@ public static partial class UniEmuSeeder
     {
         return CreateBatchStaticScenario(
             "false",
-            ("drain-setup", "Setup", 45, "false"),
-            ("drain-filling", "Filling", 150, "false"),
-            ("drain-heatup", "HeatUp", 240, "false"),
-            ("drain-reaction", "Reaction", 420, "false"),
-            ("drain-transfer", "Transfer", 120, "true"),
-            ("drain-cip", "CIP", 180, "true"));
+            ("drain-setup", "Подготовка", 45, "false"),
+            ("drain-filling", "Заполнение", 150, "false"),
+            ("drain-heatup", "Нагрев", 240, "false"),
+            ("drain-reaction", "Реакция", 420, "false"),
+            ("drain-transfer", "Слив продукта", 120, "true"),
+            ("drain-cip", "Промывка CIP", 180, "true"));
     }
 
     /// <summary>
@@ -275,12 +275,12 @@ public static partial class UniEmuSeeder
     {
         return CreateBatchStaticScenario(
             "false",
-            ("cip-setup", "Setup", 45, "false"),
-            ("cip-filling", "Filling", 150, "false"),
-            ("cip-heatup", "HeatUp", 240, "false"),
-            ("cip-reaction", "Reaction", 420, "false"),
-            ("cip-transfer", "Transfer", 120, "false"),
-            ("cip-active", "CIP", 180, "true"));
+            ("cip-setup", "Подготовка", 45, "false"),
+            ("cip-filling", "Заполнение", 150, "false"),
+            ("cip-heatup", "Нагрев", 240, "false"),
+            ("cip-reaction", "Реакция", 420, "false"),
+            ("cip-transfer", "Слив продукта", 120, "false"),
+            ("cip-active", "Промывка CIP", 180, "true"));
     }
 
     /// <summary>

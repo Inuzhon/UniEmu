@@ -188,16 +188,16 @@ public static partial class UniEmuSeeder
             calc: SinusoidCalc(spec.VibrationBase, 0.35, 18, distortion: 2.0), roundDigits: 2, description: "Вибрация шпиндельного узла в мм/с.");
         yield return CreateTag(spec, "spindle-temperature", "Темп. шпинделя", "SpindleTemperatureC", TagType.Double, TagSource.Generator, Invariant(spec.SpindleTemperatureBase),
             calc: SinusoidCalc(spec.SpindleTemperatureBase, 3.5, 180, distortion: 0.8), roundDigits: 1, description: "Температура шпиндельного узла.");
-        yield return CreateTag(spec, "spindle-override", "Коррекция шпинделя", "SpindleOverridePct", TagType.Double, TagSource.Generator, "100",
-            calc: SequenceCalc(80, 100, 100, 120, 100), roundDigits: 0, specialParameter: SpecialParameter.SpindleOvr, description: "Операторская коррекция оборотов шпинделя.");
+        yield return CreateTag(spec, "spindle-override", "Коррекция шпинделя", "SpindleOverridePct", TagType.Double, TagSource.Scenario, "100",
+            scenario: CreateSpindleOverrideScenario(), roundDigits: 0, specialParameter: SpecialParameter.SpindleOvr, description: "Операторская коррекция оборотов шпинделя.");
         yield return CreateTag(spec, "command-feed", "Заданная подача", "CommandFeedMmMin", TagType.Double, TagSource.Scenario, Invariant(spec.CommandFeed),
             scenario: CreateCommandFeedScenario(spec), roundDigits: 1, description: "Командная подача из УП.");
         yield return CreateTag(spec, "actual-feed", "Факт. подача", "ActualFeedMmMin", TagType.Double, TagSource.Script, "0",
             formula: ScriptFormula(CncScriptId(spec, "actual-feed")), roundDigits: 1, specialParameter: SpecialParameter.FeedRate, description: "Фактическая подача с учетом режима выполнения и override.");
-        yield return CreateTag(spec, "feed-override", "Коррекция подачи", "FeedOverridePct", TagType.Double, TagSource.Generator, Invariant(spec.FeedOverrideBase),
-            calc: SequenceCalc(spec.FeedOverrideBase, 100, 100, 80, spec.FeedOverrideBase), roundDigits: 0, specialParameter: SpecialParameter.FeedOvr, description: "Коррекция рабочей подачи оператором.");
-        yield return CreateTag(spec, "rapid-override", "Коррекция G00", "RapidOverridePct", TagType.Double, TagSource.Generator, Invariant(spec.RapidOverrideBase),
-            calc: SequenceCalc(25, spec.RapidOverrideBase, 50, 100, spec.RapidOverrideBase), roundDigits: 0, description: "Коррекция быстрых перемещений G00.");
+        yield return CreateTag(spec, "feed-override", "Коррекция подачи", "FeedOverridePct", TagType.Double, TagSource.Scenario, Invariant(spec.FeedOverrideBase),
+            scenario: CreateFeedOverrideScenario(spec), roundDigits: 0, specialParameter: SpecialParameter.FeedOvr, description: "Коррекция рабочей подачи оператором.");
+        yield return CreateTag(spec, "rapid-override", "Коррекция быстрого хода", "RapidOverridePct", TagType.Double, TagSource.Scenario, Invariant(spec.RapidOverrideBase),
+            scenario: CreateRapidOverrideScenario(spec), roundDigits: 0, description: "Коррекция быстрых перемещений G00.");
         yield return CreateTag(spec, "active-motion-mode", "Режим движения", "ActiveMotionMode", TagType.String, TagSource.Scenario, "G00",
             scenario: CreateMotionModeScenario(), description: "Активный режим интерполяции: G00, G01, G02 или G03.");
         yield return CreateTag(spec, "active-tool", "Инструмент", "ActiveTool", TagType.Int, TagSource.Scenario, Invariant(spec.ActiveTool),
@@ -709,6 +709,55 @@ public static partial class UniEmuSeeder
     }
 
     /// <summary>
+    /// Создает сценарий коррекции оборотов шпинделя.
+    /// </summary>
+    /// <returns>Сценарий операторской коррекции шпинделя.</returns>
+    private static TagScenarioConfigDto CreateSpindleOverrideScenario()
+    {
+        return CreateStaticScenario(
+            "100",
+            ("spindle-override-limit", "Ограничение оборотов", 45, "80"),
+            ("spindle-override-normal", "Номинальные обороты", 45, "100"),
+            ("spindle-override-stable", "Стабильная обработка", 45, "100"),
+            ("spindle-override-boost", "Повышение оборотов", 45, "120"),
+            ("spindle-override-return", "Возврат к номиналу", 45, "100"));
+    }
+
+    /// <summary>
+    /// Создает сценарий коррекции рабочей подачи.
+    /// </summary>
+    /// <param name="spec">Настройки демонстрационного ЧПУ-станка.</param>
+    /// <returns>Сценарий операторской коррекции подачи.</returns>
+    private static TagScenarioConfigDto CreateFeedOverrideScenario(CncSeedSpec spec)
+    {
+        var baseOverride = Invariant(spec.FeedOverrideBase);
+        return CreateStaticScenario(
+            baseOverride,
+            ("feed-override-base", "Операторская уставка", 45, baseOverride),
+            ("feed-override-normal", "Номинальная подача", 45, "100"),
+            ("feed-override-stable", "Стабильная обработка", 45, "100"),
+            ("feed-override-reduced", "Снижение подачи", 45, "80"),
+            ("feed-override-return", "Возврат уставки", 45, baseOverride));
+    }
+
+    /// <summary>
+    /// Создает сценарий коррекции быстрого хода.
+    /// </summary>
+    /// <param name="spec">Настройки демонстрационного ЧПУ-станка.</param>
+    /// <returns>Сценарий коррекции быстрых перемещений G00.</returns>
+    private static TagScenarioConfigDto CreateRapidOverrideScenario(CncSeedSpec spec)
+    {
+        var baseOverride = Invariant(spec.RapidOverrideBase);
+        return CreateStaticScenario(
+            baseOverride,
+            ("rapid-override-safe", "Безопасный быстрый ход", 45, "25"),
+            ("rapid-override-base", "Базовая коррекция", 45, baseOverride),
+            ("rapid-override-limited", "Ограниченный быстрый ход", 45, "50"),
+            ("rapid-override-full", "Полный быстрый ход", 45, "100"),
+            ("rapid-override-return", "Возврат к базе", 45, baseOverride));
+    }
+
+    /// <summary>
     /// Создает сценарий активного режима интерполяции.
     /// </summary>
     /// <returns>Сценарий G-кодов движения.</returns>
@@ -777,24 +826,6 @@ public static partial class UniEmuSeeder
             Period: period,
             Curvature: null,
             Distortion: distortion);
-    }
-
-    /// <summary>
-    /// Создает генератор последовательности числовых значений.
-    /// </summary>
-    /// <param name="values">Значения последовательности.</param>
-    /// <returns>Конфигурация генератора.</returns>
-    private static TagCalcConfigDto SequenceCalc(params double[] values)
-    {
-        return new TagCalcConfigDto(
-            CalcType.Sequence,
-            Start: UniEmuJson.Serialize(values),
-            Finish: null,
-            Duration: Math.Max(1, values.Length * 45),
-            Amplitude: null,
-            Period: null,
-            Curvature: null,
-            Distortion: null);
     }
 
     /// <summary>
