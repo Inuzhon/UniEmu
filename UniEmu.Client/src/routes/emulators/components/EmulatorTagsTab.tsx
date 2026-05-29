@@ -468,7 +468,8 @@ function formatTrigger(trigger: TagTrigger, source?: TagSource): string {
     return trigger.event === 'onStop'
       ? localization.routes.emulators.components.emulatorDetailPage.onStopTriggerLabel
       : localization.routes.emulators.components.emulatorDetailPage.onStartTriggerLabel;
-  if (trigger.mode === 'cron') return `cron: ${trigger.cron ?? '-'}`;
+  if (trigger.mode === 'cron')
+    return localization.routes.emulators.components.emulatorDetailPage.scheduledTriggerLabel;
   return localization.routes.emulators.components.emulatorDetailPage.intervalTriggerLabel(
     trigger.intervalValue ?? 0,
     getTagIntervalUnitLabel(trigger.intervalUnit ?? 'sec')

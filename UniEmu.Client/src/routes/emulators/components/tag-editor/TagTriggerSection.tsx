@@ -16,7 +16,6 @@ import type { SetTagEditorField } from './types';
 interface Props {
   triggerMode: TagTriggerMode;
   triggerEvent: TagTriggerEvent;
-  cron: string;
   intervalValue: number;
   intervalUnit: TagIntervalUnit;
   onFieldChange: SetTagEditorField;
@@ -25,7 +24,6 @@ interface Props {
 export const TagTriggerSection = memo(function TagTriggerSection({
   triggerMode,
   triggerEvent,
-  cron,
   intervalValue,
   intervalUnit,
   onFieldChange,
@@ -45,9 +43,6 @@ export const TagTriggerSection = memo(function TagTriggerSection({
         <SelectContent>
           <SelectItem value="once">
             {localization.routes.emulators.components.addTagDrawer.triggerModeOnceLabel}
-          </SelectItem>
-          <SelectItem value="cron">
-            {localization.routes.emulators.components.addTagDrawer.triggerModeCronLabel}
           </SelectItem>
           <SelectItem value="interval">
             {localization.routes.emulators.components.addTagDrawer.triggerModeIntervalLabel}
@@ -76,26 +71,6 @@ export const TagTriggerSection = memo(function TagTriggerSection({
               </SelectItem>
             </SelectContent>
           </Select>
-        </div>
-      )}
-
-      {triggerMode === 'cron' && (
-        <div className="space-y-1.5">
-          <Label className="text-xs">
-            {localization.routes.emulators.components.addTagDrawer.cronExpressionLabel}
-          </Label>
-          <Input
-            value={cron}
-            spellCheck={false}
-            onChange={(event) => onFieldChange('cron', event.target.value)}
-            placeholder="0 0 * * *"
-            className="font-mono"
-          />
-          <p className="text-[11px] text-muted-foreground">
-            {localization.routes.emulators.components.addTagDrawer.cronExamplePrefix}
-            <code className="font-mono">0 0 * * *</code>{' '}
-            {localization.routes.emulators.components.addTagDrawer.cronDailyMidnightHint}
-          </p>
         </div>
       )}
 

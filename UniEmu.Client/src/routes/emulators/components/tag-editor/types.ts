@@ -22,7 +22,6 @@ export interface TagEditorFormState {
   roundDigits: number;
   triggerMode: TagTriggerMode;
   triggerEvent: TagTriggerEvent;
-  cron: string;
   intervalValue: number;
   intervalUnit: TagIntervalUnit;
   calc: TagCalcConfig;

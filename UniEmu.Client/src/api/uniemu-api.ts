@@ -185,7 +185,7 @@ function getApiPathLabel(path: string): string {
 function getApiFieldLabel(field: string): string {
   const labels: Record<string, string> = {
     event: 'событие',
-    cron: 'CRON-выражение',
+    cron: 'расписание',
     emulatorId: 'ID эмулятора',
     intervalValue: 'значение интервала',
     intervalUnit: 'единица интервала',
