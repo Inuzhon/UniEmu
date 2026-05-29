@@ -1,4 +1,4 @@
-using UniEmu.Runtime.Scripting.Environment;
+﻿using UniEmu.Runtime.Scripting.Environment;
 using UniEmu.Runtime.Scripting.Services;
 using UniEmu.Runtime.Scripting.Workspace;
 
@@ -356,6 +356,63 @@ public sealed class CsxLanguageService
             content,
             position,
             includeDeclaration,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Возвращает имя и исходные объявления символа под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="position">Offset позиции в документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Целевой символ для поиска ссылок или <see langword="null"/>.</returns>
+    public Task<CsxSymbolReferenceTarget?> GetReferenceTargetAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return navigation.GetReferenceTargetAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            position,
+            visibleScripts,
+            globalsType ?? typeof(object),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Возвращает ссылки в указанном CSX-документе, которые резолвятся в заданные объявления символа.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст документа.</param>
+    /// <param name="symbolName">Имя искомого символа.</param>
+    /// <param name="declarationLocations">Расположения объявлений искомого символа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список ссылок на символ во входном документе.</returns>
+    public Task<IReadOnlyList<CsxLocation>> GetReferencesToTargetAsync(
+        string entryPath,
+        string content,
+        string symbolName,
+        IReadOnlyList<CsxLocation> declarationLocations,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type? globalsType = null,
+        CancellationToken cancellationToken = default)
+    {
+        return navigation.GetReferencesToTargetAsync(
+            TagScriptPath.Normalize(entryPath),
+            content,
+            symbolName,
+            declarationLocations,
             visibleScripts,
             globalsType ?? typeof(object),
             cancellationToken);
@@ -726,9 +783,20 @@ public sealed record CsxTextRange(
 /// </summary>
 /// <param name="DocumentPath">Путь или URI документа.</param>
 /// <param name="Range">Диапазон внутри документа.</param>
+/// <param name="SourceCode">Текст документа, если клиенту нужно создать модель для перехода.</param>
 public sealed record CsxLocation(
     string DocumentPath,
-    CsxTextRange Range);
+    CsxTextRange Range,
+    string? SourceCode = null);
+
+/// <summary>
+/// Целевой символ для поиска ссылок в других CSX-документах.
+/// </summary>
+/// <param name="Name">Имя символа, используемое для первичного поиска токенов.</param>
+/// <param name="DeclarationLocations">Расположения объявлений символа в исходных CSX-документах.</param>
+public sealed record CsxSymbolReferenceTarget(
+    string Name,
+    IReadOnlyList<CsxLocation> DeclarationLocations);
 
 /// <summary>
 /// Текстовая правка документа.

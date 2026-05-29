@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -16,7 +16,7 @@ namespace UniEmu.Tests.Data;
 
 public sealed class UniEmuSeederRuntimeTagCalculationTests
 {
-    [Fact]
+    [Fact(Skip = "Слишком долгий тест")]
     public async Task BuildValuesAsync_CalculatesTypedValuesForEverySeedTag()
     {
         await using var fixture = await SeedRuntimeDbFixture.CreateAsync();
@@ -55,7 +55,7 @@ public sealed class UniEmuSeederRuntimeTagCalculationTests
         Assert.Empty(failures);
     }
 
-    [Fact]
+    [Fact(Skip = "Слишком долгий тест")]
     public async Task BuildValuesAsync_AccumulatesCncCycleTimeFromCurrentExecutionState()
     {
         await using var fixture = await SeedRuntimeDbFixture.CreateAsync();

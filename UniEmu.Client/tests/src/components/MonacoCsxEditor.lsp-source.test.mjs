@@ -80,6 +80,27 @@ test('csx intellisense registers advanced Monaco language providers', async () =
   assert.doesNotMatch(registerSource, /registerCallHierarchyProvider/);
 });
 
+test('references and implementation only run for read-only navigation models', async () => {
+  const editorSource = await readComponentFile('MonacoCsxEditor.tsx');
+  const referencesSource = await readComponentFile('references.ts');
+  const implementationSource = await readComponentFile('implementation.ts');
+  const combinedProviderSource = [referencesSource, implementationSource].join('\n');
+
+  assert.match(editorSource, /setModelNavigationEnabled\(model,\s*Boolean\(readOnly\)\)/);
+  assert.match(editorSource, /clearModelNavigationEnabled\(modelRef\.current\)/);
+  assert.match(combinedProviderSource, /isNavigationEnabledForModel\(model\)/);
+  assert.match(combinedProviderSource, /return \[\]/);
+});
+
+test('navigation providers hydrate Monaco models from server location source code', async () => {
+  const rangesSource = await readComponentFile('ranges.ts');
+  const typesSource = await readComponentFile('types.ts');
+
+  assert.match(typesSource, /sourceCode\?: string \| null/);
+  assert.match(rangesSource, /location\.sourceCode/);
+  assert.match(rangesSource, /monacoApi\.editor\.createModel\(location\.sourceCode, MONACO_LANGUAGE_ID, uri\)/);
+});
+
 test('csx intellisense keeps provider disposables to avoid duplicate registrations', async () => {
   const registerSource = await readComponentFile('registerCsxIntellisense.ts');
   const completionSource = await readComponentFile('completion.ts');

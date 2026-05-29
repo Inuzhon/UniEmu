@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
 using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Runtime.Scripting.Workspace;
@@ -93,6 +93,93 @@ public sealed class CsxNavigationService(CsxRoslynContextFactory contextFactory)
             .ToArray();
     }
 
+    /// <summary>
+    /// Возвращает имя и исходные объявления символа под указанной позицией.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст входного документа.</param>
+    /// <param name="position">Offset позиции в раскрытом документе.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Целевой символ для поиска ссылок или <see langword="null"/>.</returns>
+    public async Task<CsxSymbolReferenceTarget?> GetReferenceTargetAsync(
+        string entryPath,
+        string content,
+        int position,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type globalsType,
+        CancellationToken cancellationToken = default)
+    {
+        using var context = contextFactory.CreateContext(entryPath, content, position, visibleScripts, globalsType, cancellationToken);
+        var symbol = await ResolveSymbolAsync(context, cancellationToken);
+        if (symbol is null || string.IsNullOrWhiteSpace(symbol.Name))
+        {
+            return null;
+        }
+
+        var declarations = SourceLocations(context, symbol.Locations);
+        return declarations.Count == 0
+            ? null
+            : new CsxSymbolReferenceTarget(symbol.Name, declarations);
+    }
+
+    /// <summary>
+    /// Возвращает ссылки во входном документе, которые Roslyn связывает с указанными объявлениями символа.
+    /// </summary>
+    /// <param name="entryPath">Путь входного CSX-файла.</param>
+    /// <param name="content">Текст входного документа.</param>
+    /// <param name="symbolName">Имя искомого символа.</param>
+    /// <param name="declarationLocations">Исходные расположения объявлений символа.</param>
+    /// <param name="visibleScripts">Скрипты, доступные для <c>#load</c>.</param>
+    /// <param name="globalsType">Тип globals-объекта скрипта.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Список ссылок во входном документе.</returns>
+    public async Task<IReadOnlyList<CsxLocation>> GetReferencesToTargetAsync(
+        string entryPath,
+        string content,
+        string symbolName,
+        IReadOnlyList<CsxLocation> declarationLocations,
+        IReadOnlyDictionary<string, string> visibleScripts,
+        Type globalsType,
+        CancellationToken cancellationToken = default)
+    {
+        if (declarationLocations.Count == 0 || string.IsNullOrWhiteSpace(symbolName))
+        {
+            return [];
+        }
+
+        using var context = contextFactory.CreateContext(entryPath, content, 0, visibleScripts, globalsType, cancellationToken);
+        var root = await context.Document.GetSyntaxRootAsync(cancellationToken);
+        var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken);
+        if (root is null || semanticModel is null)
+        {
+            return [];
+        }
+
+        var locations = new List<CsxLocation>();
+        foreach (var token in root.DescendantTokens().Where(token =>
+                     token.SpanStart >= context.EntryContentStart
+                     && string.Equals(token.ValueText, symbolName, StringComparison.Ordinal)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var symbol = CsxRoslynSymbolHelpers.ResolveSymbol(semanticModel, token);
+            if (symbol is null || !SymbolMatchesDeclarations(context, symbol, declarationLocations))
+            {
+                continue;
+            }
+
+            var location = CsxSourceMapping.ToLocation(context, token.GetLocation());
+            if (location is not null)
+            {
+                locations.Add(location);
+            }
+        }
+
+        return locations.Distinct().ToArray();
+    }
+
     public async Task<IReadOnlyList<CsxLocation>> GetImplementationsAsync(
         string entryPath,
         string content,
@@ -117,6 +204,22 @@ public sealed class CsxNavigationService(CsxRoslynContextFactory contextFactory)
             .SelectMany(symbol => SourceLocations(context, symbol.Locations))
             .Distinct()
             .ToArray();
+    }
+
+    /// <summary>
+    /// Проверяет, что символ имеет хотя бы одно объявление из целевого набора.
+    /// </summary>
+    /// <param name="context">Roslyn-контекст текущего документа.</param>
+    /// <param name="symbol">Проверяемый символ.</param>
+    /// <param name="declarationLocations">Ожидаемые расположения объявлений.</param>
+    /// <returns><see langword="true"/>, если символ соответствует целевому объявлению.</returns>
+    private static bool SymbolMatchesDeclarations(
+        CsxRoslynContext context,
+        ISymbol symbol,
+        IReadOnlyList<CsxLocation> declarationLocations)
+    {
+        var symbolDeclarations = SourceLocations(context, symbol.Locations);
+        return symbolDeclarations.Any(declarationLocations.Contains);
     }
 
     internal static async Task<ISymbol?> ResolveSymbolAsync(CsxRoslynContext context, CancellationToken cancellationToken)

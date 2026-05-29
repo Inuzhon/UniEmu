@@ -1,4 +1,6 @@
 import type { IRange } from 'monaco-editor';
+import { MONACO_LANGUAGE_ID } from './constants';
+import { setModelNavigationEnabled } from './modelNavigation';
 import type { CsxLocation, CsxTextEdit, CsxTextRange, ITextModel, MonacoApi, Position } from './types';
 
 export function completionRange(model: ITextModel, position: Position): IRange {
@@ -58,8 +60,34 @@ export function toModelUri(monacoApi: MonacoApi, model: ITextModel, documentPath
 }
 
 export function toMonacoLocation(monacoApi: MonacoApi, model: ITextModel, location: CsxLocation) {
+  const uri = toModelUri(monacoApi, model, location.documentPath);
+  hydrateNavigationModel(monacoApi, model, uri, location);
+
   return {
-    uri: toModelUri(monacoApi, model, location.documentPath),
+    uri,
     range: toMonacoRange(monacoApi, location.range),
   };
+}
+
+function hydrateNavigationModel(
+  monacoApi: MonacoApi,
+  currentModel: ITextModel,
+  uri: ITextModel['uri'],
+  location: CsxLocation
+) {
+  if (location.sourceCode == null || uri.toString() === currentModel.uri.toString()) {
+    return;
+  }
+
+  const existing = monacoApi.editor.getModel(uri);
+  const model = existing ?? monacoApi.editor.createModel(location.sourceCode, MONACO_LANGUAGE_ID, uri);
+  if (model.getLanguageId() !== MONACO_LANGUAGE_ID) {
+    monacoApi.editor.setModelLanguage(model, MONACO_LANGUAGE_ID);
+  }
+
+  if (existing && existing.getValue() !== location.sourceCode) {
+    existing.setValue(location.sourceCode);
+  }
+
+  setModelNavigationEnabled(model, true);
 }
