@@ -43,7 +43,7 @@ export function CncViewer({
               file.scope === 'shared' ? 'bg-accent/15 text-accent' : 'bg-primary/15 text-primary'
             }`}
           >
-            {file.scope === 'shared' ? 'shared' : (emulatorName ?? 'emulator')}
+            {file.scope === 'shared' ? localization.routes.cnc.components.cncViewer.sharedScopeLabel : (emulatorName ?? 'emulator')}
           </span>
           {file.isBinary && (
             <span className="rounded bg-muted px-1.5 py-px font-mono text-[10px] uppercase text-muted-foreground">
@@ -168,6 +168,7 @@ export function CncViewer({
         </div>
         <div>
           {localization.routes.cnc.components.cncViewer.loadedBadgeLabel}
+          {' '}
           <TimeAgo iso={file.uploadedAt} />
         </div>
       </div>
