@@ -194,8 +194,29 @@ public sealed class CsxIntellisenseServiceTests
             MachineDocumentUri,
             new CsxEditorPosition(2, 13)), CancellationToken.None);
 
-        Assert.Contains(references, reference => reference.DocumentPath == "common.csx");
+        Assert.Contains(references, reference => reference.DocumentPath.StartsWith("uniemu://scripts/scr-shared/common.csx", StringComparison.Ordinal));
         Assert.Contains(references, reference => reference.DocumentPath.StartsWith("uniemu://scripts/scr-machine", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GetReferencesAsync_ReturnsLoadedScriptUriAndSourceCode()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var sharedScript = await db.ScriptFiles.SingleAsync(script => script.Name == "common.csx");
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+        const string source = "#load \"common.csx\"\nreturn LoadedHelper(2);";
+
+        var references = await service.GetReferencesAsync(new CsxIntellisenseRequest(
+            source,
+            MachineDocumentUri,
+            new CsxEditorPosition(2, 13)), CancellationToken.None);
+
+        var loadedReference = Assert.Single(references, reference =>
+            !reference.DocumentPath.StartsWith("uniemu://scripts/scr-machine", StringComparison.Ordinal));
+        Assert.StartsWith("uniemu://scripts/scr-shared/common.csx", loadedReference.DocumentPath, StringComparison.Ordinal);
+        Assert.Contains("name=common.csx", loadedReference.DocumentPath, StringComparison.Ordinal);
+        Assert.Equal(sharedScript.Content, ReadLocationSourceCode(loadedReference));
     }
 
     [Fact]
@@ -227,6 +248,42 @@ public sealed class CsxIntellisenseServiceTests
             implementation.DocumentPath == MachineDocumentUri
             && implementation.Range.StartLine == 5
             && implementation.Range.StartCharacter == 6);
+    }
+
+    [Fact]
+    public async Task GetImplementationsAsync_ReturnsLoadedScriptUriAndSourceCode()
+    {
+        await using var fixture = await IntellisenseDbFixture.CreateAsync();
+        await using var db = fixture.CreateDbContext();
+        var sharedScript = await db.ScriptFiles.SingleAsync(script => script.Name == "common.csx");
+        sharedScript.Content = """
+            interface ILoadedReader
+            {
+                int Read();
+            }
+
+            class LoadedReader : ILoadedReader
+            {
+                public int Read() => 1;
+            }
+            """;
+        await db.SaveChangesAsync();
+        var service = new CsxIntellisenseService(db, new CsxLanguageService());
+        const string source = """
+            #load "common.csx"
+            ILoadedReader reader = new LoadedReader();
+            return reader.Read();
+            """;
+
+        var implementations = await service.GetImplementationsAsync(new CsxIntellisenseRequest(
+            source,
+            MachineDocumentUri,
+            PositionAt(source, "ILoadedReader")), CancellationToken.None);
+
+        var implementation = Assert.Single(implementations);
+        Assert.StartsWith("uniemu://scripts/scr-shared/common.csx", implementation.DocumentPath, StringComparison.Ordinal);
+        Assert.Contains("name=common.csx", implementation.DocumentPath, StringComparison.Ordinal);
+        Assert.Equal(sharedScript.Content, ReadLocationSourceCode(implementation));
     }
 
     [Fact]
@@ -430,6 +487,13 @@ public sealed class CsxIntellisenseServiceTests
         }
 
         return new CsxEditorPosition(line, offset - lineStart + 1);
+    }
+
+    private static string? ReadLocationSourceCode(CsxLocation location)
+    {
+        var property = typeof(CsxLocation).GetProperty("SourceCode");
+        Assert.NotNull(property);
+        return Assert.IsType<string>(property.GetValue(location));
     }
 
     private sealed class IntellisenseDbFixture : IAsyncDisposable

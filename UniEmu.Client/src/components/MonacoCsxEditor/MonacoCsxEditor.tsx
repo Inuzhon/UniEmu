@@ -3,6 +3,7 @@ import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import { localization } from '@/localization';
 import { bindCsxDiagnostics } from './diagnostics';
 import { MONACO_LANGUAGE_ID } from './constants';
+import { clearModelNavigationEnabled, setModelNavigationEnabled } from './modelNavigation';
 import { monaco } from './monacoEnvironment';
 import { registerCsxIntellisense } from './registerCsxIntellisense';
 import { cancelRequestsForModel } from './request';
@@ -46,8 +47,10 @@ export function MonacoCsxEditor({
 
     if (modelRef.current && modelRef.current !== model) {
       cancelRequestsForModel(modelRef.current);
+      clearModelNavigationEnabled(modelRef.current);
     }
 
+    setModelNavigationEnabled(model, Boolean(readOnly));
     modelRef.current = model;
     editorRef.current?.setModel(model);
   };
@@ -83,6 +86,7 @@ export function MonacoCsxEditor({
       diagnosticsRef.current = null;
       if (modelRef.current) {
         cancelRequestsForModel(modelRef.current);
+        clearModelNavigationEnabled(modelRef.current);
       }
       modelRef.current?.dispose();
       modelRef.current = null;
@@ -97,6 +101,11 @@ export function MonacoCsxEditor({
     if (!documentUri || !monacoApi) return;
     attachModel(documentUri, value, monacoApi);
   }, [documentUri, value]);
+
+  useEffect(() => {
+    if (!modelRef.current) return;
+    setModelNavigationEnabled(modelRef.current, Boolean(readOnly));
+  }, [readOnly]);
 
   return (
     <Editor

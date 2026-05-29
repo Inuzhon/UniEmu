@@ -51,6 +51,7 @@ export type CsxTextRange = {
 export type CsxLocation = {
   documentPath: string;
   range: CsxTextRange;
+  sourceCode?: string | null;
 };
 
 export type CsxTextEdit = {

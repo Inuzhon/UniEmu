@@ -2,6 +2,7 @@
 using UniEmu.Common;
 using UniEmu.Contracts.Enums;
 using UniEmu.Data;
+using UniEmu.Domain.Entities;
 using UniEmu.Runtime.Scripting.Common;
 using UniEmu.Scripting.Api;
 
@@ -26,13 +27,13 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         var result = await language.AnalyzeAsync(
                 entryPath,
                 sourceCode,
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken);
 
@@ -51,13 +52,13 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
 
         return await language.GetCompletionsAsync(
             EntryPath(context),
             sourceCode,
             CsxPositionMapper.ToOffset(sourceCode, request.Position),
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
     }
@@ -74,13 +75,13 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
 
         return await language.GetHoverAsync(
             EntryPath(context),
             sourceCode,
             CsxPositionMapper.ToOffset(sourceCode, request.Position),
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
     }
@@ -97,13 +98,13 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
 
         return await language.GetSignatureHelpAsync(
             EntryPath(context),
             sourceCode,
             CsxPositionMapper.ToOffset(sourceCode, request.Position),
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
     }
@@ -120,7 +121,7 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         return MapLocations(
@@ -128,11 +129,13 @@ public sealed class CsxIntellisenseService(
                 entryPath,
                 sourceCode,
                 CsxPositionMapper.ToOffset(sourceCode, request.Position),
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken),
             entryPath,
-            request.DocumentUri);
+            request.DocumentUri,
+            sourceCode,
+            visibleScripts);
     }
 
     /// <summary>
@@ -147,7 +150,7 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         return MapLocations(
@@ -155,11 +158,13 @@ public sealed class CsxIntellisenseService(
                 entryPath,
                 sourceCode,
                 CsxPositionMapper.ToOffset(sourceCode, request.Position),
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken),
             entryPath,
-            request.DocumentUri);
+            request.DocumentUri,
+            sourceCode,
+            visibleScripts);
     }
 
     /// <summary>
@@ -174,7 +179,7 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         return MapLocations(
@@ -183,11 +188,13 @@ public sealed class CsxIntellisenseService(
                 sourceCode,
                 CsxPositionMapper.ToOffset(sourceCode, request.Position),
                 request.IncludeDeclaration,
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken),
             entryPath,
-            request.DocumentUri);
+            request.DocumentUri,
+            sourceCode,
+            visibleScripts);
     }
 
     /// <summary>
@@ -202,7 +209,7 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         return MapLocations(
@@ -210,11 +217,13 @@ public sealed class CsxIntellisenseService(
                 entryPath,
                 sourceCode,
                 CsxPositionMapper.ToOffset(sourceCode, request.Position),
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken),
             entryPath,
-            request.DocumentUri);
+            request.DocumentUri,
+            sourceCode,
+            visibleScripts);
     }
 
     /// <summary>
@@ -234,14 +243,14 @@ public sealed class CsxIntellisenseService(
 
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
         var edit = await language.RenameAsync(
             entryPath,
             sourceCode,
             CsxPositionMapper.ToOffset(sourceCode, request.Position),
             request.NewName,
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
 
@@ -267,12 +276,12 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
 
         return await language.FormatDocumentAsync(
             EntryPath(context),
             sourceCode,
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
     }
@@ -289,13 +298,13 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
 
         return await language.FormatRangeAsync(
             EntryPath(context),
             sourceCode,
             request.Range ?? new CsxTextRange(0, 0, 0, 0),
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
     }
@@ -312,12 +321,12 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
 
         return await language.GetFoldingRangesAsync(
             EntryPath(context),
             sourceCode,
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
     }
@@ -334,12 +343,12 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
 
         return await language.GetSemanticTokensAsync(
             EntryPath(context),
             sourceCode,
-            visibleScripts,
+            visibleScripts.ContentByPath,
             typeof(TagScriptGlobals),
             cancellationToken);
     }
@@ -356,7 +365,7 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         return MapCallHierarchyItems(
@@ -364,7 +373,7 @@ public sealed class CsxIntellisenseService(
                 entryPath,
                 sourceCode,
                 CsxPositionMapper.ToOffset(sourceCode, request.Position),
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken),
             entryPath,
@@ -383,14 +392,14 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         return (await language.GetIncomingCallsAsync(
                 entryPath,
                 sourceCode,
                 CsxPositionMapper.ToOffset(sourceCode, request.Position),
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken))
             .Select(call => call with { From = MapCallHierarchyItem(call.From, entryPath, request.DocumentUri) })
@@ -409,23 +418,24 @@ public sealed class CsxIntellisenseService(
     {
         var context = CsxDocumentContextParser.Parse(request.DocumentUri);
         var sourceCode = request.SourceCode ?? string.Empty;
-        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, cancellationToken);
+        var visibleScripts = await LoadVisibleScriptsAsync(context, sourceCode, request.DocumentUri, cancellationToken);
         var entryPath = EntryPath(context);
 
         return (await language.GetOutgoingCallsAsync(
                 entryPath,
                 sourceCode,
                 CsxPositionMapper.ToOffset(sourceCode, request.Position),
-                visibleScripts,
+                visibleScripts.ContentByPath,
                 typeof(TagScriptGlobals),
                 cancellationToken))
             .Select(call => call with { To = MapCallHierarchyItem(call.To, entryPath, request.DocumentUri) })
             .ToArray();
     }
 
-    private async Task<Dictionary<string, string>> LoadVisibleScriptsAsync(
+    private async Task<VisibleScriptSet> LoadVisibleScriptsAsync(
         CsxDocumentContext context,
         string sourceCode,
+        string? documentUri,
         CancellationToken cancellationToken)
     {
         var sharedScope = UniEmuJson.EnumString(ScriptScope.Shared);
@@ -438,14 +448,19 @@ public sealed class CsxIntellisenseService(
             .ThenBy(script => script.Name)
             .ToListAsync(cancellationToken);
 
-        var result = VisibleScriptResolver.ToContentMap(scripts);
+        var contentByPath = VisibleScriptResolver.ToContentMap(scripts);
+        var documentsByPath = CreateVisibleDocumentMap(scripts);
 
         if (!string.IsNullOrWhiteSpace(context.ScriptName))
         {
-            VisibleScriptResolver.AddOrReplace(result, context.ScriptName, sourceCode);
+            VisibleScriptResolver.AddOrReplace(contentByPath, context.ScriptName, sourceCode);
+            if (!string.IsNullOrWhiteSpace(documentUri))
+            {
+                documentsByPath[TagScriptPath.Normalize(context.ScriptName)] = new VisibleScriptDocument(documentUri, sourceCode);
+            }
         }
 
-        return result;
+        return new VisibleScriptSet(contentByPath, documentsByPath);
     }
 
     private static string EntryPath(CsxDocumentContext context)
@@ -458,12 +473,15 @@ public sealed class CsxIntellisenseService(
     private static IReadOnlyList<CsxLocation> MapLocations(
         IReadOnlyList<CsxLocation> locations,
         string entryPath,
-        string? documentUri)
+        string? documentUri,
+        string sourceCode,
+        VisibleScriptSet visibleScripts)
     {
         return locations
             .Select(location => location with
             {
-                DocumentPath = MapDocumentPath(location.DocumentPath, entryPath, documentUri),
+                DocumentPath = MapDocumentPath(location.DocumentPath, entryPath, documentUri, visibleScripts),
+                SourceCode = ResolveLocationSourceCode(location.DocumentPath, entryPath, sourceCode, visibleScripts),
             })
             .ToArray();
     }
@@ -508,13 +526,72 @@ public sealed class CsxIntellisenseService(
         };
     }
 
-    private static string MapDocumentPath(string documentPath, string entryPath, string? documentUri)
+    private static string MapDocumentPath(
+        string documentPath,
+        string entryPath,
+        string? documentUri,
+        VisibleScriptSet? visibleScripts = null)
     {
-        return string.Equals(documentPath, entryPath, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(documentUri)
-            ? documentUri
+        if (string.Equals(documentPath, entryPath, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(documentUri))
+        {
+            return documentUri;
+        }
+
+        var normalized = TagScriptPath.Normalize(documentPath);
+        return visibleScripts is not null && visibleScripts.DocumentsByPath.TryGetValue(normalized, out var document)
+            ? document.DocumentUri
             : documentPath;
     }
 
+    private static string? ResolveLocationSourceCode(
+        string documentPath,
+        string entryPath,
+        string sourceCode,
+        VisibleScriptSet visibleScripts)
+    {
+        if (string.Equals(documentPath, entryPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return sourceCode;
+        }
+
+        var normalized = TagScriptPath.Normalize(documentPath);
+        return visibleScripts.DocumentsByPath.TryGetValue(normalized, out var document)
+            ? document.SourceCode
+            : null;
+    }
+
+    private static Dictionary<string, VisibleScriptDocument> CreateVisibleDocumentMap(IEnumerable<ScriptFileEntity> scripts)
+    {
+        var result = new Dictionary<string, VisibleScriptDocument>(StringComparer.OrdinalIgnoreCase);
+        foreach (var script in scripts
+                     .OrderBy(script => string.Equals(script.Scope, UniEmuJson.EnumString(ScriptScope.Shared), StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                     .ThenBy(script => script.Name, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(script => script.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            result[TagScriptPath.Normalize(script.Name)] = new VisibleScriptDocument(
+                BuildDocumentUri(script),
+                script.Content);
+        }
+
+        return result;
+    }
+
+    private static string BuildDocumentUri(ScriptFileEntity script)
+    {
+        var query = $"name={Uri.EscapeDataString(script.Name)}&scope={Uri.EscapeDataString(script.Scope)}";
+        if (!string.IsNullOrWhiteSpace(script.EmulatorId))
+        {
+            query += $"&emulatorId={Uri.EscapeDataString(script.EmulatorId)}";
+        }
+
+        return $"uniemu://scripts/{Uri.EscapeDataString(script.Id)}/{Uri.EscapeDataString(script.Name)}?{query}";
+    }
+
+    private sealed record VisibleScriptSet(
+        IReadOnlyDictionary<string, string> ContentByPath,
+        IReadOnlyDictionary<string, VisibleScriptDocument> DocumentsByPath);
+
+    private sealed record VisibleScriptDocument(string DocumentUri, string SourceCode);
 }
 
 /// <summary>

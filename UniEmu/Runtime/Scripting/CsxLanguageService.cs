@@ -726,9 +726,11 @@ public sealed record CsxTextRange(
 /// </summary>
 /// <param name="DocumentPath">Путь или URI документа.</param>
 /// <param name="Range">Диапазон внутри документа.</param>
+/// <param name="SourceCode">Текст документа, если клиенту нужно создать модель для перехода.</param>
 public sealed record CsxLocation(
     string DocumentPath,
-    CsxTextRange Range);
+    CsxTextRange Range,
+    string? SourceCode = null);
 
 /// <summary>
 /// Текстовая правка документа.
