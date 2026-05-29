@@ -8,6 +8,7 @@ import type {
   TagType,
 } from '@/types/uniemu';
 import { DEFAULT_INLINE_SCRIPT } from './constants';
+import { normalizeVisibleTriggerMode } from './tagValidation';
 import type { TagEditorFormState } from './types';
 
 export const sanitizeStaticValue = (type: TagType, value: string) => {
@@ -61,7 +62,6 @@ export const createEmptyTagEditorFormState = (): TagEditorFormState => ({
   roundDigits: 2,
   triggerMode: 'interval',
   triggerEvent: 'onStart',
-  cron: '0 0 * * *',
   intervalValue: 1,
   intervalUnit: 'sec',
   calc: createDefaultCalc(),
@@ -94,7 +94,6 @@ export const createTagEditorFormState = (tag: EmulatorTag): TagEditorFormState =
     roundDigits: tag.roundDigits ?? 2,
     triggerMode: tag.trigger.mode,
     triggerEvent: tag.trigger.event ?? 'onStart',
-    cron: tag.trigger.cron ?? '0 0 * * *',
     intervalValue: tag.trigger.intervalValue ?? 1,
     intervalUnit: tag.trigger.intervalUnit ?? 'sec',
     calc,
@@ -118,7 +117,6 @@ export const buildTagFormSnapshot = (form: TagEditorFormState) =>
       form.type === 'double' && form.roundEnabled ? clampRoundDigits(form.roundDigits) : null,
     triggerMode: form.triggerMode,
     triggerEvent: form.triggerEvent,
-    cron: form.cron,
     intervalValue: form.intervalValue,
     intervalUnit: form.intervalUnit,
     calc: form.calc,
@@ -133,10 +131,11 @@ export const hasScenarioDuration = (scenario: TagScenarioConfig) =>
 
 export const buildTagPayload = (form: TagEditorFormState): Omit<EmulatorTag, 'id'> => {
   const isScenario = form.source === 'scenario';
+  const triggerMode = normalizeVisibleTriggerMode(form.triggerMode);
   const trigger: TagTrigger = isScenario
     ? { mode: 'interval', event: null, cron: null, intervalValue: 1, intervalUnit: 'sec' }
     : {
-        mode: form.triggerMode,
+        mode: triggerMode,
         event: null,
         cron: null,
         intervalValue: null,
@@ -144,9 +143,8 @@ export const buildTagPayload = (form: TagEditorFormState): Omit<EmulatorTag, 'id
       };
 
   if (!isScenario) {
-    if (form.triggerMode === 'once') trigger.event = form.triggerEvent;
-    if (form.triggerMode === 'cron') trigger.cron = form.cron;
-    if (form.triggerMode === 'interval') {
+    if (triggerMode === 'once') trigger.event = form.triggerEvent;
+    if (triggerMode === 'interval') {
       trigger.intervalValue = form.intervalValue;
       trigger.intervalUnit = form.intervalUnit;
     }

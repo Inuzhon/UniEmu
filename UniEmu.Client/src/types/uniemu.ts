@@ -53,7 +53,7 @@ export type CalcType =
 /**
  * Режим срабатывания вычисления тега.
  *  - once:     один раз при выбранном событии (старт/стоп эмулятора)
- *  - cron:     по cron-выражению
+ *  - cron:     legacy-режим расписания, не настраивается в клиенте
  *  - interval: с заданной периодичностью (value + unit)
  */
 export type TagTriggerMode = 'once' | 'cron' | 'interval';
@@ -63,7 +63,7 @@ export type TagIntervalUnit = 'ms' | 'sec' | 'min';
 export interface TagTrigger {
   mode: TagTriggerMode;
   event?: TagTriggerEvent | null;        // для mode === "once"
-  cron?: string | null;                  // для mode === "cron", напр. "0 0 * * *"
+  cron?: string | null;                  // legacy-расписание backend
   intervalValue?: number | null;         // для mode === "interval"
   intervalUnit?: TagIntervalUnit | null; // для mode === "interval"
 }

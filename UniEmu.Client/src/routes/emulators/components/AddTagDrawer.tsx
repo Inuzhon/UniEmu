@@ -473,7 +473,6 @@ export function AddTagDrawer({ emulatorId, open, onOpenChange, tag }: Props) {
               <TagTriggerSection
                 triggerMode={form.triggerMode}
                 triggerEvent={form.triggerEvent}
-                cron={form.cron}
                 intervalValue={form.intervalValue}
                 intervalUnit={form.intervalUnit}
                 onFieldChange={setField}

@@ -118,6 +118,10 @@ export function clampIntervalValue(value: number) {
   return Math.round(clampFiniteNumber(value, 1, MAX_CALC_DURATION_SECONDS, 1));
 }
 
+export function normalizeVisibleTriggerMode(mode: TagEditorFormState['triggerMode']) {
+  return mode === 'once' ? 'once' : 'interval';
+}
+
 export function normalizeTagEditorForm(form: TagEditorFormState): TagEditorFormState {
   let next = form;
   const requiredType = getRequiredTagType(next.specialParameter);
@@ -136,6 +140,13 @@ export function normalizeTagEditorForm(form: TagEditorFormState): TagEditorFormS
 
   if (next.type !== 'double' && next.roundEnabled) {
     next = { ...next, roundEnabled: false };
+  }
+
+  if (next.triggerMode !== normalizeVisibleTriggerMode(next.triggerMode)) {
+    next = {
+      ...next,
+      triggerMode: normalizeVisibleTriggerMode(next.triggerMode),
+    };
   }
 
   const normalizedScenario = normalizeScenario(next.type, next.scenario);
@@ -279,13 +290,6 @@ function appendTriggerErrors(errors: string[], form: TagEditorFormState) {
   if (form.triggerMode === 'interval') {
     if (!Number.isFinite(form.intervalValue) || form.intervalValue < 1) {
       errors.push('Интервал вычисления тега должен быть больше нуля.');
-    }
-  }
-
-  if (form.triggerMode === 'cron') {
-    const parts = form.cron.trim().split(/\s+/).filter(Boolean);
-    if (parts.length < 5 || parts.length > 7) {
-      errors.push('Cron-выражение тега некорректно.');
     }
   }
 }
