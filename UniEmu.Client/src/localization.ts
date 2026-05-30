@@ -138,11 +138,12 @@ export const localization = {
           editButtonLabel: 'Редактировать',
           descriptionLabel: 'Описание',
           descriptionPlaceholder: 'Краткое описание программы…',
-          missingDescriptionText: '- описание не задано',
+          missingDescriptionText: 'описание не задано',
           binaryPreviewUnavailable: 'Бинарный файл - предпросмотр недоступен',
           downloadBinaryHint: 'Используйте «Скачать» для выгрузки',
           lineCountLabel: (p0: number) => formatCount(p0, ['строка', 'строки', 'строк']),
           loadedBadgeLabel: 'загружено',
+          sharedScopeLabel: 'Общий',
         },
         dropZone: {
           title: 'Перетащите файлы УП сюда',
@@ -536,6 +537,7 @@ export const localization = {
           deleteActionLabel: 'Удалить',
         },
         scriptEditor: {
+          sharedScopeLabel: 'Общий',
           dirtyBadgeLabel: 'изменено',
           kilobytesUnitLabel: 'КБ',
           updatedBadgeLabel: 'обновлено',

@@ -72,7 +72,7 @@ export function ScriptEditor({
               file.scope === 'shared' ? 'bg-accent/15 text-accent' : 'bg-primary/15 text-primary'
             }`}
           >
-            {file.scope === 'shared' ? 'shared' : (emulatorName ?? 'emulator')}
+            {file.scope === 'shared' ? localization.routes.scripts.components.scriptEditor.sharedScopeLabel : (emulatorName ?? 'emulator')}
           </span>
           {dirty && (
             <span className="rounded bg-signal-warning/15 px-1.5 py-px font-mono text-[10px] uppercase text-signal-warning">
@@ -145,14 +145,14 @@ export function ScriptEditor({
           <span>UTF-8</span>
           <span>LF</span>
         </div>
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           {file.scope === 'shared' && (
             <span className="flex items-center gap-1">
               <Share2 className="h-3 w-3" />{' '}
               {localization.routes.scripts.components.scriptEditor.sharedScopeHint}
             </span>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   );
