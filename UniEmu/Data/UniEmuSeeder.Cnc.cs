@@ -242,8 +242,8 @@ public static partial class UniEmuSeeder
                     programName,
                     spec.Id,
                     isMainProgram
-                        ? $"Seed: основная управляющая программа для {spec.Name}."
-                        : $"Seed: альтернативная управляющая программа для {spec.Name}.",
+                        ? $"Основная управляющая программа"
+                        : $"Альтернативная управляющая программа",
                     CreateCncProgramContent(programName),
                     now.AddHours(-1));
             }
@@ -509,7 +509,7 @@ public static partial class UniEmuSeeder
                 EmulatorId = spec.Id,
                 EmulatorName = spec.Name,
                 Level = UniEmuJson.EnumString(EventLevel.Info),
-                Message = $"Seed: ЧПУ-станок {spec.Name} подготовлен с программой {spec.ProgramName}, сценариями осей, шпинделя и диагностикой.",
+                Message = $"ЧПУ-станок {spec.Name} подготовлен с программой {spec.ProgramName}, сценариями осей, шпинделя и диагностикой.",
                 Timestamp = now.AddSeconds(20 + index),
             };
 

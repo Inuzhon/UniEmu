@@ -211,8 +211,43 @@ public static partial class UniEmuSeeder
             FormulaJson = formula is null ? null : UniEmuJson.Serialize(formula),
             ScenarioJson = scenario is null ? null : UniEmuJson.Serialize(scenario),
             RoundDigits = roundDigits,
-            SpecialParameter = UniEmuJson.EnumString(specialParameter ?? SpecialParameter.None),
+            SpecialParameter = UniEmuJson.EnumString(FixSpecialParameter(specialParameter)),
             Description = description,
+        };
+    }
+
+    private static SpecialParameter FixSpecialParameter(SpecialParameter? specialParameter)
+    {
+        return specialParameter switch
+        {
+            SpecialParameter.PrgName => specialParameter.Value,
+            //SpecialParameter.PartCounter => expr,
+            //SpecialParameter.ErrorNum => expr,
+            //SpecialParameter.FeedOvr => expr,
+            //SpecialParameter.SpindleOvr => expr,
+            //SpecialParameter.JogOvr => expr,
+            SpecialParameter.FrameNum => specialParameter.Value,
+            SpecialParameter.FrameText => specialParameter.Value,
+            //SpecialParameter.ToolNum => expr,
+            //SpecialParameter.WorkMode => expr,
+            //SpecialParameter.SystemState => expr,
+            //SpecialParameter.MachineReadiness => expr,
+            //SpecialParameter.TechnologicalStop => expr,
+            //SpecialParameter.EmergencyStop => expr,
+            //SpecialParameter.FeedRate => expr,
+            //SpecialParameter.ErrorText => expr,
+            //SpecialParameter.CycleTime => expr,
+            //SpecialParameter.SpindleSpeed => expr,
+            //SpecialParameter.SpindleLoad => expr,
+            //SpecialParameter.AxisLoad => expr,
+            //SpecialParameter.AxisPosition => expr,
+            //SpecialParameter.Message => expr,
+            //SpecialParameter.CNCModel => expr,
+            //SpecialParameter.FirmwareVersion => expr,
+            //SpecialParameter.SerialNumber => expr,
+            //SpecialParameter.PLCVersion => expr,
+            SpecialParameter.Subprogram => specialParameter.Value,
+            _ => SpecialParameter.None,
         };
     }
 
