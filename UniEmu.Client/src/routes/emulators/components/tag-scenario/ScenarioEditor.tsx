@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type {
   CncProgram,
@@ -256,9 +255,9 @@ export function ScenarioEditor({
       </div>
 
       {/* Двухпанельный layout */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,320px)_1fr]">
+      <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,320px)_1fr]">
         {/* ЛЕВО — список сегментов */}
-        <div className="flex min-h-0 flex-col rounded-md border border-border bg-background/40">
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-background/40">
           <div className="border-b border-border p-2 space-y-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -307,8 +306,8 @@ export function ScenarioEditor({
             </div>
           </div>
 
-          <ScrollArea className="max-h-[420px] flex-1">
-            <ul className="p-1.5">
+          <div className="max-h-[420px] min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <ul className="min-w-0 overflow-hidden p-1.5">
               {filtered.length === 0 && (
                 <li className="px-2 py-6 text-center text-[11px] text-muted-foreground">
                   {
@@ -321,21 +320,24 @@ export function ScenarioEditor({
                 const isSelected = seg.id === selectedId;
                 const startAt = cumOffsets[idx] ?? 0;
                 return (
-                  <li key={seg.id}>
+                  <li key={seg.id} className="min-w-0 overflow-hidden">
                     <button
                       type="button"
                       onClick={() => setSelectedId(seg.id)}
                       className={cn(
-                        'group block w-full rounded-md border border-transparent px-2 py-1.5 text-left transition-colors',
+                        'group block w-full min-w-0 overflow-hidden rounded-md border border-transparent px-2 py-1.5 text-left transition-colors',
                         isSelected ? 'border-primary/40 bg-primary/10' : 'hover:bg-muted/30'
                       )}
                     >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="rounded bg-primary/15 px-1 py-0.5 font-mono text-[10px] font-semibold text-primary">
+                      <div className="mb-1 flex min-w-0 items-center justify-between gap-2 overflow-hidden">
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                          <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 font-mono text-[10px] font-semibold text-primary">
                             #{idx + 1}
                           </span>
-                          <span className="truncate text-xs font-medium">
+                          <span
+                            title={seg.label || undefined}
+                            className="min-w-0 flex-1 truncate text-xs font-medium"
+                          >
                             {seg.label || (
                               <span className="text-muted-foreground">
                                 {
@@ -346,7 +348,7 @@ export function ScenarioEditor({
                             )}
                           </span>
                         </div>
-                        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                           <Button asChild size="icon" variant="ghost" className="h-6 w-6">
                             <span
                               role="button"
@@ -437,7 +439,7 @@ export function ScenarioEditor({
                 );
               })}
             </ul>
-          </ScrollArea>
+          </div>
         </div>
 
         {/* ПРАВО — sticky-превью + форма выбранного сегмента */}
