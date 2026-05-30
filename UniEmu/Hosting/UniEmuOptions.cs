@@ -1,4 +1,4 @@
-namespace UniEmu.Hosting;
+﻿namespace UniEmu.Hosting;
 
 /// <summary>
 /// Strongly typed settings from the UniEmu configuration section.
@@ -6,6 +6,7 @@ namespace UniEmu.Hosting;
 public sealed class UniEmuOptions
 {
     public const string SectionName = "UniEmu";
+    public const string DefaultTargetUrlValue = "http://127.0.0.1:8080";
 
     public bool DisableRuntime { get; set; }
 
@@ -18,6 +19,8 @@ public sealed class UniEmuOptions
     public bool EnableStaticAssetCompression { get; set; }
 
     public bool EnableStaticAssetCaching { get; set; }
+
+    public string DefaultTargetUrl { get; set; } = DefaultTargetUrlValue;
 
     public int ScriptExecutionTimeoutSeconds { get; set; } = 5;
 

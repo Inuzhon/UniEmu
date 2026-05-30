@@ -32,6 +32,7 @@ services:
       UniEmu__DisableRuntime: ${UNIEMU_DISABLE_RUNTIME:-false}
       UniEmu__SkipStartupDatabase: ${UNIEMU_SKIP_STARTUP_DATABASE:-false}
       UniEmu__SeedData: ${UNIEMU_SEED_DATA:-false}
+      UniEmu__DefaultTargetUrl: ${UNIEMU_DEFAULT_TARGET_URL:-http://host.docker.internal:8080}
       UniEmu__DisableStaticAssets: ${UNIEMU_DISABLE_STATIC_ASSETS:-false}
       UniEmu__EnableStaticAssetCompression: ${UNIEMU_ENABLE_STATIC_ASSET_COMPRESSION:-true}
       UniEmu__EnableStaticAssetCaching: ${UNIEMU_ENABLE_STATIC_ASSET_CACHING:-true}
@@ -61,6 +62,8 @@ services:
       Serilog__WriteTo__1__Args__fileSizeLimitBytes: ${UNIEMU_LOG_FILE_SIZE_LIMIT_BYTES:-10485760}
     ports:
       - "${UNIEMU_PORT:-5083}:${UNIEMU_PORT:-5083}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - uniemu-data:/app/data
       - uniemu-logs:/app/Logs

@@ -71,8 +71,9 @@ public static partial class UniEmuSeeder
     /// </summary>
     /// <param name="spec">Настройки демонстрационной печи.</param>
     /// <param name="now">Текущее время заполнения базы.</param>
+    /// <param name="targetUrl">URL целевой системы для эмулятора.</param>
     /// <returns>Сущность эмулятора печи.</returns>
-    private static EmulatorEntity CreateFurnaceEmulator(FurnaceSeedSpec spec, DateTimeOffset now)
+    private static EmulatorEntity CreateFurnaceEmulator(FurnaceSeedSpec spec, DateTimeOffset now, string targetUrl)
     {
         return new EmulatorEntity
         {
@@ -80,7 +81,7 @@ public static partial class UniEmuSeeder
             Name = spec.Name,
             Status = nameof(EmulatorStatus.Stopped),
             ProtocolId = spec.ProtocolId,
-            TargetUrl = "http://127.0.0.1:8080",
+            TargetUrl = targetUrl,
             IntervalSec = spec.IntervalSec,
             LastRun = now.AddMinutes(-12),
             NextRun = now.AddSeconds(spec.IntervalSec),

@@ -9,6 +9,8 @@ export const TELEMETRY_CHART_VISIBLE_PACKET_COUNT = 120;
 
 export const REALTIME_STORE_FLUSH_INTERVAL_MS = 100;
 
+export const DEFAULT_TARGET_URL = 'http://127.0.0.1:8080';
+
 export const TELEMETRY_LINE_COLORS = [
   'oklch(0.78 0.16 195)',
   'oklch(0.82 0.16 80)',

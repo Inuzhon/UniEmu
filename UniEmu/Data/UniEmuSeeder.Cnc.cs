@@ -116,8 +116,9 @@ public static partial class UniEmuSeeder
     /// </summary>
     /// <param name="spec">Настройки демонстрационного ЧПУ-станка.</param>
     /// <param name="now">Текущее время заполнения базы.</param>
+    /// <param name="targetUrl">URL целевой системы для эмулятора.</param>
     /// <returns>Сущность эмулятора ЧПУ-станка.</returns>
-    private static EmulatorEntity CreateCncEmulator(CncSeedSpec spec, DateTimeOffset now)
+    private static EmulatorEntity CreateCncEmulator(CncSeedSpec spec, DateTimeOffset now, string targetUrl)
     {
         return new EmulatorEntity
         {
@@ -125,7 +126,7 @@ public static partial class UniEmuSeeder
             Name = spec.Name,
             Status = nameof(EmulatorStatus.Stopped),
             ProtocolId = spec.ProtocolId,
-            TargetUrl = "http://127.0.0.1:8080",
+            TargetUrl = targetUrl,
             IntervalSec = spec.IntervalSec,
             LastRun = now.AddMinutes(-7),
             NextRun = now.AddSeconds(spec.IntervalSec),

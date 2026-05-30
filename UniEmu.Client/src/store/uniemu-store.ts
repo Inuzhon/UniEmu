@@ -2,6 +2,7 @@ import { create, type StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { uniEmuApi } from '@/api/uniemu-api';
 import {
+  DEFAULT_TARGET_URL,
   TELEMETRY_CHART_VISIBLE_PACKET_COUNT,
   TELEMETRY_PACKET_RETENTION_LIMIT,
   REALTIME_STORE_FLUSH_INTERVAL_MS,
@@ -9,6 +10,7 @@ import {
 import { PERSIST_STORE } from '@/lib/feature-flags';
 import { RuntimeUpdatesClient } from '@/realtime/runtime-updates-client';
 import type {
+  AppSettings,
   CncProgram,
   CncScope,
   Emulator,
@@ -22,6 +24,7 @@ import type {
 } from '@/types/uniemu';
 
 interface UniEmuState {
+  appSettings: AppSettings;
   emulators: Emulator[];
   events: SystemEvent[];
   tagsByEmulator: Record<string, EmulatorTag[]>;
@@ -82,6 +85,7 @@ const pendingTelemetryUpdates = new Map<string, RuntimeTelemetryUpdate[]>();
 const pendingTagValueUpdates = new Map<string, RuntimeTagValueUpdate>();
 
 const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
+  appSettings: { defaultTargetUrl: DEFAULT_TARGET_URL },
   emulators: [],
   events: [],
   tagsByEmulator: {},
@@ -95,7 +99,8 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
   hydrate: async () => {
     set({ loading: true, apiError: null });
     try {
-      const [emulators, events, scripts, cncPrograms] = await Promise.all([
+      const [appSettings, emulators, events, scripts, cncPrograms] = await Promise.all([
+        uniEmuApi.settings.get(),
         uniEmuApi.emulators.list(),
         uniEmuApi.events.list(200),
         uniEmuApi.scripts.list(),
@@ -105,6 +110,7 @@ const stateCreator: StateCreator<UniEmuState> = (set, get) => ({
         emulators.map(async (emulator) => [emulator.id, await uniEmuApi.tags.list(emulator.id)] as const),
       );
       set({
+        appSettings,
         emulators: sortEmulators(emulators),
         events,
         scripts,

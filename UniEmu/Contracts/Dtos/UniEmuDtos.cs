@@ -1,4 +1,4 @@
-using UniEmu.Contracts.Enums;
+﻿using UniEmu.Contracts.Enums;
 
 namespace UniEmu.Contracts.Dtos;
 
@@ -30,6 +30,12 @@ public sealed record EmulatorDto(
     int TagsCount,
     long UptimeSec,
     long TotalRequests);
+
+/// <summary>
+/// Настройки клиентского приложения, зависящие от конфигурации backend.
+/// </summary>
+/// <param name="DefaultTargetUrl">URL целевой системы, подставляемый при создании эмулятора.</param>
+public sealed record AppSettingsDto(string DefaultTargetUrl);
 
 /// <summary>
 /// Настройки события или расписания, запускающего расчет тега.

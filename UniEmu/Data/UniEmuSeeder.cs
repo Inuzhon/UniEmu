@@ -16,24 +16,31 @@ public static partial class UniEmuSeeder
     /// Заполняет пустую базу промышленными эмуляторами, тегами, сценариями, генераторами, скриптами и событиями.
     /// </summary>
     /// <param name="db">Контекст базы данных UniEmu.</param>
+    /// <param name="defaultTargetUrl">URL целевой системы для создаваемых seed-эмуляторов.</param>
     /// <param name="cancellationToken">Токен отмены операции сохранения.</param>
     /// <returns>Задача инициализации seed-данных.</returns>
-    public static async Task SeedAsync(UniEmuDbContext db, CancellationToken cancellationToken = default)
+    public static async Task SeedAsync(
+        UniEmuDbContext db,
+        string? defaultTargetUrl = null,
+        CancellationToken cancellationToken = default)
     {
         if (db.Emulators.Any())
             return;
 
         var now = DateTimeOffset.UtcNow;
+        var targetUrl = string.IsNullOrWhiteSpace(defaultTargetUrl)
+            ? "http://127.0.0.1:8080"
+            : defaultTargetUrl.Trim();
         var furnaces = CreateFurnaceSpecs();
         var cncMachines = CreateCncSpecs();
         var batchReactors = CreateBatchReactorSpecs();
         var legacyOvens = CreateLegacyOvenSpecs();
 
         db.Emulators.AddRange(
-            furnaces.Select(spec => CreateFurnaceEmulator(spec, now))
-                .Concat(cncMachines.Select(spec => CreateCncEmulator(spec, now)))
-                .Concat(batchReactors.Select(spec => CreateBatchReactorEmulator(spec, now)))
-                .Concat(legacyOvens.Select(spec => CreateLegacyOvenEmulator(spec, now))));
+            furnaces.Select(spec => CreateFurnaceEmulator(spec, now, targetUrl))
+                .Concat(cncMachines.Select(spec => CreateCncEmulator(spec, now, targetUrl)))
+                .Concat(batchReactors.Select(spec => CreateBatchReactorEmulator(spec, now, targetUrl)))
+                .Concat(legacyOvens.Select(spec => CreateLegacyOvenEmulator(spec, now, targetUrl))));
         db.EmulatorTags.AddRange(
             furnaces.SelectMany(CreateFurnaceTags)
                 .Concat(cncMachines.SelectMany(CreateCncTags))

@@ -15,6 +15,10 @@ export interface Emulator {
   totalRequests: number;
 }
 
+export interface AppSettings {
+  defaultTargetUrl: string;
+}
+
 export type TagType = 'int' | 'double' | 'string' | 'bool';
 
 export type TagSource =
