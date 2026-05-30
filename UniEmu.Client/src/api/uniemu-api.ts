@@ -1,4 +1,5 @@
 import type {
+  AppSettings,
   CncProgram,
   CncScope,
   Emulator,
@@ -219,6 +220,9 @@ const query = (params: Record<string, string | number | undefined>) => {
 };
 
 export const uniEmuApi = {
+  settings: {
+    get: () => request<AppSettings>('/api/settings'),
+  },
   emulators: {
     list: () => request<Emulator[]>('/api/emulators'),
     get: (emulatorId: string) =>

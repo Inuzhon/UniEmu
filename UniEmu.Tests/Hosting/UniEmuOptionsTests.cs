@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using UniEmu.Hosting;
@@ -19,6 +19,7 @@ public sealed class UniEmuOptionsTests
                 ["UniEmu:DisableStaticAssets"] = "true",
                 ["UniEmu:EnableStaticAssetCompression"] = "true",
                 ["UniEmu:EnableStaticAssetCaching"] = "true",
+                ["UniEmu:DefaultTargetUrl"] = "http://dispatcher.local:9080",
                 ["UniEmu:DispatcherBlockCheckIntervalSeconds"] = "9",
                 ["UniEmu:ScriptExecutionTimeoutSeconds"] = "7",
             })
@@ -35,6 +36,7 @@ public sealed class UniEmuOptionsTests
         Assert.True(options.DisableStaticAssets);
         Assert.True(options.EnableStaticAssetCompression);
         Assert.True(options.EnableStaticAssetCaching);
+        Assert.Equal("http://dispatcher.local:9080", options.DefaultTargetUrl);
         Assert.Equal(9, options.DispatcherBlockCheckIntervalSeconds);
         Assert.Equal(7, options.ScriptExecutionTimeoutSeconds);
     }

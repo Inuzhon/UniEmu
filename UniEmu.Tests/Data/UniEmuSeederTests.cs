@@ -20,6 +20,32 @@ namespace UniEmu.Tests.Data;
 public sealed class UniEmuSeederTests
 {
     [Fact]
+    public async Task SeedAsync_UsesConfiguredDefaultTargetUrl()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<UniEmuDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            await db.Database.MigrateAsync();
+
+            await UniEmuSeeder.SeedAsync(db, defaultTargetUrl: "http://host.docker.internal:8080");
+        }
+
+        await using (var db = new UniEmuDbContext(options))
+        {
+            var emulators = await db.Emulators.ToListAsync();
+
+            Assert.NotEmpty(emulators);
+            Assert.All(emulators, emulator => Assert.Equal("http://host.docker.internal:8080", emulator.TargetUrl));
+        }
+    }
+
+    [Fact]
     public async Task SeedAsync_CreatesIndustrialDemoDataset()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

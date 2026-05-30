@@ -26,7 +26,7 @@ public static class UniEmuApplicationStartup
             await db.Database.MigrateAsync();
 
             if (options.SeedData)
-                await UniEmuSeeder.SeedAsync(db);
+                await UniEmuSeeder.SeedAsync(db, options.DefaultTargetUrl);
 
             if (!options.DisableRuntime)
             {

@@ -17,16 +17,23 @@ import { Label } from '@/components/ui/label';
 import { useUniEmuStore } from '@/store/uniemu-store';
 import { formatNumber, formatUptime } from '@/utils/format';
 import { localization } from '@/localization';
-import { Emulator } from '@/types/uniemu';
 
-const DefaultEmulator = {
+type EmulatorDraft = {
+  name: string;
+  protocolId: string;
+  targetUrl: string;
+  intervalSec: string;
+};
+
+const defaultEmulator = (defaultTargetUrl: string) => ({
   name: '',
-  protocolId: 1,
-  targetUrl: 'http://127.0.0.1:8080',
-  intervalSec: 5,
-} satisfies Partial<Emulator>;
+  protocolId: '1',
+  targetUrl: defaultTargetUrl,
+  intervalSec: '5',
+}) satisfies EmulatorDraft;
 
 export function EmulatorsListPage() {
+  const appSettings = useUniEmuStore((s) => s.appSettings);
   const emulators = useUniEmuStore((s) => s.emulators);
   const toggleStatus = useUniEmuStore((s) => s.toggleStatus);
   const createEmulator = useUniEmuStore((s) => s.createEmulator);
@@ -34,12 +41,17 @@ export function EmulatorsListPage() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'Running' | 'Stopped' | 'Error'>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState(DefaultEmulator);
+  const [form, setForm] = useState(() => defaultEmulator(appSettings.defaultTargetUrl));
+
+  const openCreateDialog = () => {
+    setForm(defaultEmulator(appSettings.defaultTargetUrl));
+    setDialogOpen(true);
+  };
 
   const handleDialogOpenChange = (open: boolean) => {
     setDialogOpen(open);
     if (!open) {
-      setForm(DefaultEmulator);
+      setForm(defaultEmulator(appSettings.defaultTargetUrl));
     }
   };
 
@@ -55,7 +67,7 @@ export function EmulatorsListPage() {
       intervalSec,
     });
     setDialogOpen(false);
-    setForm(DefaultEmulator);
+    setForm(defaultEmulator(appSettings.defaultTargetUrl));
     navigate({ to: '/emulators/$id', params: { id } });
   };
 
@@ -82,7 +94,7 @@ export function EmulatorsListPage() {
             {localization.routes.emulators.components.emulatorsListPage.description}
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setDialogOpen(true)}>
+        <Button className="gap-2" onClick={openCreateDialog}>
           <Plus className="h-4 w-4" />
           {localization.routes.emulators.components.emulatorsListPage.createButtonLabel}
         </Button>
