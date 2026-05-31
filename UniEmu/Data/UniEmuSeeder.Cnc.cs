@@ -21,8 +21,8 @@ public static partial class UniEmuSeeder
             new CncSeedSpec(
                 Id: "em-2ad967c1d",
                 Name: "Фрезерный центр VMC 650",
-                ProtocolId: 41,
-                IntervalSec: 1,
+                ProtocolId: 2,
+                IntervalSec: DEFAULT_INTERVAL,
                 TotalRequests: 0,
                 ProgramName: "VMC650_MAIN.NC",
                 Model: "Fanuc 0i-MF Plus",
@@ -51,8 +51,8 @@ public static partial class UniEmuSeeder
             new CncSeedSpec(
                 Id: "em-332847e64",
                 Name: "Токарный станок Turn 200",
-                ProtocolId: 42,
-                IntervalSec: 1,
+                ProtocolId: 3,
+                IntervalSec: DEFAULT_INTERVAL,
                 TotalRequests: 0,
                 ProgramName: "LATHE200_MAIN.NC",
                 Model: "Siemens SINUMERIK 828D",
@@ -81,7 +81,7 @@ public static partial class UniEmuSeeder
             new CncSeedSpec(
                 Id: "em-1426dc9ea",
                 Name: "Портальный фрезерный станок",
-                ProtocolId: 43,
+                ProtocolId: 1,
                 IntervalSec: 2,
                 TotalRequests: 0,
                 ProgramName: "ROUTER03_NESTING.NC",

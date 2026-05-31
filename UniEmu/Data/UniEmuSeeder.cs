@@ -12,6 +12,8 @@ namespace UniEmu.Data;
 /// </summary>
 public static partial class UniEmuSeeder
 {
+    private const int DEFAULT_INTERVAL = 5;
+
     /// <summary>
     /// Заполняет пустую базу промышленными эмуляторами, тегами, сценариями, генераторами, скриптами и событиями.
     /// </summary>

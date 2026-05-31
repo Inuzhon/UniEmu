@@ -22,7 +22,7 @@ public static partial class UniEmuSeeder
                 Id: "em-b6f42a901",
                 Name: "Смесительный реактор BR-101",
                 ProtocolId: 51,
-                IntervalSec: 1,
+                IntervalSec: DEFAULT_INTERVAL,
                 TotalRequests: 0,
                 UnitName: "BR-101",
                 Area: "Synthesis",

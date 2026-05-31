@@ -22,7 +22,7 @@ public static partial class UniEmuSeeder
                 Id: "em-legacy-oven1",
                 Name: "Индустриальная печь Oven1",
                 ProtocolId: 13,
-                IntervalSec: 1,
+                IntervalSec: DEFAULT_INTERVAL,
                 ProgramName: "O7735.nc"),
         ];
     }
